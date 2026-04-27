@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Env (contains keys – do not commit)
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+
+# Web research outputs
+.firecrawl/
+
+# Supabase local
+supabase/.temp/
+
+# Editor / OS
+.DS_Store
+*.log
+.vercel
+
+# Local bulk / supplier files (kept on disk, not in git)
+product-images/
+product-images-extracted/
+demo-videos/
+Accessories*/
+Emuca*/
+/Paint grade mouldings technical paint spec/
+*.xlsx
+*.tsbuildinfo
+
+# Ad-hoc docs dropped in repo root
+What are kitchen corner posts*.docx

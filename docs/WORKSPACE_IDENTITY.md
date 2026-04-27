@@ -53,11 +53,20 @@ Create folders if needed. **Do not** commit these files (they are outside the re
 
 ### 4. `npx supabase link` in each project root
 
-With the right token in the environment (new terminal in this repo), run:
+**If the Supabase CLI is logged in as the same account that owns the project:** with the right token in the environment (new terminal in this repo), run:
 
 ```powershell
 npx supabase link --project-ref jhmepthfxnpmwpjobumj
 ```
+
+**If the CLI was tied to a different org** (e.g. only the Trade Mouldings org appears in `npx supabase projects list`):
+
+1. Log out: `npx supabase logout` (confirm with `y`), then `npx supabase login` with the **Lamtek** account, **or**
+2. Create `%USERPROFILE%\.config\lamtek\supabase-access-token` (one line = [access token](https://supabase.com/dashboard/account/tokens) from the **Lamtek** account), then from the repo root run:
+
+   ```powershell
+   npm run supabase:link:token
+   ```
 
 Trade Mouldings (other repo) should link to its own project ref when you use that workspace’s terminal (different token if different account).
 

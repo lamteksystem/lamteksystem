@@ -1,0 +1,11 @@
+{
+  "label": "My project",
+  "ghUser": "your-github-username-for-gh-cli",
+  "supabaseTokenFile": ".config/yourname/supabase-access-token",
+  "chrome": {
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "profileName": "Readable name",
+    "profileDirectory": "Profile 1",
+    "openUrls": ["https://github.com/"]
+  }
+}

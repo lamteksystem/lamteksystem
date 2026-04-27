@@ -1,0 +1,11 @@
+---
+description: Per-workspace GitHub and Supabase identity for Lamtek
+globs:
+alwaysApply: true
+---
+
+# Lamtek workspace context
+
+- The integrated terminal is configured in `.vscode/settings.json` to run `scripts/activate-workspace-context.ps1` on startup. That switches **GitHub CLI** to `ghUser` in `scripts/identity.config.json` and sets **SUPABASE_ACCESS_TOKEN** from the file path in that JSON.
+- For **Chrome**, use the profile whose directory name is in `identity.config.json` → `chrome.profileDirectory` (see `chrome://version` in that profile). Optional: run `. ./scripts/activate-workspace-context.ps1 -LaunchChrome` to open dashboard URLs in that profile.
+- Do not assume the Trade Mouldings account: this folder is **Lamtek** only. When the user works in `TradeMouldings`, that repo’s script switches identity back.

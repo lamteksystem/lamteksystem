@@ -32,3 +32,6 @@ Emuca*/
 
 # Ad-hoc docs dropped in repo root
 What are kitchen corner posts*.docx
+
+# Optional local override for scripts/identity.config.json (untracked)
+scripts/identity.config.local.json

@@ -1,0 +1,15 @@
+{
+  "terminal.integrated.profiles.windows": {
+    "Lamtek (gh + Supabase)": {
+      "path": "C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe",
+      "args": [
+        "-NoExit",
+        "-NoProfile",
+        "-Command",
+        ". \"${workspaceFolder}/scripts/activate-workspace-context.ps1\""
+      ],
+      "icon": "terminal-powershell"
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "Lamtek (gh + Supabase)"
+}

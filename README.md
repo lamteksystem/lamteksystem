@@ -171,6 +171,7 @@ Right after migrations, the **products** table is empty (or has only what’s in
 
 - **Repository:** [github.com/lamteksystem/lamteksystem](https://github.com/lamteksystem/lamteksystem) · org: [github.com/lamteksystem](https://github.com/lamteksystem)
 - **First-time GitHub + Supabase:** [docs/SETUP_GITHUB_AND_SUPABASE.md](docs/SETUP_GITHUB_AND_SUPABASE.md) (push access and DB migrations)
+- **Multiple accounts on one PC (Lamtek vs Trade Mouldings):** [docs/WORKSPACE_IDENTITY.md](docs/WORKSPACE_IDENTITY.md) — this repo’s terminal auto-switches `gh` + Supabase token; set Chrome profile in `scripts/identity.config.json`
 - **Supabase (Lamtek):** [Dashboard](https://supabase.com/dashboard/project/jhmepthfxnpmwpjobumj) — set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env` (this Vite app does **not** use `NEXT_PUBLIC_*`).
 - **App URL:** http://localhost:5173 (after `npm run dev`).
 - **Staff backend:** http://localhost:5173/admin (log in with a staff/admin user).

@@ -1,0 +1,14 @@
+{
+  "label": "Lamtek",
+  "ghUser": "lamteksystem",
+  "supabaseTokenFile": ".config/lamtek/supabase-access-token",
+  "chrome": {
+    "exePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "profileName": "Lamtek (rename in chrome://version if needed)",
+    "profileDirectory": "Default",
+    "openUrls": [
+      "https://github.com/lamteksystem/lamteksystem",
+      "https://supabase.com/dashboard/project/jhmepthfxnpmwpjobumj"
+    ]
+  }
+}

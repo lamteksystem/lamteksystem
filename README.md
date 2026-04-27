@@ -170,6 +170,7 @@ Right after migrations, the **products** table is empty (or has only what’s in
 ## Quick reference
 
 - **Repository:** [github.com/lamteksystem/lamteksystem](https://github.com/lamteksystem/lamteksystem) · org: [github.com/lamteksystem](https://github.com/lamteksystem)
+- **First-time GitHub + Supabase:** [docs/SETUP_GITHUB_AND_SUPABASE.md](docs/SETUP_GITHUB_AND_SUPABASE.md) (push access and DB migrations)
 - **Supabase (Lamtek):** [Dashboard](https://supabase.com/dashboard/project/jhmepthfxnpmwpjobumj) — set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env` (this Vite app does **not** use `NEXT_PUBLIC_*`).
 - **App URL:** http://localhost:5173 (after `npm run dev`).
 - **Staff backend:** http://localhost:5173/admin (log in with a staff/admin user).

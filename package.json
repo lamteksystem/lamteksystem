@@ -23,6 +23,7 @@
     "supabase:link": "npx supabase link --project-ref jhmepthfxnpmwpjobumj",
     "supabase:push": "npx supabase db push",
     "db:migrate": "npx supabase db push",
+    "db:push:remote": "node --env-file=.env scripts/push-migrations.mjs",
     "supabase:status": "npx supabase status",
     "seed": "node --env-file=.env scripts/run-seed.js",
     "create-demo-orders": "node --env-file=.env scripts/create-demo-orders.js",

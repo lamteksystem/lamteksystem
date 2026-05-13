@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useStaff } from '@/hooks/useStaff'
 import BrandLogo from '@/components/BrandLogo'
+import { withBasePath } from '@/lib/basePath'
 
 const DEMO_CUSTOMER_EMAIL = 'demo@lamtek.co.uk'
 const DEMO_CUSTOMER_PASSWORD = 'Demo123!'
@@ -78,7 +79,7 @@ export default function AdminLogin() {
       setError('Enter your staff email first, then use Resend confirmation.')
       return
     }
-    const redirectTo = `${window.location.origin}/admin/login`
+    const redirectTo = `${window.location.origin}${withBasePath('/admin/login')}`
     const { error: resendErr } = await supabase.auth.resend({
       type: 'signup',
       email,
@@ -143,6 +144,9 @@ export default function AdminLogin() {
             </button>
           </div>
         </form>
+        <p className="login-footer">
+          <Link to="/forgot-password">Forgot password?</Link>
+        </p>
         <p className="login-footer">
           <Link to="/login">Customer login</Link>
           {' · '}

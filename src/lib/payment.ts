@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { withBasePath } from '@/lib/basePath'
 
 /**
  * Create a Stripe Checkout Session for the order and redirect to Stripe.
@@ -6,8 +7,8 @@ import { supabase } from '@/lib/supabase'
  */
 export async function redirectToCheckout(orderId: string, amountIncVat: number): Promise<{ error?: string }> {
   const origin = window.location.origin
-  const successUrl = `${origin}/account/orders/${orderId}?payment=success`
-  const cancelUrl = `${origin}/account/orders/${orderId}?payment=cancelled`
+  const successUrl = `${origin}${withBasePath(`/account/orders/${orderId}`)}?payment=success`
+  const cancelUrl = `${origin}${withBasePath(`/account/orders/${orderId}`)}?payment=cancelled`
   const amountPence = Math.round(amountIncVat * 100)
   if (amountPence < 50) {
     return { error: 'Amount must be at least £0.50' }

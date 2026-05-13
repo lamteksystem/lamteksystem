@@ -6,6 +6,8 @@ import Layout from '@/components/Layout'
 import AdminLayout from '@/components/AdminLayout'
 import MtoLayout from '@/components/MtoLayout'
 import Login from '@/pages/Login'
+import ForgotPassword from '@/pages/ForgotPassword'
+import ResetPassword from '@/pages/ResetPassword'
 import Dashboard from '@/pages/Dashboard'
 import Downloads from '@/pages/Downloads'
 import Ordering from '@/pages/Ordering'
@@ -128,6 +130,8 @@ export default function App() {
       <Route path="/site/lamtek-complete-uk" element={<MarketingLamtekCompleteCoUkHubPage />} />
       <Route path="/site/tealbury-uk" element={<MarketingTealburyCoUkHubPage />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route
         path="/"

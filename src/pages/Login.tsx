@@ -132,6 +132,9 @@ export default function Login() {
           </button>
         </form>
         <p className="login-footer">
+          <Link to="/forgot-password">Forgot password?</Link>
+        </p>
+        <p className="login-footer">
           Need access? <a href="mailto:info@lamtek.co.uk">Contact Lamtek</a>.
         </p>
         <div className="login-staff-section">

@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { redirectToCheckout, verifyCheckoutSession } from '@/lib/payment'
 import { useEffectiveUserId } from '@/contexts/ImpersonationContext'
 import type { OrderRow, LocationRow } from '@/types/database'
+import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
 import { trackingUrl } from '@/lib/tracking'
 import { useDraftOrder } from '@/hooks/useDraftOrder'
 import { recalcOrderTotals } from '@/lib/orders'
@@ -199,11 +200,12 @@ export default function OrderDetail() {
     )
   }
 
-  const orderLabel = order.reference || `Order ${order.id.slice(0, 8)}`
+  const orderHeading =
+    order.reference?.trim() ? `Order ${order.reference.trim()}` : formatOrderReferenceOrFallback(order)
 
   return (
     <div className="account-page order-detail-page">
-      <PageNav breadcrumb={[{ to: '/account', label: 'My account' }, { label: orderLabel }]} />
+      <PageNav breadcrumb={[{ to: '/account', label: 'My account' }, { label: orderHeading }]} />
 
       {paymentMessage === 'success' && (
         <div className="order-payment-banner order-payment-banner--success">
@@ -228,7 +230,7 @@ export default function OrderDetail() {
       )}
 
       <div className="card order-detail-card">
-        <h1>Order {order.reference || order.id.slice(0, 8)}</h1>
+        <h1>{orderHeading}</h1>
         <p className="order-detail-meta">
           <span className={`order-status order-status-${order.status}`}>
             {STATUS_LABELS[order.status] ?? order.status}
@@ -345,9 +347,9 @@ export default function OrderDetail() {
                 ) : null}
               </p>
             ) : order.collection_location_id ? (
-              <p className="muted">Collection depot (loading…)</p>
+              <p className="muted">Collection point (loading…)</p>
             ) : (
-              <p className="muted">No depot selected on this order.</p>
+              <p className="muted">No collection point selected on this order.</p>
             )}
             {order.collection_ready_at && (
               <p>

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { useDraftOrder } from '@/hooks/useDraftOrder'
 import { useMtoCartRefresh } from '@/components/MtoLayout'
 import { recalcOrderTotals } from '@/lib/orders'
 import type { ProductRow } from '@/types/database'
 
-/** Static list when no Mouldings category exists in DB (from reference: Arched Pelmet, Bullnose, Canopy, Cornice, etc.) */
+/** Fallback when no trims/pelmet category exists in DB (pelmets, cornice, canopy, etc.). */
 const FALLBACK_MOULDINGS = [
   { description: 'Arched Pelmet', details: 'Up to 2500 x 200 x 18 (300mm ends)', price: 51.73, sku: 'MOLD-ARCH-PELMET' },
   { description: 'Bullnose Square Modern 50 x 30 x 3050', details: '50 x 30', price: 21.62, sku: 'MOLD-BULL-50' },
@@ -44,6 +45,7 @@ export default function MtoMouldingsAccessories() {
           .from('products')
           .select('*')
           .eq('category_id', cat.id)
+          .eq('catalog_program', CATALOG_PROGRAM.LAMTEK)
           .eq('active', true)
           .order('sort_order')
           .order('name')
@@ -103,7 +105,7 @@ export default function MtoMouldingsAccessories() {
   if (useFallback) {
     return (
       <div className="mto-config card">
-        <h1 className="mto-config-title">Mouldings & Accessories</h1>
+        <h1 className="mto-config-title">Trims, pelmets &amp; accessories</h1>
         <p className="mto-config-meta">
           Range: {rangeName} · Colour: {colour}
         </p>
@@ -146,7 +148,7 @@ export default function MtoMouldingsAccessories() {
   if (products.length === 0 && !useFallback) {
     return (
       <div className="mto-config card">
-        <h1 className="mto-config-title">Mouldings & Accessories</h1>
+        <h1 className="mto-config-title">Trims, pelmets &amp; accessories</h1>
         <p className="mto-config-meta">Loading…</p>
       </div>
     )
@@ -154,7 +156,7 @@ export default function MtoMouldingsAccessories() {
 
   return (
     <div className="mto-config card">
-      <h1 className="mto-config-title">Mouldings & Accessories</h1>
+      <h1 className="mto-config-title">Trims, pelmets &amp; accessories</h1>
       <p className="mto-config-meta">
         Range: {rangeName} · Colour: {colour}
       </p>

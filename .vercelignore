@@ -1,4 +1,4 @@
-node_modules
+﻿node_modules
 dist
 .git
 .cursor
@@ -13,7 +13,6 @@ Emuca Wine Racks
 Paint grade mouldings technical paint spec
 product-images-extracted
 What are kitchen corner posts and why are they needed.docx
-Napwood Construction Price List From Trade Mouldings.xlsx
 *.pdf
 *.doc
 *.docx
@@ -23,3 +22,4 @@ Napwood Construction Price List From Trade Mouldings.xlsx
 *.JPG
 *.jpg
 *.jpeg
+

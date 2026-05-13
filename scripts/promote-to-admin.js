@@ -1,6 +1,6 @@
 /**
  * Promote an existing user to admin by adding/updating their staff_profiles row.
- * Use this to make trademouldingsltd@gmail.com (or any existing account) an admin.
+ * Use this to make lamteksystem@gmail.com (or any existing account) an admin.
  * Run: npm run promote-to-admin
  * (with SUPABASE_SERVICE_ROLE_KEY and PROMOTE_EMAIL set in .env)
  */
@@ -9,8 +9,8 @@ import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-const PROMOTE_EMAIL = process.env.PROMOTE_EMAIL || 'trademouldingsltd@gmail.com'
-const DISPLAY_NAME = process.env.PROMOTE_DISPLAY_NAME || 'Trade Mouldings Admin'
+const PROMOTE_EMAIL = process.env.PROMOTE_EMAIL || 'lamteksystem@gmail.com'
+const DISPLAY_NAME = process.env.PROMOTE_DISPLAY_NAME || 'Lamtek Admin'
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (e.g. in .env).')
@@ -38,10 +38,11 @@ async function main() {
     console.error('staff_profiles upsert failed:', error.message)
     process.exit(1)
   }
-  console.log('Done. User', PROMOTE_EMAIL, 'is now an admin. Sign in at /login and you’ll be redirected to /admin.')
+  console.log('Done. User', PROMOTE_EMAIL, 'is now an admin. Sign in at /login and youâ€™ll be redirected to /admin.')
 }
 
 main().catch((err) => {
   console.error(err)
   process.exit(1)
 })
+

@@ -23,6 +23,10 @@ import {
   londonYmd,
   validateDeliverySelection,
 } from '@/lib/deliveryWindows'
+import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
+import { lamtekPortalLocations } from '@/lib/lamtekLocations'
+import { recalcOrderTotals } from '@/lib/orders'
+import { VAT_RATE } from '@/lib/tax'
 
 interface LineWithDetails {
   id: string
@@ -145,6 +149,19 @@ export default function OrderCart() {
       .catch(() => setDeliveryWindows([]))
   }, [])
 
+  const collectionLocations = useMemo(() => lamtekPortalLocations(locations), [locations])
+
+  useEffect(() => {
+    if (!draftOrder?.id) return
+    if (!collectionLocationId) return
+    if (collectionLocations.some((l) => l.id === collectionLocationId)) return
+    setCollectionLocationId('')
+    void supabase
+      .from('orders')
+      .update({ collection_location_id: null, updated_at: new Date().toISOString() })
+      .eq('id', draftOrder.id)
+  }, [collectionLocations, collectionLocationId, draftOrder?.id])
+
   useEffect(() => {
     if (!effectiveUserId) return
     supabase
@@ -256,7 +273,7 @@ export default function OrderCart() {
   function validateBeforeSubmit(): boolean {
     if (!draftOrder?.id || lines.length === 0) return false
     if (fulfillmentMethod === 'collect' && !collectionLocationId) {
-      setFormError('Choose a collection depot to continue.')
+      setFormError('Choose a collection point to continue.')
       fulfillmentCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       return false
     }
@@ -308,36 +325,23 @@ export default function OrderCart() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deliverySameAsBilling, fulfillmentMethod, profile?.billing_address, profile?.billing_city, profile?.billing_postcode, profile?.contact_name, profile?.company_name, profile?.phone, profile?.email_override, draftOrder?.id])
 
-  async function updateQuantity(lineId: string, delta: number) {
-    const line = lines.find((l) => l.id === lineId)
-    if (!line || !draftOrder) return
-    const newQty = Math.max(0, line.quantity + delta)
-    if (newQty === 0) {
-      await supabase.from('order_lines').delete().eq('id', lineId)
-    } else {
-      await supabase.from('order_lines').update({ quantity: newQty }).eq('id', lineId)
-    }
-    await recalcTotals()
-  }
-
-  async function setExactQuantity(lineId: string, nextQty: number) {
-    const qty = Math.max(0, Math.floor(nextQty))
+  function applyOptimisticLineQuantity(lineId: string, qty: number) {
+    setQtyDraftByLineId((prev) => {
+      if (qty === 0) {
+        const { [lineId]: _removed, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [lineId]: String(qty) }
+    })
     if (qty === 0) {
-      await supabase.from('order_lines').delete().eq('id', lineId)
+      setLines((prev) => prev.filter((l) => l.id !== lineId))
     } else {
-      await supabase.from('order_lines').update({ quantity: qty }).eq('id', lineId)
+      setLines((prev) => prev.map((l) => (l.id === lineId ? { ...l, quantity: qty } : l)))
     }
-    await recalcTotals()
   }
 
-  async function removeLine(lineId: string) {
-    await setExactQuantity(lineId, 0)
-  }
-
-  async function recalcTotals() {
-    if (!draftOrder?.id || !effectiveUserId) return
-    await repriceDraftOrderLinesForCustomer({ orderId: draftOrder.id, customerUserId: effectiveUserId })
-    await refresh()
+  async function reloadCartLinesFromServer() {
+    if (!draftOrder?.id) return
     const { data } = await supabase
       .from('order_lines')
       .select('id, quantity, unit_price, product_snapshot, product_id, product:products(name, sku, category_id)')
@@ -347,6 +351,70 @@ export default function OrderCart() {
       product: Array.isArray(r.product) ? (r.product[0] ?? null) : (r.product ?? null),
     })) as LineWithDetails[]
     setLines(list)
+    setQtyDraftByLineId(Object.fromEntries(list.map((l) => [l.id, String(l.quantity)])))
+  }
+
+  /** Full repricing + sync — use before submit / clear cart / initial pricing pass. */
+  async function recalcTotals() {
+    if (!draftOrder?.id || !effectiveUserId) return
+    await repriceDraftOrderLinesForCustomer({ orderId: draftOrder.id, customerUserId: effectiveUserId })
+    await refresh()
+    await reloadCartLinesFromServer()
+  }
+
+  /** Quantity change: instant UI, persist qty + order totals quickly; repricing runs in background (tier rules may adjust unit prices). */
+  async function finalizeQuantityChangeAfterPersist() {
+    if (!draftOrder?.id || !effectiveUserId) return
+    await recalcOrderTotals(draftOrder.id)
+    void refresh()
+    void (async () => {
+      try {
+        await repriceDraftOrderLinesForCustomer({ orderId: draftOrder.id, customerUserId: effectiveUserId })
+        await refresh()
+        await reloadCartLinesFromServer()
+      } catch {
+        await reloadCartLinesFromServer()
+      }
+    })()
+  }
+
+  async function updateQuantity(lineId: string, delta: number) {
+    const line = lines.find((l) => l.id === lineId)
+    if (!line || !draftOrder) return
+    const draftStr = qtyDraftByLineId[lineId]
+    const parsedDraft = draftStr !== undefined && /^\d+$/.test(draftStr) ? Number(draftStr) : null
+    const baseQty = parsedDraft !== null ? parsedDraft : line.quantity
+    const newQty = Math.max(0, baseQty + delta)
+    applyOptimisticLineQuantity(lineId, newQty)
+    try {
+      if (newQty === 0) {
+        await supabase.from('order_lines').delete().eq('id', lineId)
+      } else {
+        await supabase.from('order_lines').update({ quantity: newQty }).eq('id', lineId)
+      }
+      await finalizeQuantityChangeAfterPersist()
+    } catch {
+      await reloadCartLinesFromServer()
+    }
+  }
+
+  async function setExactQuantity(lineId: string, nextQty: number) {
+    const qty = Math.max(0, Math.floor(nextQty))
+    applyOptimisticLineQuantity(lineId, qty)
+    try {
+      if (qty === 0) {
+        await supabase.from('order_lines').delete().eq('id', lineId)
+      } else {
+        await supabase.from('order_lines').update({ quantity: qty }).eq('id', lineId)
+      }
+      await finalizeQuantityChangeAfterPersist()
+    } catch {
+      await reloadCartLinesFromServer()
+    }
+  }
+
+  async function removeLine(lineId: string) {
+    await setExactQuantity(lineId, 0)
   }
 
   async function saveQuotation() {
@@ -416,21 +484,28 @@ export default function OrderCart() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftOrder?.id, effectiveUserId])
 
+  const totalExVat = useMemo(() => {
+    if (lines.length > 0) {
+      return lines.reduce((s, l) => s + l.quantity * Number(l.unit_price), 0)
+    }
+    return draftOrder ? Number(draftOrder.total_ex_vat) : 0
+  }, [lines, draftOrder])
+
+  const totalIncVat = useMemo(() => totalExVat * VAT_RATE, [totalExVat])
+
   if (!draftOrder && !loading) {
     return (
       <div className="order-cart-page">
-        <PageNav backTo="/ordering" backLabel="Create order" />
+        <PageNav backTo="/ordering/start" backLabel="Create order" />
         <div className="cart-empty-state card">
           <h1>Your cart is empty</h1>
           <p>Add products from Create order to build an estimate or place an order.</p>
-          <Link to="/ordering" className="btn">Go to Create order</Link>
+          <Link to="/ordering/start" className="btn">Go to Create order</Link>
         </div>
       </div>
     )
   }
 
-  const totalExVat = draftOrder ? Number(draftOrder.total_ex_vat) : 0
-  const totalIncVat = draftOrder ? Number(draftOrder.total_inc_vat) : 0
   const busy = !!action
   const checklist: ChecklistGroup[] =
     draftOrder?.id
@@ -471,16 +546,13 @@ export default function OrderCart() {
 
   return (
     <div className="order-cart-page">
-      <PageNav backTo="/ordering" backLabel="Create order" />
+      <PageNav backTo="/ordering/start" backLabel="Create order" />
       <div className="cart-page-header">
         <h1>Order cart</h1>
         <p className="page-intro">Review your items, then save as a quotation or place your order.</p>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.5rem' }}>
           <Link to={continueShoppingHref} className="btn btn-outline btn-small">
             ← Continue shopping
-          </Link>
-          <Link to="/ordering?flow=guided" className="btn btn-ghost btn-small">
-            Guided setup
           </Link>
           <label style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
             <span className="admin-muted" style={{ fontSize: '0.9rem' }}>Basket</span>
@@ -492,7 +564,7 @@ export default function OrderCart() {
               {draftOrders.length === 0 ? <option value="">(none)</option> : null}
               {draftOrders.map((o) => (
                 <option key={o.id} value={o.id}>
-                  {(o.reference?.trim() || o.id.slice(0, 8))} · updated {new Date(o.updated_at).toLocaleDateString()}
+                  {formatOrderReferenceOrFallback(o)} · updated {new Date(o.updated_at).toLocaleDateString()}
                 </option>
               ))}
             </select>
@@ -521,7 +593,7 @@ export default function OrderCart() {
             <div className="card cart-list-card">
               <h2 className="cart-list-title">1) Items ({lines.length})</h2>
               {lines.length === 0 ? (
-                <p className="cart-no-items">No items yet. <Link to="/ordering">Add products</Link> from Create order.</p>
+                <p className="cart-no-items">No items yet. <Link to="/ordering/start">Add products</Link> from Create order.</p>
               ) : (
                 <ul className="cart-lines">
                   {lines.map((line) => (
@@ -594,8 +666,8 @@ export default function OrderCart() {
                 <h2 style={{ marginTop: 0 }}>2) Delivery or collection</h2>
                 <p className="admin-muted" style={{ marginTop: 0 }}>
                   {fulfillmentMethod === 'collect'
-                    ? 'Choose where to collect. Add a contact for order updates (can differ from billing).'
-                    : 'Add a delivery contact (can be different from the billing/company contact).'}
+                    ? 'Choose where to collect (Lamtek Group collection points — from your configured sites). Add a contact for order updates.'
+                    : 'Delivery to your address or site. Add a delivery contact if it differs from the billing/company contact.'}
                 </p>
                 {formError && (
                   <div className="order-payment-banner order-payment-banner--error" style={{ marginBottom: '0.75rem' }}>
@@ -642,7 +714,7 @@ export default function OrderCart() {
 
                 {fulfillmentMethod === 'collect' && (
                   <>
-                    <label>Collection depot</label>
+                    <label>Collection point</label>
                     <select
                       value={collectionLocationId}
                       onChange={async (e) => {
@@ -651,10 +723,10 @@ export default function OrderCart() {
                         setFormError(null)
                         await persistDeliveryPatch({ collection_location_id: v || null })
                       }}
-                      aria-label="Collection depot"
+                      aria-label="Collection point"
                     >
-                      <option value="">— Select depot —</option>
-                      {locations.map((l) => (
+                      <option value="">— Select collection point —</option>
+                      {collectionLocations.map((l) => (
                         <option key={l.id} value={l.id}>
                           {l.code ? `${l.code} — ` : ''}{l.name}
                         </option>
@@ -780,9 +852,9 @@ export default function OrderCart() {
                   </>
                 )}
 
-                <h3 style={{ margin: '0.75rem 0 0.25rem' }}>{fulfillmentMethod === 'collect' ? 'Contact' : 'Delivery contact'}</h3>
-                <div className="admin-inline-form" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <label style={{ minWidth: 240 }}>
+                <h3 className="cart-delivery-contact-heading">{fulfillmentMethod === 'collect' ? 'Contact' : 'Delivery contact'}</h3>
+                <div className="cart-delivery-contact-grid">
+                  <label className="cart-delivery-field">
                     Name
                     <input
                       value={deliveryContactName}
@@ -791,7 +863,7 @@ export default function OrderCart() {
                       placeholder="Contact name"
                     />
                   </label>
-                  <label style={{ minWidth: 200 }}>
+                  <label className="cart-delivery-field">
                     Phone
                     <input
                       value={deliveryContactPhone}
@@ -800,7 +872,7 @@ export default function OrderCart() {
                       placeholder="Contact phone"
                     />
                   </label>
-                  <label style={{ minWidth: 280, flex: 1 }}>
+                  <label className="cart-delivery-field">
                     Email
                     <input
                       value={deliveryContactEmail}
@@ -810,23 +882,28 @@ export default function OrderCart() {
                     />
                   </label>
                 </div>
-                <label>Contact notes</label>
-                <textarea
-                  value={deliveryContactNotes}
-                  onChange={(e) => setDeliveryContactNotes(e.target.value)}
-                  onBlur={() => persistDeliveryPatch({ delivery_contact_notes: deliveryContactNotes.trim() || null })}
-                  rows={2}
-                  placeholder="e.g. call before delivery, access notes"
-                />
-
-                <label>{fulfillmentMethod === 'collect' ? 'Notes for your order' : 'Delivery notes'}</label>
-                <textarea
-                  value={deliveryNotes}
-                  onChange={(e) => setDeliveryNotes(e.target.value)}
-                  onBlur={() => persistDeliveryPatch({ delivery_notes: deliveryNotes.trim() || null })}
-                  rows={2}
-                  placeholder={fulfillmentMethod === 'collect' ? 'Any notes for staff' : 'Notes for delivery'}
-                />
+                <div className="cart-delivery-textareas-grid">
+                  <label className="cart-delivery-textarea-wrap">
+                    Contact notes
+                    <textarea
+                      value={deliveryContactNotes}
+                      onChange={(e) => setDeliveryContactNotes(e.target.value)}
+                      onBlur={() => persistDeliveryPatch({ delivery_contact_notes: deliveryContactNotes.trim() || null })}
+                      rows={3}
+                      placeholder="e.g. call before delivery, access notes"
+                    />
+                  </label>
+                  <label className="cart-delivery-textarea-wrap">
+                    {fulfillmentMethod === 'collect' ? 'Notes for your order' : 'Delivery notes'}
+                    <textarea
+                      value={deliveryNotes}
+                      onChange={(e) => setDeliveryNotes(e.target.value)}
+                      onBlur={() => persistDeliveryPatch({ delivery_notes: deliveryNotes.trim() || null })}
+                      rows={3}
+                      placeholder={fulfillmentMethod === 'collect' ? 'Any notes for staff' : 'Notes for delivery'}
+                    />
+                  </label>
+                </div>
               </div>
             )}
           </div>
@@ -860,7 +937,7 @@ export default function OrderCart() {
                     <span className="admin-report-list-label">
                       {readinessChecks.fulfillmentOk ? '✓' : '•'}{' '}
                       {fulfillmentMethod === 'collect'
-                        ? 'Collection depot selected'
+                        ? 'Collection point selected'
                         : needsDeliveryWindow
                           ? 'Delivery date & window'
                           : 'Delivery / collection chosen'}
@@ -925,7 +1002,7 @@ export default function OrderCart() {
                 <p className="cart-action-hint">Request a formal quote without committing.</p>
                 {!canSubmit && fulfillmentMethod === 'collect' && (
                   <p className="cart-action-hint" style={{ color: 'var(--danger, #b00020)' }}>
-                    Choose a collection depot to continue.
+                    Choose a collection point to continue.
                   </p>
                 )}
                 {!canSubmit && fulfillmentMethod === 'delivery' && needsDeliveryWindow && (

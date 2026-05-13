@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { getDocumentUrls } from '@/lib/documents'
@@ -28,6 +29,10 @@ const MEASUREMENT_KEYS = new Set([
   'dimensions', 'size', 'measurements',
 ])
 
+function isInternalPricelistKey(k: string): boolean {
+  return k.startsWith('lamtek_') || k.startsWith('tealbury_')
+}
+
 interface AssemblyWithName {
   id: string
   name: string
@@ -50,9 +55,16 @@ export default function ProductDetailModal({
   onSelectProduct,
   onAddToCart,
 }: ProductDetailModalProps) {
+  const backdropElRef = useRef<HTMLDivElement | null>(null)
   const modalRef = useRef<HTMLDivElement | null>(null)
   const closeBtnRef = useRef<HTMLButtonElement | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  /** Ignore backdrop dismiss briefly so stray pointer events cannot close immediately after mount. */
+  const backdropDismissReadyAtRef = useRef(0)
+  /** True only after primary pointer pressed down on backdrop (not on card then released on backdrop — that must not dismiss). */
+  const pointerBackdropPrimedRef = useRef(false)
   const [assemblies, setAssemblies] = useState<AssemblyWithName[]>([])
   const [technicalDocs, setTechnicalDocs] = useState<DocumentRow[]>([])
   const [otherDocs, setOtherDocs] = useState<DocumentRow[]>([])
@@ -68,7 +80,7 @@ export default function ProductDetailModal({
   const allOptionsList = Object.entries(options).filter(
     ([k, v]) => k !== 'components' && v != null && String(v).trim() !== ''
   ) as [string, string][]
-  const optionsList = allOptionsList.filter(([k]) => !MEASUREMENT_KEYS.has(k))
+  const optionsList = allOptionsList.filter(([k]) => !MEASUREMENT_KEYS.has(k) && !isInternalPricelistKey(k))
   const measurementsList = allOptionsList.filter(([k]) => MEASUREMENT_KEYS.has(k))
   const componentsFromOptions = Array.isArray(options.components)
     ? (options.components as string[])
@@ -136,6 +148,11 @@ export default function ProductDetailModal({
     return supabase.storage.from('documents').getPublicUrl(row.file_path).data.publicUrl
   }
 
+  useLayoutEffect(() => {
+    // Long window + mousedown suppression: opening click/pointer can otherwise land on the backdrop as a ghost click.
+    backdropDismissReadyAtRef.current = performance.now() + 750
+  }, [])
+
   useEffect(() => {
     returnFocusRef.current = (document.activeElement as HTMLElement | null) ?? null
     window.setTimeout(() => closeBtnRef.current?.focus(), 0)
@@ -143,7 +160,7 @@ export default function ProductDetailModal({
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        onClose()
+        if (!e.repeat) onCloseRef.current()
         return
       }
       if (e.key !== 'Tab') return
@@ -175,14 +192,29 @@ export default function ProductDetailModal({
     return () => {
       document.removeEventListener('keydown', handleKey)
       document.body.style.overflow = ''
-      returnFocusRef.current?.focus?.()
+      // Defer: avoids Strict Mode double-mount + focus churn firing odd follow-up activation in some browsers.
+      window.requestAnimationFrame(() => {
+        returnFocusRef.current?.focus?.()
+      })
     }
-  }, [onClose])
+  }, [])
 
   useEffect(() => {
     setQuantity(1)
     setAdding(false)
   }, [product.id])
+
+  /** If primed dismiss on backdrop but pointer released over the dialog (same overlay), abandon — otherwise primed leaks. */
+  useEffect(() => {
+    function clearPrimedUnlessBackdropSurface(ev: PointerEvent) {
+      if (!pointerBackdropPrimedRef.current) return
+      const back = backdropElRef.current
+      if (!back) return
+      if (ev.target !== back) pointerBackdropPrimedRef.current = false
+    }
+    document.addEventListener('pointerup', clearPrimedUnlessBackdropSurface, true)
+    return () => document.removeEventListener('pointerup', clearPrimedUnlessBackdropSurface, true)
+  }, [])
 
   const modalTitleId = useMemo(() => `product-modal-title-${product.id}`, [product.id])
 
@@ -199,13 +231,42 @@ export default function ProductDetailModal({
     }
   }
 
-  return (
+  function shouldIgnoreBackdropDismiss(): boolean {
+    return performance.now() < backdropDismissReadyAtRef.current
+  }
+
+  function handleBackdropPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    pointerBackdropPrimedRef.current = false
+    if (e.button !== 0) return
+    if (e.target !== e.currentTarget) return
+    if (shouldIgnoreBackdropDismiss()) return
+    pointerBackdropPrimedRef.current = true
+  }
+
+  function handleBackdropPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return
+    if (e.target !== e.currentTarget) return
+    if (!pointerBackdropPrimedRef.current) return
+    pointerBackdropPrimedRef.current = false
+    if (shouldIgnoreBackdropDismiss()) return
+    onCloseRef.current()
+  }
+
+  function handleBackdropPointerCancel() {
+    pointerBackdropPrimedRef.current = false
+  }
+
+  const modalTree = (
     <div
+      ref={backdropElRef}
       className="product-modal-backdrop"
       role="dialog"
       aria-modal="true"
       aria-labelledby={modalTitleId}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onPointerDown={handleBackdropPointerDown}
+      onPointerUp={handleBackdropPointerUp}
+      onPointerCancel={handleBackdropPointerCancel}
+      onLostPointerCapture={handleBackdropPointerCancel}
     >
       <div className="product-modal card" ref={modalRef}>
         <button
@@ -440,4 +501,7 @@ export default function ProductDetailModal({
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(modalTree, document.body)
 }

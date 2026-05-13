@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { PageNav } from '@/components/PageNav'
 import ProductDetailModal from '@/components/ProductDetailModal'
 import { supabase } from '@/lib/supabase'
+import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { getProductAvailabilityMeta } from '@/lib/productAvailability'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
@@ -132,7 +133,7 @@ function ProductCard({
           >
             £{Number(product.unit_price).toFixed(2)}
           </button>
-          <Link to="/ordering" className="btn btn-small" onClick={(e) => e.stopPropagation()}>
+          <Link to="/ordering/start" className="btn btn-small" onClick={(e) => e.stopPropagation()}>
             Add to order
           </Link>
         </div>
@@ -179,7 +180,7 @@ function ProductTableRow({
         </button>
       </td>
       <td className="product-table-cell product-table-action" onClick={(e) => e.stopPropagation()}>
-        <Link to="/ordering" className="btn btn-small">
+        <Link to="/ordering/start" className="btn btn-small">
           Add to order
         </Link>
       </td>
@@ -213,7 +214,13 @@ export default function Products() {
     async function load() {
       const [catRes, prodRes] = await Promise.all([
         supabase.from('categories').select('*').order('sort_order').order('name'),
-        supabase.from('products').select('*').eq('active', true).order('sort_order').order('name'),
+        supabase
+          .from('products')
+          .select('*')
+          .eq('active', true)
+          .eq('catalog_program', CATALOG_PROGRAM.LAMTEK)
+          .order('sort_order')
+          .order('name'),
       ])
       setCategories(catRes.data ?? [])
       setProducts(prodRes.data ?? [])
@@ -222,7 +229,10 @@ export default function Products() {
     load()
   }, [])
 
-  const displayCategories = categories.filter((c) => !c.parent_id)
+  const displayCategories = useMemo(() => {
+    const withProduct = new Set(products.map((p) => p.category_id))
+    return categories.filter((c) => !c.parent_id && withProduct.has(c.id))
+  }, [categories, products])
 
   const filtered = useMemo(() => {
     let list = products.filter((p) => {
@@ -323,7 +333,7 @@ export default function Products() {
         <p className="page-intro">
           Door ranges, cabinets, handles, lighting, and accessories. Filter by category or search, then add items from the Create order page.
         </p>
-        <Link to="/ordering" className="btn">Create order →</Link>
+        <Link to="/ordering/start" className="btn">Create order →</Link>
       </div>
 
       <div className="products-filters">
@@ -511,7 +521,7 @@ export default function Products() {
       ) : filtered.length === 0 ? (
         <div className="card products-empty">
           <p>No products match. Try changing the category, search, or filters.</p>
-          <Link to="/ordering">Go to Create order</Link>
+          <Link to="/ordering/start">Go to Create order</Link>
         </div>
       ) : viewType === 'table' ? (
         <div className="products-table-wrap">

@@ -1,4 +1,4 @@
--- Contact details for depots (from trademouldings.com/contact-us)
+-- Contact details for depots (from Lamtek.com/contact-us)
 alter table public.locations
   add column if not exists phone text,
   add column if not exists opening_hours text;
@@ -18,3 +18,4 @@ end $$;
 create policy "Authenticated read active locations"
   on public.locations for select to authenticated
   using (active = true);
+

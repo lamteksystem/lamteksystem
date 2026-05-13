@@ -1,6 +1,6 @@
 /**
- * Create the first admin (staff) user for Trade Mouldings.
- * This is a NODE.JS script — do NOT paste this into the Supabase SQL Editor.
+ * Create the first admin (staff) user for Lamtek.
+ * This is a NODE.JS script â€” do NOT paste this into the Supabase SQL Editor.
  * Run in your terminal:  npm run create-admin
  * (with SUPABASE_SERVICE_ROLE_KEY and optionally ADMIN_EMAIL, ADMIN_PASSWORD set)
  */
@@ -9,9 +9,9 @@ import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'trademouldingsltd@gmail.com'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ChangeMeAdmin1!'
-const ADMIN_DISPLAY_NAME = process.env.ADMIN_DISPLAY_NAME || 'Trade Mouldings Admin'
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'lamteksystem@gmail.com'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'LamtekSystem26'
+const ADMIN_DISPLAY_NAME = process.env.ADMIN_DISPLAY_NAME || 'Lamtek Admin'
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (and optionally ADMIN_EMAIL, ADMIN_PASSWORD).')
@@ -84,3 +84,4 @@ main().catch((err) => {
   console.error(err)
   process.exit(1)
 })
+

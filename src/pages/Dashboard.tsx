@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { useDraftOrder } from '@/hooks/useDraftOrder'
 import { useEffectiveUserId } from '@/contexts/ImpersonationContext'
 import type { OrderRow } from '@/types/database'
+import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
 
 export default function Dashboard() {
   const effectiveUserId = useEffectiveUserId()
@@ -14,7 +16,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('products').select('id', { count: 'exact', head: true }).eq('active', true),
+      supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('active', true)
+        .eq('catalog_program', CATALOG_PROGRAM.LAMTEK),
       supabase.from('categories').select('id', { count: 'exact', head: true }),
       supabase.from('documents').select('id', { count: 'exact', head: true }),
     ]).then(([p, c, d]) => {
@@ -58,7 +64,7 @@ export default function Dashboard() {
       </section>
 
       <section className="dashboard-value-strip">
-        <Link to="/ordering" className="dashboard-value-item dashboard-value-item--link">
+        <Link to="/ordering/start" className="dashboard-value-item dashboard-value-item--link">
           <span className="dashboard-value-icon">◇</span>
           <span>Component &amp; complete ordering</span>
         </Link>
@@ -73,11 +79,11 @@ export default function Dashboard() {
       </section>
 
       <section className="dashboard-demo-journey card">
-        <h2>Suggested demo journey</h2>
+        <h2>Quick start</h2>
         <ol className="dashboard-demo-journey-list">
-          <li><Link to="/products">Browse products</Link> and open a few product details.</li>
-          <li><Link to="/ordering">Create order</Link> and add items, then review the <Link to="/ordering/cart">cart</Link>.</li>
-          <li>Save as quotation/place order, then review progress in <Link to="/account">My account</Link>.</li>
+          <li><Link to="/products">Browse products</Link> and open product details.</li>
+          <li><Link to="/ordering/start">Create an order</Link> (manual or guided), add lines, then review the <Link to="/ordering/cart">cart</Link>.</li>
+          <li>Save as quotation or place the order; track progress under <Link to="/account">My account</Link>.</li>
         </ol>
       </section>
 
@@ -118,7 +124,7 @@ export default function Dashboard() {
             {recentOrders.map((o) => (
               <li key={o.id}>
                 <Link to={`/account/orders/${o.id}`}>
-                  {o.reference || `Order ${o.id.slice(0, 8)}`}
+                  {formatOrderReferenceOrFallback(o)}
                 </Link>
                 <span className="dashboard-recent-meta">
                   {new Date(o.created_at).toLocaleDateString()} · {o.status}
@@ -138,7 +144,7 @@ export default function Dashboard() {
             <p>Door ranges, cabinets, handles, lighting, and accessories. Filter by category and search.</p>
             <span className="dashboard-cta">View ranges →</span>
           </Link>
-          <Link to="/ordering" className="dashboard-card card">
+          <Link to="/ordering/start" className="dashboard-card card">
             <h2>Create order</h2>
             <p>Build a complete kitchen or bedroom estimate — add components or complete units and review in the cart.</p>
             <span className="dashboard-cta">Start order →</span>

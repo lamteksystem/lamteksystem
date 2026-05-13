@@ -1,10 +1,10 @@
-# Quote / order exports – specification (v1)
+﻿# Quote / order exports â€“ specification (v1)
 
 ## Current baseline (implemented)
 
 - Invoice-style print views exist:
-  - Customer: `/account/orders/:orderId/invoice` (`src/pages/InvoicePrint.tsx`) → `InvoicePrintView`
-  - Admin: `/admin/orders/:orderId/invoice` (`src/pages/admin/AdminInvoicePrint.tsx`) → `InvoicePrintView`
+  - Customer: `/account/orders/:orderId/invoice` (`src/pages/InvoicePrint.tsx`) â†’ `InvoicePrintView`
+  - Admin: `/admin/orders/:orderId/invoice` (`src/pages/admin/AdminInvoicePrint.tsx`) â†’ `InvoicePrintView`
 - Gating: customer invoice print requires `invoice_number` and status in `invoiced|paid` (see `InvoicePrint.tsx`).
 
 ## Export variants to add (planning)
@@ -13,13 +13,13 @@
 
 - **When**: `orders.status` is `draft` or `quotation` (and optionally `placed` if you want post-acceptance quote record).
 - **Includes**: line items, qty, unit price, VAT/totals, customer details, payment terms.
-- **Branding**: Trade Mouldings standard header/footer.
+- **Branding**: Lamtek standard header/footer.
 
 ### B) Customer quotation PDF (without pricing)
 
 - **Use**: sharing externally / early-stage quotes.
 - **Includes**: line items + qty + descriptions; **hide** unit prices, VAT, totals.
-- **Label**: clearly titled **“Quotation (no pricing)”** to avoid confusion.
+- **Label**: clearly titled **â€œQuotation (no pricing)â€** to avoid confusion.
 
 ### C) Internal admin export (with cost + margin) (optional)
 
@@ -41,3 +41,4 @@
 
 - Totals match order totals for priced exports.
 - No-pricing export contains **no currency symbols** in line columns and **no totals section**.
+

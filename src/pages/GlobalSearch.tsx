@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { getDocumentUrls } from '@/lib/documents'
 import ProductDetailModal from '@/components/ProductDetailModal'
 import type { CategoryRow, DocumentRow, OrderRow, ProductRow, TicketRow } from '@/types/database'
 import { PageNav } from '@/components/PageNav'
 import { useEffectiveUserId } from '@/contexts/ImpersonationContext'
+import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
+import { getProductAvailabilityMeta } from '@/lib/productAvailability'
 
 type Scope = 'all' | 'products' | 'orders' | 'downloads' | 'support'
 
@@ -189,6 +192,7 @@ export default function GlobalSearch() {
           .from('products')
           .select('*')
           .eq('active', true)
+          .eq('catalog_program', CATALOG_PROGRAM.LAMTEK)
           .or(`name.ilike.${like},sku.ilike.${like},description.ilike.${like}`)
           .limit(25)
 
@@ -374,7 +378,9 @@ export default function GlobalSearch() {
                 <p className="global-search-muted">No product matches.</p>
               ) : (
                 <div className="global-search-items">
-                  {productsScored.slice(0, scope === 'all' ? 6 : 20).map((p) => (
+                  {productsScored.slice(0, scope === 'all' ? 6 : 20).map((p) => {
+                    const availability = getProductAvailabilityMeta(p)
+                    return (
                     <div key={p.id} className="card global-search-item">
                       <div className="global-search-item-main">
                         {p.image_url ? (
@@ -389,6 +395,11 @@ export default function GlobalSearch() {
                             </button>
                           </div>
                           {p.sku && <div className="global-search-item-sub">SKU: {highlightText(p.sku, highlightTerm)}</div>}
+                          <div className="global-search-item-sub">
+                            <span className="product-badge" title={availability.detail ?? availability.label}>
+                              {availability.label}
+                            </span>
+                          </div>
                           {p.description && <div className="global-search-item-desc">{p.description.slice(0, 90)}{p.description.length > 90 ? '…' : ''}</div>}
                         </div>
                       </div>
@@ -400,7 +411,8 @@ export default function GlobalSearch() {
                       </div>
                       <div className="global-search-item-price">Price: {formatMoney(p.unit_price)}</div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </section>
@@ -427,7 +439,7 @@ export default function GlobalSearch() {
                         <tr key={o.id}>
                           <td>
                             <Link to={`/account/orders/${o.id}`} className="link-inline">
-                              {o.reference ? highlightText(o.reference, highlightTerm) : o.id.slice(0, 8)}
+                              {highlightText(formatOrderReferenceOrFallback(o), highlightTerm)}
                             </Link>
                           </td>
                           <td>{statusLabel(o.status)}</td>

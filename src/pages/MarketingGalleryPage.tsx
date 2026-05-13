@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import MarketingHeader from '@/components/MarketingHeader'
+import MarketingHeroBackdrop from '@/components/marketing/MarketingHeroBackdrop'
+import MarketingHeroExtraCard from '@/components/marketing/MarketingHeroExtraCard'
 
 /** Gallery imagery from lamtek.co.uk/gallery (Wix CDN). */
 const GALLERY_IMAGES: { src: string; alt: string }[] = [
@@ -59,6 +61,7 @@ export default function MarketingGalleryPage() {
       <MarketingHeader />
       <main className="marketing-main marketing-main--wide">
         <section className="marketing-hero card">
+          <MarketingHeroBackdrop variant="split" />
           <div className="marketing-hero-copy">
             <p className="marketing-kicker">Inspiration</p>
             <h1>Gallery</h1>
@@ -76,6 +79,49 @@ export default function MarketingGalleryPage() {
                 lamtek.co.uk/gallery
               </a>
             </p>
+            <div className="marketing-hero-actions">
+              <Link to="/site/products" className="btn">Popular products</Link>
+              <Link to="/login" className="btn btn-outline">Login to browse all</Link>
+            </div>
+          </div>
+          <div className="marketing-hero-rail">
+            <div className="marketing-hero-panel">
+              <h2>Gallery themes</h2>
+              <ul>
+                <li>Shaker and modern style inspiration</li>
+                <li>Kitchen, bedroom, and living spaces</li>
+                <li>Lamtek and Lamtek Complete applications</li>
+              </ul>
+            </div>
+            <MarketingHeroExtraCard
+              title="How to use these shots"
+              items={[
+                'Ideal for showroom conversations, proposals, and mood boards',
+                'Full SKU detail and trade pricing still live in your account catalogue',
+                'Door ranges and finishes: browse Lamtek Complete online for current styles',
+              ]}
+              footer={
+                <Link to="/site/products" className="marketing-hero-extra-link">
+                  Product overview →
+                </Link>
+              }
+            />
+          </div>
+        </section>
+
+        <section className="marketing-gallery-banner card">
+          <div>
+            <h2>Designed to inspire your showroom pipeline</h2>
+            <p>
+              Use these visuals in sales conversations, then move into account login for full catalogue data and trade prices.
+            </p>
+          </div>
+          <div className="marketing-gallery-banner-icon" aria-hidden>
+            <svg viewBox="0 0 56 56">
+              <rect x="8" y="10" width="40" height="30" rx="4" />
+              <path d="M14 33l9-9 7 6 8-8 4 4" />
+              <circle cx="19" cy="20" r="3" />
+            </svg>
           </div>
         </section>
         <section className="marketing-gallery-grid" aria-label="Project gallery">

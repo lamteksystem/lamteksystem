@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Create dummy staff and dummy customers for testing.
  * Uses Supabase Auth Admin + staff_profiles / customer_profiles.
  * Run: npm run seed-dummy-users
@@ -22,8 +22,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 })
 
 const DUMMY_STAFF = [
-  { email: 'staff1@trademouldings.com', display_name: 'Staff One', role: 'staff' },
-  { email: 'staff2@trademouldings.com', display_name: 'Staff Two', role: 'staff' },
+  { email: 'staff1@Lamtek.com', display_name: 'Staff One', role: 'staff' },
+  { email: 'staff2@Lamtek.com', display_name: 'Staff Two', role: 'staff' },
 ]
 
 const DUMMY_CUSTOMERS = [
@@ -79,3 +79,4 @@ main().catch((err) => {
   console.error(err)
   process.exit(1)
 })
+

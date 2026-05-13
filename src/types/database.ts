@@ -43,6 +43,8 @@ export interface ProductRow {
   sort_order: number
   created_at: string
   is_stock?: boolean
+  /** `lamtek` = component catalogue; `tealbury` = curated packaged kitchens programme. */
+  catalog_program?: 'lamtek' | 'tealbury'
 }
 
 /** Subset returned by `marketing_carousel_products` RPC (public homepage; no pricing/cost/stock). */
@@ -127,6 +129,46 @@ export interface ShipmentRow {
   shipped_at: string
   note: string | null
   created_at: string
+}
+
+export type PickListStatus = 'generated' | 'picking' | 'picked' | 'cancelled'
+
+export interface PickListRow {
+  id: string
+  order_id: string
+  shipment_id: string | null
+  location_id: string | null
+  status: PickListStatus
+  generated_at: string
+  started_at: string | null
+  completed_at: string | null
+  cancelled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PickListItemRow {
+  id: string
+  pick_list_id: string
+  order_line_id: string | null
+  product_id: string | null
+  required_qty: number
+  picked_qty: number
+  created_at: string
+  updated_at: string
+}
+
+export interface PackageLabelRow {
+  id: string
+  package_code: string
+  pick_list_id: string | null
+  order_id: string
+  printed: boolean
+  scanned: boolean
+  printed_at: string | null
+  scanned_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface StockMovementRow {

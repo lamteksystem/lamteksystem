@@ -129,7 +129,7 @@ export default function MarketingPopularProductsCarousel() {
 
   if (loading) {
     return (
-      <section className="card marketing-carousel marketing-carousel--loading" aria-busy>
+      <section className="card marketing-carousel marketing-carousel--loading marketing-carousel-shell" aria-busy>
         <h2>Popular products</h2>
         <p className="marketing-gallery-intro">Loading…</p>
       </section>
@@ -138,7 +138,7 @@ export default function MarketingPopularProductsCarousel() {
 
   if (n === 0) {
     return (
-      <section className="card marketing-carousel-empty">
+      <section className="card marketing-carousel-empty marketing-carousel-shell">
         <h2>Popular products</h2>
         <p className="marketing-gallery-intro">Catalogue products will appear here once available.</p>
         <Link to={customerLoginHref(CUSTOMER_ORDERING_PATH)} className="btn btn-outline">
@@ -150,7 +150,7 @@ export default function MarketingPopularProductsCarousel() {
 
   return (
     <section
-      className="marketing-carousel card"
+      className="marketing-carousel card marketing-carousel-shell"
       aria-roledescription="carousel"
       aria-label="Popular products"
     >

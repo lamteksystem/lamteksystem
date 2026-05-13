@@ -106,9 +106,10 @@ export default function CreateAccount() {
               <div className="account-open-grid">
                 <fieldset className="account-open-fieldset">
                   <legend>Preferred servicing depots/regions</legend>
-                  <label><input type="checkbox" checked={form.deliveryRegions.includes('rochdale')} onChange={() => toggleRegion('rochdale')} /> Rochdale (Head Office)</label>
-                  <label><input type="checkbox" checked={form.deliveryRegions.includes('cookstown')} onChange={() => toggleRegion('cookstown')} /> Cookstown</label>
-                  <label><input type="checkbox" checked={form.deliveryRegions.includes('dublin')} onChange={() => toggleRegion('dublin')} /> Dublin</label>
+                  <label><input type="checkbox" checked={form.deliveryRegions.includes('kirkby')} onChange={() => toggleRegion('kirkby')} /> Kirkby-in-Ashfield (Nottinghamshire — head office &amp; loading)</label>
+                  <label><input type="checkbox" checked={form.deliveryRegions.includes('lamtek-complete')} onChange={() => toggleRegion('lamtek-complete')} /> Lamtek Complete trade kitchens (same site)</label>
+                  <label><input type="checkbox" checked={form.deliveryRegions.includes('tealbury')} onChange={() => toggleRegion('tealbury')} /> Tealbury made-to-order (Lamtek group)</label>
+                  <label><input type="checkbox" checked={form.deliveryRegions.includes('uk-wide')} onChange={() => toggleRegion('uk-wide')} /> UK-wide delivery (no fixed depot)</label>
                 </fieldset>
                 <label className="account-open-consent">
                   <input type="checkbox" required /> I confirm these details are accurate and I consent to account verification checks.

@@ -126,11 +126,11 @@ export default function AdminCreateOrder() {
         <span className="admin-breadcrumb">Create order</span>
       </div>
       <p className="page-intro">
-        One step: pick the account that will own the order. You’ll go straight to order detail to add lines, pricing, delivery or collection, then save or progress status.
+        One step: pick the account that will own the order. You'll go straight to order detail to add lines, pricing, delivery or collection, then save or progress status.
       </p>
 
       {parentOrderId && parentOrder && !parentLoadError && (
-        <div className="card admin-card" style={{ marginBottom: '1rem', borderColor: 'var(--tm-gold, #b8860b)' }}>
+        <div className="card admin-card" style={{ marginBottom: '1rem', borderColor: 'var(--lamtek-gold, #b8860b)' }}>
           <p style={{ margin: 0 }}>
             <strong>Follow-up order</strong> — linked to parent{' '}
             <Link to={`/admin/orders/${parentOrderId}`}>
@@ -175,8 +175,9 @@ export default function AdminCreateOrder() {
         >
           {creating ? 'Creating…' : 'Create draft order'}
         </button>
-        <p className="admin-muted" style={{ marginTop: '1rem' }}>After creating, you’ll be taken to the order to add lines, set delivery details, and process it.</p>
+        <p className="admin-muted" style={{ marginTop: '1rem' }}>After creating, you'll be taken to the order to add lines, set delivery details, and process it.</p>
       </div>
     </div>
   )
 }
+

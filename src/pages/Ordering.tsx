@@ -10,7 +10,9 @@ import { useEffectiveUserId } from '@/contexts/ImpersonationContext'
 import { getOrderProject, type OrderProject } from '@/lib/orderProject'
 import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
 import { resolveChecklistAssemblyFilters, resolveChecklistCategoryId, type ChecklistHint } from '@/lib/checklistRouting'
+import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
 import { getProductAvailabilityMeta } from '@/lib/productAvailability'
+import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import type { CategoryRow, ProductRow, AssemblyWithLines } from '@/types/database'
 
 type OrderMode = 'component' | 'complete'
@@ -59,6 +61,7 @@ export default function Ordering() {
         .from('products')
         .select('*')
         .eq('active', true)
+        .eq('catalog_program', CATALOG_PROGRAM.LAMTEK)
         .order('sort_order')
         .order('name')
       setProducts(prodData ?? [])
@@ -78,7 +81,14 @@ export default function Ordering() {
         .eq('active', true)
         .order('sort_order')
         .order('width_mm', { nullsFirst: false })
-      setAssemblies((assyData ?? []) as AssemblyWithLines[])
+      const rawAssemblies = (assyData ?? []) as AssemblyWithLines[]
+      const assyFiltered = rawAssemblies.filter((a) =>
+        (a.assembly_lines ?? []).every((line) => {
+          const p = line.product as ProductRow | undefined
+          return !p || p.catalog_program !== CATALOG_PROGRAM.TEALBURY
+        })
+      )
+      setAssemblies(assyFiltered)
       setLoading(false)
     }
     load()
@@ -428,11 +438,24 @@ export default function Ordering() {
     return <OrderingWizard />
   }
 
-  if (loading) return <p>Loading…</p>
+  if (loading) {
+    return (
+      <div className="ordering-page">
+        <PageNav backTo="/" backLabel="Dashboard" />
+        <div className="admin-loading-state" style={{ minHeight: '12rem' }}>
+          <div className="admin-loading-spinner" aria-hidden />
+          <p>Loading catalogue…</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="ordering-page">
-      <PageNav backTo={workflowComplete ? "/ordering?flow=guided" : "/"} backLabel={workflowComplete ? "Change order type or range" : "Dashboard"} />
+      <PageNav
+        backTo={workflowComplete ? '/ordering/start' : '/'}
+        backLabel={workflowComplete ? 'Choose manual or Guided Order' : 'Dashboard'}
+      />
       <div className="ordering-header">
         <h1>Create order</h1>
         <p className="page-intro">
@@ -492,7 +515,7 @@ export default function Ordering() {
                   </div>
                 ) : null}
               </div>
-              <Link to="/ordering?flow=guided" className="btn btn-outline btn-small" title="Edit guided setup">
+              <Link to="/ordering?flow=guided" className="btn btn-outline btn-small" title="Edit project or Guided Order steps">
                 Edit
               </Link>
             </div>
@@ -509,7 +532,7 @@ export default function Ordering() {
               {draftOrders.length === 0 ? <option value="">(none)</option> : null}
               {draftOrders.map((o) => (
                 <option key={o.id} value={o.id}>
-                  {(o.reference?.trim() || o.id.slice(0, 8))} · updated {new Date(o.updated_at).toLocaleDateString()}
+                  {formatOrderReferenceOrFallback(o)} · updated {new Date(o.updated_at).toLocaleDateString()}
                 </option>
               ))}
             </select>
@@ -526,13 +549,8 @@ export default function Ordering() {
             Manage baskets
           </Link>
           {workflowComplete && (
-            <Link to="/ordering?flow=guided" className="btn btn-ghost btn-small">
+            <Link to="/ordering/start" className="btn btn-ghost btn-small">
               Change workflow
-            </Link>
-          )}
-          {!workflowComplete && (
-            <Link to="/ordering?flow=guided" className="btn btn-ghost btn-small">
-              Guided order (type &amp; range)
             </Link>
           )}
           <Link to="/ordering/mto" className="btn btn-outline">

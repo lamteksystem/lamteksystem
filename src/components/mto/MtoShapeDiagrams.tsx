@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SVG shape diagrams for Made to Measure ordering.
  * All use viewBox for scaling; default size controlled by CSS (--mtm-diagram-size).
  */
@@ -10,8 +10,8 @@ const defaultSize = 120
 export function DoorRect({ width = defaultSize, height = defaultSize, className = '' }: { width?: number; height?: number; className?: string }) {
   return (
     <svg viewBox="0 0 100 100" className={`mtm-diagram mtm-door-rect ${className}`} style={{ width, height }} aria-hidden>
-      <rect x="8" y="8" width="84" height="84" rx="2" fill="var(--tm-surface)" stroke="var(--tm-gray)" strokeWidth="2" />
-      <rect x="12" y="12" width="76" height="76" rx="1" fill="var(--tm-gray-light)" stroke="var(--tm-gray)" strokeWidth="1" />
+      <rect x="8" y="8" width="84" height="84" rx="2" fill="var(--lamtek-surface)" stroke="var(--lamtek-gray)" strokeWidth="2" />
+      <rect x="12" y="12" width="76" height="76" rx="1" fill="var(--lamtek-gray-light)" stroke="var(--lamtek-gray)" strokeWidth="1" />
     </svg>
   )
 }
@@ -20,8 +20,8 @@ export function DoorRect({ width = defaultSize, height = defaultSize, className 
 export function DoorFramed({ width = defaultSize, height = defaultSize, className = '' }: { width?: number; height?: number; className?: string }) {
   return (
     <svg viewBox="0 0 100 100" className={`mtm-diagram mtm-door-framed ${className}`} style={{ width, height }} aria-hidden>
-      <rect x="5" y="5" width="90" height="90" rx="2" fill="none" stroke="var(--tm-black)" strokeWidth="4" />
-      <rect x="14" y="14" width="72" height="72" rx="1" fill="var(--tm-gray-light)" stroke="var(--tm-gray)" strokeWidth="1.5" />
+      <rect x="5" y="5" width="90" height="90" rx="2" fill="none" stroke="var(--lamtek-black)" strokeWidth="4" />
+      <rect x="14" y="14" width="72" height="72" rx="1" fill="var(--lamtek-gray-light)" stroke="var(--lamtek-gray)" strokeWidth="1.5" />
     </svg>
   )
 }
@@ -128,7 +128,7 @@ export function DoorAngled({
   const d = paths[type] ?? paths['top-right']
   return (
     <svg viewBox="0 0 100 100" className={`mtm-diagram mtm-door-angled ${className}`} style={{ width, height }} aria-hidden>
-      <path d={d} fill="var(--tm-gray-light)" stroke="var(--tm-gray)" strokeWidth="2" strokeLinejoin="round" />
+      <path d={d} fill="var(--lamtek-gray-light)" stroke="var(--lamtek-gray)" strokeWidth="2" strokeLinejoin="round" />
       <AngledDoorLabels type={type} />
     </svg>
   )
@@ -144,12 +144,12 @@ export function DoorNonStandard({ variant }: { variant: 'door' | 'drawer' }) {
         width={isDoor ? 70 : 70}
         height={isDoor ? 80 : 30}
         rx="2"
-        fill="var(--tm-gray-light)"
-        stroke="var(--tm-gray)"
+        fill="var(--lamtek-gray-light)"
+        stroke="var(--lamtek-gray)"
         strokeWidth="2"
       />
       {variant === 'drawer' && (
-        <rect x="35" y="42" width="30" height="6" rx="1" fill="var(--tm-gray)" />
+        <rect x="35" y="42" width="30" height="6" rx="1" fill="var(--lamtek-gray)" />
       )}
     </svg>
   )
@@ -159,7 +159,7 @@ export function DoorNonStandard({ variant }: { variant: 'door' | 'drawer' }) {
 export function PanelRect({ width = defaultSize, height = defaultSize, className = '' }: { width?: number; height?: number; className?: string }) {
   return (
     <svg viewBox="0 0 100 100" className={`mtm-diagram mtm-panel ${className}`} style={{ width, height }} aria-hidden>
-      <rect x="15" y="8" width="70" height="84" rx="2" fill="var(--tm-gray-light)" stroke="var(--tm-gray)" strokeWidth="2" />
+      <rect x="15" y="8" width="70" height="84" rx="2" fill="var(--lamtek-gray-light)" stroke="var(--lamtek-gray)" strokeWidth="2" />
     </svg>
   )
 }
@@ -168,7 +168,7 @@ export function PanelRect({ width = defaultSize, height = defaultSize, className
 export function RoundTop({ width = defaultSize, height = defaultSize, className = '' }: { width?: number; height?: number; className?: string }) {
   return (
     <svg viewBox="0 0 100 100" className={`mtm-diagram mtm-round ${className}`} style={{ width, height }} aria-hidden>
-      <circle cx="50" cy="50" r="42" fill="var(--tm-gray-light)" stroke="var(--tm-gray)" strokeWidth="2" />
+      <circle cx="50" cy="50" r="42" fill="var(--lamtek-gray-light)" stroke="var(--lamtek-gray)" strokeWidth="2" />
     </svg>
   )
 }
@@ -186,8 +186,8 @@ export function CornerAngledTop({ width = defaultSize, height = defaultSize, cla
     <svg viewBox="0 0 100 100" className={`mtm-diagram mtm-corner-angled ${className}`} style={{ width, height }} aria-hidden>
       <path
         d={`M ${x} ${y} L ${x + len} ${y} L ${x + len} ${y + depth - angleDepth} L ${x + len - angleLen} ${y + depth} L ${x} ${y + depth} Z`}
-        fill="var(--tm-gray-light)"
-        stroke="var(--tm-gray)"
+        fill="var(--lamtek-gray-light)"
+        stroke="var(--lamtek-gray)"
         strokeWidth="2"
         strokeLinejoin="round"
       />
@@ -195,11 +195,11 @@ export function CornerAngledTop({ width = defaultSize, height = defaultSize, cla
       <text x={x + len - angleLen / 2} y={y + depth + 6} textAnchor="middle" className="mtm-corner-angled-label--small">ANGLE LENGTH</text>
       <text x={x - 4} y={y + depth / 2} textAnchor="middle" className="mtm-corner-angled-label" style={{ writingMode: 'vertical-rl' }}>DEPTH</text>
       <text x={x + len + 5} y={y + (depth - angleDepth) / 2} textAnchor="middle" className="mtm-corner-angled-label--small" style={{ writingMode: 'vertical-rl' }}>ANGLE DEPTH</text>
-      <path d={`M ${x + 8} ${y + 6} L ${x + len - 8} ${y + 6}`} stroke="var(--tm-gray)" strokeWidth="1" markerEnd={`url(#${markerId})`} />
+      <path d={`M ${x + 8} ${y + 6} L ${x + len - 8} ${y + 6}`} stroke="var(--lamtek-gray)" strokeWidth="1" markerEnd={`url(#${markerId})`} />
       <text x={x + len / 2} y={y + 14} textAnchor="middle" className="mtm-corner-angled-label--small">GRAIN DIRECTION</text>
       <defs>
         <marker id={markerId} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-          <path d="M 0 0 L 6 3 L 0 6 Z" fill="var(--tm-gray)" />
+          <path d="M 0 0 L 6 3 L 0 6 Z" fill="var(--lamtek-gray)" />
         </marker>
       </defs>
     </svg>
@@ -210,13 +210,13 @@ export function CornerAngledTop({ width = defaultSize, height = defaultSize, cla
 export function ProfiledPanel({ width = defaultSize, height = defaultSize, className = '' }: { width?: number; height?: number; className?: string }) {
   return (
     <svg viewBox="0 0 100 100" className={`mtm-diagram mtm-profiled ${className}`} style={{ width, height }} aria-hidden>
-      <rect x="12" y="15" width="76" height="70" rx="3" fill="var(--tm-gray-light)" stroke="var(--tm-gray)" strokeWidth="2" />
-      <path d="M 12 18 Q 12 15 15 15" fill="none" stroke="var(--tm-gray)" strokeWidth="1.5" />
+      <rect x="12" y="15" width="76" height="70" rx="3" fill="var(--lamtek-gray-light)" stroke="var(--lamtek-gray)" strokeWidth="2" />
+      <path d="M 12 18 Q 12 15 15 15" fill="none" stroke="var(--lamtek-gray)" strokeWidth="1.5" />
     </svg>
   )
 }
 
-/** Live preview: door with dimensions (H × W) */
+/** Live preview: door with dimensions (H Ã— W) */
 export function DoorPreview({ heightMm, widthMm }: { heightMm: number; widthMm: number }) {
   if (!heightMm || !widthMm || heightMm <= 0 || widthMm <= 0) return null
   const max = Math.max(heightMm, widthMm, 1)
@@ -226,10 +226,11 @@ export function DoorPreview({ heightMm, widthMm }: { heightMm: number; widthMm: 
   const y = (100 - hNorm) / 2
   return (
     <svg viewBox="0 0 100 100" className="mtm-diagram mtm-preview" style={{ width: 160, height: 160 }} aria-hidden>
-      <rect x={x} y={y} width={wNorm} height={hNorm} rx="2" fill="var(--tm-gray-light)" stroke="var(--tm-gold)" strokeWidth="2" />
-      <text x="50" y="50" textAnchor="middle" dominantBaseline="middle" fontSize="10" fill="var(--tm-gray)">
-        {heightMm} × {widthMm}
+      <rect x={x} y={y} width={wNorm} height={hNorm} rx="2" fill="var(--lamtek-gray-light)" stroke="var(--lamtek-gold)" strokeWidth="2" />
+      <text x="50" y="50" textAnchor="middle" dominantBaseline="middle" fontSize="10" fill="var(--lamtek-gray)">
+        {heightMm} Ã— {widthMm}
       </text>
     </svg>
   )
 }
+

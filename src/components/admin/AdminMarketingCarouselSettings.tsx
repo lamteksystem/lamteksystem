@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+﻿import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { usePermission } from '@/hooks/usePermission'
 import type { MarketingSiteSettingsRow, ProductRow } from '@/types/database'
@@ -154,7 +154,7 @@ export default function AdminMarketingCarouselSettings() {
       </p>
 
       {error && <p className="login-error" style={{ marginBottom: '0.75rem' }}>{error}</p>}
-      {saved && <p className="admin-settings-hint" style={{ color: 'var(--tm-success)' }}>Saved.</p>}
+      {saved && <p className="admin-settings-hint" style={{ color: 'var(--lamtek-success)' }}>Saved.</p>}
 
       <div className="admin-settings-list">
         <label className="admin-settings-row">
@@ -240,3 +240,4 @@ export default function AdminMarketingCarouselSettings() {
     </section>
   )
 }
+

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
 import type { OrderRow, OrderLineRow, ProductRow, CustomerProfileRow, LocationRow, ProductStockRow } from '@/types/database'
+import { lamtekPortalLocations } from '@/lib/lamtekLocations'
 
 type DatePreset = '7d' | '30d' | '90d' | 'ytd'
 
@@ -161,9 +162,9 @@ export default function AdminReports() {
   useEffect(() => {
     async function loadLocations() {
       const { data } = await supabase.from('locations').select('*').eq('active', true).order('sort_order').order('name')
-      const locs = (data ?? []) as LocationRow[]
+      const locs = lamtekPortalLocations((data ?? []) as LocationRow[])
       setLocations(locs)
-      if (!stockLocationId) setStockLocationId(locs[0]?.id ?? '')
+      setStockLocationId((prev) => (prev && locs.some((l) => l.id === prev) ? prev : (locs[0]?.id ?? '')))
     }
     loadLocations()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -745,10 +746,10 @@ export default function AdminReports() {
           <div className="admin-muted">Valuation (cost): £{stockMetrics.valuation.toFixed(2)}</div>
         </div>
           {stockMetrics.low.length === 0 ? (
-            <p className="admin-muted">No low-stock items (≤ {stockLowThreshold}).</p>
+            <p className="admin-muted">No low-stock items (â‰¤ {stockLowThreshold}).</p>
         ) : (
           <>
-              <p className="admin-muted">Low stock (≤ {stockLowThreshold})</p>
+              <p className="admin-muted">Low stock (â‰¤ {stockLowThreshold})</p>
             <ul className="admin-report-list">
               {stockMetrics.low.map((x) => (
                 <li key={x.productId} className="admin-report-list-item">
@@ -948,7 +949,7 @@ export default function AdminReports() {
                           type="button"
                           className="btn btn-small"
                           style={{
-                            background: statusCardFilter === s ? 'var(--tm-primary-500)' : undefined,
+                            background: statusCardFilter === s ? 'var(--lamtek-primary-500)' : undefined,
                             color: statusCardFilter === s ? 'white' : undefined,
                           }}
                           onClick={() => setStatusCardFilter(s)}
@@ -969,7 +970,7 @@ export default function AdminReports() {
                   </li>
                   <li style={{ padding: 0, borderBottom: 'none' }}>
                     <div style={{ maxHeight: '48vh', overflow: 'auto' }}>
-                      <ul className="admin-report-list" style={{ borderTop: '1px solid var(--tm-border)' }}>
+                      <ul className="admin-report-list" style={{ borderTop: '1px solid var(--lamtek-border)' }}>
                         {statusCardOrders.slice(0, 200).map((o) => (
                           <li key={o.id} className="admin-report-list-item">
                             <span className="admin-report-list-label">
@@ -1029,7 +1030,7 @@ export default function AdminReports() {
                       tabIndex={0}
                       style={{
                         cursor: 'pointer',
-                        background: trendCardDateFilter === p.date ? 'var(--tm-primary-50)' : undefined,
+                        background: trendCardDateFilter === p.date ? 'var(--lamtek-primary-50)' : undefined,
                       }}
                       onClick={() => setTrendCardDateFilter(p.date)}
                       onKeyDown={(e) => {
@@ -1046,7 +1047,7 @@ export default function AdminReports() {
                   </li>
                   <li style={{ padding: 0, borderBottom: 'none' }}>
                     <div style={{ maxHeight: '48vh', overflow: 'auto' }}>
-                      <ul className="admin-report-list" style={{ borderTop: '1px solid var(--tm-border)' }}>
+                      <ul className="admin-report-list" style={{ borderTop: '1px solid var(--lamtek-border)' }}>
                         {trendCardDateFilter && trendCardOrders.length === 0 ? (
                           <li className="admin-report-list-item">
                             <span className="admin-report-list-label">No orders</span>
@@ -1101,7 +1102,7 @@ export default function AdminReports() {
                       tabIndex={0}
                       style={{
                         cursor: 'pointer',
-                        background: trendCardDateFilter === p.date ? 'var(--tm-primary-50)' : undefined,
+                        background: trendCardDateFilter === p.date ? 'var(--lamtek-primary-50)' : undefined,
                       }}
                       onClick={() => setTrendCardDateFilter(p.date)}
                       onKeyDown={(e) => {
@@ -1118,7 +1119,7 @@ export default function AdminReports() {
                   </li>
                   <li style={{ padding: 0, borderBottom: 'none' }}>
                     <div style={{ maxHeight: '48vh', overflow: 'auto' }}>
-                      <ul className="admin-report-list" style={{ borderTop: '1px solid var(--tm-border)' }}>
+                      <ul className="admin-report-list" style={{ borderTop: '1px solid var(--lamtek-border)' }}>
                         {trendCardDateFilter && trendCardOrders.length === 0 ? (
                           <li className="admin-report-list-item">
                             <span className="admin-report-list-label">No orders</span>
@@ -1172,4 +1173,5 @@ export default function AdminReports() {
     </div>
   )
 }
+
 

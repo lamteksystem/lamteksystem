@@ -1,6 +1,6 @@
 import { Link, NavLink } from 'react-router-dom'
 import { useTheme, type ThemeId } from '@/contexts/ThemeContext'
-
+import { publicAsset } from '@/lib/basePath'
 function HomeIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" width={18} height={18} aria-hidden focusable="false">
@@ -18,7 +18,8 @@ export default function MarketingHeader() {
     { id: 'light', label: 'Light' },
   ]
 
-  const logoSrc = resolvedTheme === 'dark' ? '/marketing/logo-on-dark.png' : '/marketing/logo-on-light.png'
+  const logoSrc =
+    resolvedTheme === 'dark' ? publicAsset('marketing/logo-on-dark.png') : publicAsset('marketing/logo-on-light.png')
 
   return (
     <header className="marketing-header">
@@ -48,7 +49,7 @@ export default function MarketingHeader() {
           Contact
         </NavLink>
       </nav>
-      <div className="marketing-actions-wrap">
+      <div className="marketing-header-end">
         <div className="marketing-theme-switch" role="group" aria-label="Theme switcher">
           {themeOptions.map((opt) => (
             <button
@@ -62,12 +63,12 @@ export default function MarketingHeader() {
           ))}
         </div>
         <nav className="marketing-actions" aria-label="Marketing site actions">
-          <a href="/create-account" className="btn btn-outline">
+          <Link to="/create-account" className="btn btn-outline">
             Open an account
-          </a>
-          <a href="/login" className="btn">
+          </Link>
+          <Link to="/login" className="btn">
             Login
-          </a>
+          </Link>
         </nav>
       </div>
     </header>

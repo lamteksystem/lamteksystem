@@ -4,6 +4,7 @@ import { PageNav } from '@/components/PageNav'
 import { supabase } from '@/lib/supabase'
 import { useEffectiveUserId } from '@/contexts/ImpersonationContext'
 import type { TicketRow, OrderRow, OrderLineRow, ProductRow } from '@/types/database'
+import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
 
 export default function Support() {
   const effectiveUserId = useEffectiveUserId()
@@ -178,7 +179,7 @@ export default function Support() {
           <option value="">—</option>
           {orders.map((o) => (
             <option key={o.id} value={o.id}>
-              {o.reference ?? o.id.slice(0, 8)} · {o.status} · {new Date(o.created_at).toLocaleDateString()}
+              {formatOrderReferenceOrFallback(o)} · {o.status} · {new Date(o.created_at).toLocaleDateString()}
             </option>
           ))}
         </select>

@@ -2,9 +2,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { chromium } from '@playwright/test'
 
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173'
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'trademouldingsltd@gmail.com'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'TradeMouldings-26'
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5175'
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'lamteksystem@gmail.com'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'LamtekSystem26'
 const ROOT_DIR = process.cwd()
 const OUTPUT_DIR = path.join(ROOT_DIR, 'demo-videos')
 const RAW_VIDEO_DIR = path.join(OUTPUT_DIR, '_raw')
@@ -69,7 +69,7 @@ function cue(index, startSeconds, endSeconds, text) {
 function buildCaptions(sectionLabel) {
   const lines = [
     'WEBVTT\n',
-    cue(1, 0.0, 3.0, `Trade Mouldings Admin Demo: ${sectionLabel}`),
+    cue(1, 0.0, 3.0, `Lamtek Admin Demo: ${sectionLabel}`),
     cue(2, 3.0, 8.5, 'Staff credentials are typed and sign-in is submitted.'),
     cue(3, 8.5, 16.5, `Navigating to ${sectionLabel}.`),
     cue(4, 16.5, 26.0, 'Section controls are demonstrated with scrolling and interactions.'),
@@ -127,12 +127,12 @@ async function sectionInteraction(page, section) {
   switch (section.id) {
     case '02-orders':
       await clickFirstVisible(page, [
-        () => page.getByRole('button', { name: '▦' }).first(),
-        () => page.getByRole('button', { name: '◫' }).first(),
+        () => page.getByRole('button', { name: 'â–¦' }).first(),
+        () => page.getByRole('button', { name: 'â—«' }).first(),
       ])
       await page.waitForTimeout(600)
       await clickFirstVisible(page, [
-        () => page.getByRole('button', { name: '☰' }).first(),
+        () => page.getByRole('button', { name: 'â˜°' }).first(),
       ])
       return
     case '03-archived-orders':
@@ -259,7 +259,7 @@ async function createIndex(results) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Trade Mouldings Admin Demo Videos</title>
+  <title>Lamtek Admin Demo Videos</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 24px; background: #f8fafc; color: #0f172a; }
     h1 { margin: 0 0 16px; }
@@ -270,7 +270,7 @@ async function createIndex(results) {
   </style>
 </head>
 <body>
-  <h1>Trade Mouldings Admin Demo Videos</h1>
+  <h1>Lamtek Admin Demo Videos</h1>
   <p>One video per section, no narration, with toggleable captions.</p>
   <div class="grid">${rows}</div>
 </body>
@@ -302,3 +302,4 @@ main().catch((err) => {
   console.error(err)
   process.exit(1)
 })
+

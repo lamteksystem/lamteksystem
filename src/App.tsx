@@ -9,6 +9,8 @@ import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
 import Downloads from '@/pages/Downloads'
 import Ordering from '@/pages/Ordering'
+import OrderingStart from '@/pages/OrderingStart'
+import TealburyOrdering from '@/pages/TealburyOrdering'
 import OrderCart from '@/pages/OrderCart'
 import OrderBaskets from '@/pages/OrderBaskets'
 import Account from '@/pages/Account'
@@ -29,8 +31,11 @@ import {
   MarketingDepotsDetailPage,
   MarketingDepotsPage,
   MarketingDownloadsPage,
+  MarketingLamtekCoUkHubPage,
+  MarketingLamtekCompleteCoUkHubPage,
   MarketingManufacturingPage,
   MarketingOrderingPage,
+  MarketingTealburyCoUkHubPage,
 } from '@/pages/MarketingSections'
 import MtoIndex from '@/pages/mto/MtoIndex'
 import MtoNonStandard from '@/pages/mto/MtoNonStandard'
@@ -66,24 +71,26 @@ import AdminStock from '@/pages/admin/AdminStock'
 import AdminLocations from '@/pages/admin/AdminLocations'
 import AdminDeliveryWindows from '@/pages/admin/AdminDeliveryWindows'
 import AdminPricing from '@/pages/admin/AdminPricing'
-import AdminImportCatalogue from '@/pages/admin/AdminImportCatalogue'
+import AdminTealburyPricelist from '@/pages/admin/AdminTealburyPricelist'
 import AdminReports from '@/pages/admin/AdminReports'
 import AdminAccounting from '@/pages/admin/AdminAccounting'
 import AdminTickets from '@/pages/admin/AdminTickets'
 import AdminTicketDetail from '@/pages/admin/AdminTicketDetail'
+import AdminPickListDetail from '@/pages/admin/AdminPickListDetail'
+import AdminPickLists from '@/pages/admin/AdminPickLists'
+import AdminPickListPrint from '@/pages/admin/AdminPickListPrint'
+import AdminPackageLabelPrint from '@/pages/admin/AdminPackageLabelPrint'
 import Depots from '@/pages/Depots'
 import NotFound from '@/pages/NotFound'
 import { AdminUiProvider } from '@/contexts/AdminUiContext'
-import { useImpersonation } from '@/contexts/ImpersonationContext'
 
-/** Customer portal (/) is only for non-staff, or for staff when impersonating a customer. */
+/** Trade portal beneath `/`: full app for logged-in users. Logged-out visitors see marketing home. */
 function CustomerPortalRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
-  const { isStaff, loading: staffLoading } = useStaff()
-  const { impersonatingUserId } = useImpersonation()
+  const { loading: staffLoading } = useStaff()
 
   if (loading || staffLoading) return <div className="app-loading">Loading…</div>
-  if (!user || (isStaff && !impersonatingUserId)) return <MarketingHome />
+  if (!user) return <MarketingHome />
   return <>{children}</>
 }
 
@@ -117,6 +124,9 @@ export default function App() {
       <Route path="/site/gallery" element={<MarketingGalleryPage />} />
       <Route path="/site/manufacturing" element={<MarketingManufacturingPage />} />
       <Route path="/site/depots-details" element={<MarketingDepotsDetailPage />} />
+      <Route path="/site/lamtek-uk" element={<MarketingLamtekCoUkHubPage />} />
+      <Route path="/site/lamtek-complete-uk" element={<MarketingLamtekCompleteCoUkHubPage />} />
+      <Route path="/site/tealbury-uk" element={<MarketingTealburyCoUkHubPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route
@@ -131,7 +141,9 @@ export default function App() {
         <Route path="products" element={<Products />} />
         <Route path="downloads" element={<Downloads />} />
         <Route path="depots" element={<Depots />} />
+        <Route path="ordering/tealbury" element={<TealburyOrdering />} />
         <Route path="ordering" element={<Ordering />} />
+        <Route path="ordering/start" element={<OrderingStart />} />
         <Route path="ordering/baskets" element={<OrderBaskets />} />
         <Route path="ordering/cart" element={<OrderCart />} />
         <Route path="ordering/mto" element={<MtoLayout />}>
@@ -174,7 +186,7 @@ export default function App() {
         </Route>
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="catalogue" element={<AdminCatalogue />} />
-        <Route path="catalogue/import" element={<AdminImportCatalogue />} />
+        <Route path="catalogue/tealbury" element={<AdminTealburyPricelist />} />
         <Route path="stock" element={<AdminStock />} />
         <Route path="locations" element={<AdminLocations />} />
         <Route path="delivery-windows" element={<AdminDeliveryWindows />} />
@@ -185,6 +197,10 @@ export default function App() {
         <Route path="orders/:orderId/packing-slip" element={<AdminPackingSlipPrint />} />
         <Route path="orders/:orderId/quote" element={<AdminQuotePrint />} />
         <Route path="orders/:orderId" element={<AdminOrderDetail />} />
+        <Route path="pick-lists" element={<AdminPickLists />} />
+        <Route path="pick-lists/:pickListId/print" element={<AdminPickListPrint />} />
+        <Route path="pick-lists/:pickListId" element={<AdminPickListDetail />} />
+        <Route path="package-labels/:labelId/print" element={<AdminPackageLabelPrint />} />
         <Route path="create-order" element={<AdminCreateOrder />} />
         <Route path="uploads" element={<AdminDocumentUploads />} />
         <Route path="pricing" element={<AdminPricing />} />

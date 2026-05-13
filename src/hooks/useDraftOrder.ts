@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useEffectiveUserId } from '@/contexts/ImpersonationContext'
 import type { OrderRow } from '@/types/database'
+import { defaultNewDraftBasketReference, formatOrderReferenceOrFallback, formatOrderTimestampLabel } from '@/lib/orderDisplayName'
 import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
 
 const PREF_ACTIVE_DRAFT_ORDER_ID = 'active_draft_order_id'
@@ -53,7 +54,13 @@ export function useDraftOrder() {
     if (!effectiveUserId) throw new Error('Not logged in')
     const { data, error } = await supabase
       .from('orders')
-      .insert({ user_id: effectiveUserId, status: 'draft', total_ex_vat: 0, total_inc_vat: 0, reference: null })
+      .insert({
+        user_id: effectiveUserId,
+        status: 'draft',
+        total_ex_vat: 0,
+        total_inc_vat: 0,
+        reference: defaultNewDraftBasketReference(),
+      })
       .select('id')
       .single()
     if (error) throw error
@@ -64,7 +71,7 @@ export function useDraftOrder() {
   const createDraftOrder = useCallback(
     async (name?: string) => {
       if (!effectiveUserId) throw new Error('Not logged in')
-      const reference = name?.trim() ? name.trim() : null
+      const reference = name?.trim() ? name.trim() : defaultNewDraftBasketReference()
       const { data, error } = await supabase
         .from('orders')
         .insert({ user_id: effectiveUserId, status: 'draft', total_ex_vat: 0, total_inc_vat: 0, reference })
@@ -113,7 +120,9 @@ export function useDraftOrder() {
           status: 'draft',
           total_ex_vat: 0,
           total_inc_vat: 0,
-          reference: from.reference ? `${from.reference} (Copy)` : 'Copy',
+          reference: from.reference?.trim()
+            ? `${from.reference.trim()} (copy)`
+            : `Copy · ${formatOrderTimestampLabel(from.created_at)}`,
         })
         .select('id')
         .single()
@@ -144,7 +153,7 @@ export function useDraftOrder() {
 
   const draftOrderLabel = useMemo(() => {
     if (!draftOrder) return null
-    return draftOrder.reference?.trim() || `Draft ${draftOrder.id.slice(0, 8)}`
+    return formatOrderReferenceOrFallback(draftOrder)
   }, [draftOrder])
 
   return {

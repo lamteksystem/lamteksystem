@@ -1,4 +1,4 @@
-﻿-- Linked orders for extras/replacements/samples.
+-- Linked orders for extras/replacements/samples.
 alter table public.orders
   add column if not exists parent_order_id uuid references public.orders(id) on delete set null,
   add column if not exists link_reason text check (link_reason in ('extras','replacement','samples','goodwill','other'));

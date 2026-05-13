@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import MarketingHeader from '@/components/MarketingHeader'
+import MarketingHeroBackdrop from '@/components/marketing/MarketingHeroBackdrop'
+import { publicAsset } from '@/lib/basePath'
 
 export default function MarketingAboutPage() {
   return (
@@ -7,6 +9,7 @@ export default function MarketingAboutPage() {
       <MarketingHeader />
       <main className="marketing-main marketing-main--wide">
         <section className="marketing-hero marketing-hero--image card">
+          <MarketingHeroBackdrop variant="media" />
           <div className="marketing-hero-copy">
             <p className="marketing-kicker">Est. 1989 · Crafting excellence</p>
             <h1>About Lamtek</h1>
@@ -32,7 +35,7 @@ export default function MarketingAboutPage() {
           </div>
           <div className="marketing-hero-media">
             <img
-              src="/marketing/warehouse-boards.png"
+              src={publicAsset('marketing/warehouse-boards.png')}
               alt="High-bay warehouse with panel stock and Lamtek operations"
               loading="eager"
               className="marketing-hero-photo"
@@ -67,7 +70,7 @@ export default function MarketingAboutPage() {
 
         <section className="marketing-split card">
           <div className="marketing-split-media">
-            <img src="/marketing/manufacturing-factory.png" alt="Wood panel production and factory floor" loading="lazy" />
+            <img src={publicAsset('marketing/manufacturing-factory.png')} alt="Wood panel production and factory floor" loading="lazy" />
           </div>
           <div className="marketing-split-copy">
             <h2>Manufacturing you can stand behind</h2>
@@ -86,7 +89,7 @@ export default function MarketingAboutPage() {
 
         <section className="marketing-split card marketing-split--reverse">
           <div className="marketing-split-media">
-            <img src="/marketing/bedroom-harrington.png" alt="Sage green shaker bedroom wardrobes in a styled room" loading="lazy" />
+            <img src={publicAsset('marketing/bedroom-harrington.png')} alt="Sage green shaker bedroom wardrobes in a styled room" loading="lazy" />
           </div>
           <div className="marketing-split-copy">
             <h2>Complete kitchens and living spaces</h2>

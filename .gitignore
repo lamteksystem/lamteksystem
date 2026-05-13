@@ -5,9 +5,14 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.secrets/
 
 # Build
 dist/
+
+# Playwright test artefacts
+playwright-report/
+test-results/
 
 # Web research outputs
 .firecrawl/

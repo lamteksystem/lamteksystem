@@ -277,7 +277,7 @@ export default function Account() {
             </div>
           </div>
           <div className="account-quick-actions">
-            <Link to="/ordering" className="btn">Create order</Link>
+            <Link to="/ordering/start" className="btn">Create order</Link>
             <Link to="/downloads" className="btn btn-outline">Downloads</Link>
             <Link to="/account/support" className="btn btn-outline">Support</Link>
             <Link to="/account/help" className="btn btn-outline">Help</Link>
@@ -532,7 +532,7 @@ export default function Account() {
               <select
                 value={theme}
                 onChange={(e) => setTheme(e.target.value as ThemeId)}
-                style={{ padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--tm-gray-light)' }}
+                style={{ padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--lamtek-gray-light)' }}
               >
                 <option value="auto">Auto (system)</option>
                 <option value="light">Light</option>
@@ -672,3 +672,4 @@ export default function Account() {
     </div>
   )
 }
+

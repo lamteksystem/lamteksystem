@@ -6,8 +6,8 @@ const runDemoSeedE2e = !process.env.CI || process.env.E2E_RUN_DEMO === '1'
 const CUSTOMER_EMAIL = process.env.DEMO_CUSTOMER_EMAIL || 'demo@lamtek.co.uk'
 const CUSTOMER_PASSWORD = process.env.DEMO_CUSTOMER_PASSWORD || 'Demo123!'
 
-const STAFF_EMAIL = process.env.DEMO_STAFF_EMAIL || 'owners-demo@lamtek.co.uk'
-const STAFF_PASSWORD = process.env.DEMO_STAFF_PASSWORD || 'Lamtek-26'
+const STAFF_EMAIL = process.env.DEMO_STAFF_EMAIL || 'lamteksystem@gmail.com'
+const STAFF_PASSWORD = process.env.DEMO_STAFF_PASSWORD || 'LamtekSystem26'
 
 const PRODUCT_NAME_SNIPPET = 'Hadfield Painted 715 x 395'
 

@@ -1,6 +1,6 @@
-/**
+﻿/**
  * One-time setup: create storage buckets and a test user.
- * This is a NODE.JS script — do NOT paste this into the Supabase SQL Editor.
+ * This is a NODE.JS script â€” do NOT paste this into the Supabase SQL Editor.
  * Run in your terminal:  npm run setup:supabase
  * (with SUPABASE_SERVICE_ROLE_KEY set). Then run 002_storage_policies.sql in SQL Editor.
  */
@@ -10,12 +10,12 @@ import { createClient } from '@supabase/supabase-js'
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || 'customer@example.com'
-const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || 'TradeMouldings1!'
+const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || 'Lamtek1!'
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.')
   console.error('Set them in the environment or in a .env file (use dotenv or export).')
-  console.error('Get the service role key from: Supabase Dashboard → Project Settings → API → service_role (secret)')
+  console.error('Get the service role key from: Supabase Dashboard â†’ Project Settings â†’ API â†’ service_role (secret)')
   process.exit(1)
 }
 
@@ -73,3 +73,4 @@ main().catch((err) => {
   console.error(err)
   process.exit(1)
 })
+

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PageNav } from '@/components/PageNav'
+import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
 import { useDraftOrder } from '@/hooks/useDraftOrder'
 import { supabase } from '@/lib/supabase'
 
@@ -88,7 +89,7 @@ export default function OrderBaskets() {
   if (loading) {
     return (
       <div className="ordering-page">
-        <PageNav backTo="/ordering" backLabel="Create order" />
+        <PageNav backTo="/ordering/start" backLabel="Create order" />
         <p>Loading…</p>
       </div>
     )
@@ -96,7 +97,7 @@ export default function OrderBaskets() {
 
   return (
     <div className="ordering-page">
-      <PageNav backTo="/ordering" backLabel="Create order" />
+      <PageNav backTo="/ordering/start" backLabel="Create order" />
       <div className="ordering-header">
         <h1>Baskets</h1>
         <p className="page-intro">
@@ -127,16 +128,15 @@ export default function OrderBaskets() {
               </thead>
               <tbody>
                 {sorted.map((o) => {
-                  const label = (o.reference ?? '').trim() || o.id.slice(0, 8)
+                  const label = formatOrderReferenceOrFallback(o)
                   const isActive = draftOrder?.id === o.id
                   const busy = busyId === o.id
                   return (
                     <tr key={o.id}>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <strong>{label}</strong>
+                          <strong title={`Order ID: ${o.id}`}>{label}</strong>
                           {isActive ? <span className="admin-table-paid-badge">Active</span> : null}
-                          <span className="admin-muted">· {o.id.slice(0, 8)}</span>
                         </div>
                         {renamingId === o.id && (
                           <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

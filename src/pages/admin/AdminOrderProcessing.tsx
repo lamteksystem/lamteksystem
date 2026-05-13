@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import type { OrderRow, LocationRow } from '@/types/database'
+import type { OrderRow, LocationRow, PickListRow } from '@/types/database'
 import { allocateStockForOrderShipmentAtomic } from '@/lib/stock'
 import { insertOrderEvent } from '@/lib/orderEvents'
 import { useStaff } from '@/hooks/useStaff'
 import { usePermission } from '@/hooks/usePermission'
+import { lamtekPortalLocations } from '@/lib/lamtekLocations'
+import { createPickListFromOrder } from '@/lib/pickLists'
 
 const STATUS_LABELS: Record<string, string> = {
   placed: 'Placed',
@@ -24,8 +26,12 @@ export default function AdminOrderProcessing() {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [locations, setLocations] = useState<LocationRow[]>([])
   const [shippingId, setShippingId] = useState<string | null>(null)
+  const [pickListMap, setPickListMap] = useState<Record<string, PickListRow>>({})
+  const [pickListBusyId, setPickListBusyId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   async function load() {
+    setActionError(null)
     const { data: locData } = await supabase
       .from('locations')
       .select('*')
@@ -45,6 +51,23 @@ export default function AdminOrderProcessing() {
     const list = (orderData ?? []) as OrderRow[]
     setOrders(list)
 
+    if (list.length > 0) {
+      const orderIds = list.map((o) => o.id)
+      const { data: pickLists } = await supabase
+        .from('pick_lists')
+        .select('*')
+        .in('order_id', orderIds)
+        .in('status', ['generated', 'picking', 'picked'])
+        .order('created_at', { ascending: false })
+      const byOrder: Record<string, PickListRow> = {}
+      ;((pickLists ?? []) as PickListRow[]).forEach((pickList) => {
+        if (!byOrder[pickList.order_id]) byOrder[pickList.order_id] = pickList
+      })
+      setPickListMap(byOrder)
+    } else {
+      setPickListMap({})
+    }
+
     const userIds = [...new Set(list.map((o) => o.user_id))]
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
@@ -58,9 +81,30 @@ export default function AdminOrderProcessing() {
     setLoading(false)
   }
 
+  async function ensurePickList(orderId: string, locationId?: string | null) {
+    if (!canEditOrders || pickListBusyId) return
+    setActionError(null)
+    setPickListBusyId(orderId)
+    try {
+      const { pickListId } = await createPickListFromOrder({
+        orderId,
+        locationId: locationId ?? shipFromLocations[0]?.id ?? null,
+        actorUserId: staffProfile?.user_id ?? null,
+      })
+      await load()
+      window.open(`/admin/pick-lists/${pickListId}`, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Could not generate pick list.')
+    } finally {
+      setPickListBusyId(null)
+    }
+  }
+
   useEffect(() => {
     load()
   }, [filter])
+
+  const shipFromLocations = useMemo(() => lamtekPortalLocations(locations), [locations])
 
   const filteredOrders = orders.filter((o) => {
     const q = search.trim().toLowerCase()
@@ -86,7 +130,7 @@ export default function AdminOrderProcessing() {
   async function shipFromQueue(orderId: string) {
     if (!canEditOrders) return
     if (shippingId) return
-    const locationId = locations[0]?.id
+    const locationId = shipFromLocations[0]?.id
     if (!locationId) return
     setShippingId(orderId)
     const order = orders.find((o) => o.id === orderId)
@@ -129,6 +173,7 @@ export default function AdminOrderProcessing() {
       <div className="admin-page-header">
         <span className="admin-breadcrumb">Order processing</span>
         <div className="admin-page-header-actions">
+          <Link to="/admin/pick-lists" className="btn btn-outline btn-small">Pick lists</Link>
           <Link to="/admin/orders" className="btn btn-outline btn-small">All orders</Link>
         </div>
       </div>
@@ -139,6 +184,11 @@ export default function AdminOrderProcessing() {
           <span className="admin-muted">{filteredOrders.length} in queue</span>
         </div>
         <p className="page-intro">Use this queue for daily operations: invoice placed orders, then ship invoiced orders.</p>
+        {actionError && (
+          <div className="admin-confirm-box" role="alert">
+            <p>{actionError}</p>
+          </div>
+        )}
 
         <div className="admin-orders-quick-filters">
           <button type="button" className={`btn btn-small ${filter === 'placed' ? 'active' : 'btn-outline'}`} onClick={() => setFilter('placed')}>
@@ -181,13 +231,14 @@ export default function AdminOrderProcessing() {
                 <th>Status</th>
                 <th>Invoice #</th>
                 <th>Expected delivery</th>
+                <th>Pick list</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="admin-muted">No orders match this queue/filter right now.</td>
+                  <td colSpan={8} className="admin-muted">No orders match this queue/filter right now.</td>
                 </tr>
               ) : (
                 filteredOrders.map((o) => (
@@ -207,8 +258,25 @@ export default function AdminOrderProcessing() {
                     <td>{o.invoice_number ?? '—'}</td>
                     <td>{o.delivery_expected_date ? new Date(o.delivery_expected_date).toLocaleDateString() : '—'}</td>
                     <td>
+                      {pickListMap[o.id] ? (
+                        <Link to={`/admin/pick-lists/${pickListMap[o.id].id}`} className="admin-link">
+                          {pickListMap[o.id].status}
+                        </Link>
+                      ) : (
+                        <span className="admin-muted">None</span>
+                      )}
+                    </td>
+                    <td>
                       <div className="admin-order-processing-actions">
                         <Link to={`/admin/orders/${o.id}`} className="btn btn-small">Open</Link>
+                        <button
+                          type="button"
+                          className="btn btn-small btn-outline"
+                          onClick={() => ensurePickList(o.id)}
+                          disabled={!!pickListBusyId}
+                        >
+                          {pickListBusyId === o.id ? 'Generating…' : pickListMap[o.id] ? 'Open pick list' : 'Generate pick list'}
+                        </button>
                         {o.status === 'placed' && (
                           <button
                             type="button"
@@ -225,7 +293,7 @@ export default function AdminOrderProcessing() {
                             className="btn btn-small btn-primary"
                             onClick={() => shipFromQueue(o.id)}
                             disabled={!!shippingId}
-                            title={locations[0]?.name ? `Ships from ${locations[0].name}` : 'Ships from first active location'}
+                            title={shipFromLocations[0]?.name ? `Ships from ${shipFromLocations[0].name}` : 'Ships from first Lamtek group location'}
                           >
                             {shippingId === o.id ? 'Shipping…' : 'Ship + allocate stock'}
                           </button>

@@ -8,6 +8,7 @@ import { useCustomerUi } from '@/contexts/CustomerUiContext'
 import { useEffectiveUserId } from '@/contexts/ImpersonationContext'
 import BrandLogo from '@/components/BrandLogo'
 import type { DocumentRow, OrderRow, ProductRow, TicketRow } from '@/types/database'
+import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
 
 export default function Layout() {
   const navigate = useNavigate()
@@ -166,7 +167,7 @@ export default function Layout() {
         const orderSuggestions = orderList.slice(0, 3).map((o) => ({
           kind: 'order' as const,
           id: o.id,
-          title: o.reference ?? o.id.slice(0, 8),
+          title: formatOrderReferenceOrFallback(o),
           subtitle: `${o.status} · ${new Date(o.created_at).toLocaleDateString()}`,
           onSelect: () => navigate(`/account/orders/${o.id}`),
         }))
@@ -236,8 +237,23 @@ export default function Layout() {
     </div>
   )
 
+  const staffPortalPreviewBanner = isStaff && !impersonatingUserId ? (
+    <div className="staff-portal-preview-banner" role="note">
+      <p className="staff-portal-preview-text">
+        <strong>Staff preview.</strong> You&apos;re on the Lamtek trade portal while signed in with your staff login. For a specific
+        customer account (orders, CRM context), open <Link to="/admin">Admin</Link> and use <strong>View as customer</strong>, then come
+        back here.
+      </p>
+      <Link to="/admin" className="staff-portal-preview-link">
+        Back to admin
+      </Link>
+    </div>
+  ) : null
+
   if (useSidebarMenu) {
     const customerPath = location.pathname
+    const createOrderNavActive =
+      customerPath === '/ordering/start' || customerPath === '/ordering' || customerPath.startsWith('/ordering/mto')
 
     const groupForceOpen = {
       shop: customerPath === '/' || customerPath.startsWith('/products') || customerPath.startsWith('/ordering'),
@@ -263,6 +279,7 @@ export default function Layout() {
     return (
       <div className="layout customer-layout customer-layout--sidebar">
         {sharedBanner}
+        {staffPortalPreviewBanner}
         <aside className="customer-sidebar">
           <Link to="/" className="customer-sidebar-logo">
             <BrandLogo className="app-logo-image app-logo-image--sidebar" />
@@ -306,8 +323,14 @@ export default function Layout() {
               </button>
               {groupOpen('ordering') && (
                 <div className="customer-sidebar-children">
-                  <NavLink to="/ordering" className={({ isActive }) => `customer-sidebar-item ${isActive ? 'active' : ''}`}>
+                  <NavLink
+                    to="/ordering/start"
+                    className={() => `customer-sidebar-item ${createOrderNavActive ? 'active' : ''}`}
+                  >
                     Create order
+                  </NavLink>
+                  <NavLink to="/ordering/tealbury" className={({ isActive }) => `customer-sidebar-item ${isActive ? 'active' : ''}`}>
+                    Tealbury kitchens
                   </NavLink>
                   <NavLink to="/ordering/baskets" className={({ isActive }) => `customer-sidebar-item ${isActive ? 'active' : ''}`}>
                     Order baskets
@@ -412,7 +435,7 @@ export default function Layout() {
                   autoComplete="off"
                   aria-autocomplete="list"
                   aria-expanded={suggestionsOpen}
-                  aria-controls="tm-global-search-suggestions"
+                  aria-controls="lamtek-global-search-suggestions"
                   onKeyDown={(e) => {
                     if (!suggestionsOpen) return
                     if (e.key === 'Escape') {
@@ -444,7 +467,7 @@ export default function Layout() {
                 {suggestionsOpen && (
                   <div
                     className="header-search-suggestions"
-                    id="tm-global-search-suggestions"
+                    id="lamtek-global-search-suggestions"
                     role="listbox"
                     aria-label="Search suggestions"
                   >
@@ -488,7 +511,8 @@ export default function Layout() {
     <>
       <Link to="/" onClick={() => setMobileMenuOpen(false)}>Dashboard</Link>
       <Link to="/products" onClick={() => setMobileMenuOpen(false)}>Products</Link>
-      <Link to="/ordering" onClick={() => setMobileMenuOpen(false)}>Create Order</Link>
+      <Link to="/ordering/start" onClick={() => setMobileMenuOpen(false)}>Create Order</Link>
+      <Link to="/ordering/tealbury" onClick={() => setMobileMenuOpen(false)}>Tealbury kitchens</Link>
       <Link to="/downloads" onClick={() => setMobileMenuOpen(false)}>Downloads</Link>
       <Link to="/depots" onClick={() => setMobileMenuOpen(false)}>Depots</Link>
       <Link to="/account" onClick={() => setMobileMenuOpen(false)}>My Account</Link>
@@ -520,6 +544,7 @@ export default function Layout() {
   return (
     <div className="layout">
       {sharedBanner}
+      {staffPortalPreviewBanner}
       <header className="header">
         <Link to="/" className="header-logo" onClick={() => setMobileMenuOpen(false)}>
           <BrandLogo className="app-logo-image app-logo-image--header" />
@@ -546,7 +571,7 @@ export default function Layout() {
             autoComplete="off"
             aria-autocomplete="list"
             aria-expanded={suggestionsOpen}
-            aria-controls="tm-global-search-suggestions"
+            aria-controls="lamtek-global-search-suggestions"
             onKeyDown={(e) => {
               if (!suggestionsOpen) return
               if (e.key === 'Escape') {
@@ -578,7 +603,7 @@ export default function Layout() {
           {suggestionsOpen && (
             <div
               className="header-search-suggestions"
-              id="tm-global-search-suggestions"
+              id="lamtek-global-search-suggestions"
               role="listbox"
               aria-label="Search suggestions"
             >

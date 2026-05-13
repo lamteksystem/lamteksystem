@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import CatalogueTealburyImportBlock from '@/components/admin/CatalogueTealburyImportBlock'
+import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { supabase } from '@/lib/supabase'
 import { useAdminUi } from '@/contexts/AdminUiContext'
 import AdminProductModal from '@/components/admin/AdminProductModal'
@@ -86,6 +88,16 @@ export default function AdminCatalogue() {
   const [activeOnly, setActiveOnly] = useState(true)
   const [stockOnly, setStockOnly] = useState(false)
   const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'sku_asc' | 'sku_desc' | 'price_asc' | 'price_desc'>('name_asc')
+  const [catalogProgramFilter, setCatalogProgramFilter] = useState<'all' | 'lamtek' | 'tealbury'>('all')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const catalogueTab: 'browse' | 'import' | 'audit' | 'images' =
+    tabParam === 'import' || tabParam === 'audit' || tabParam === 'images' ? tabParam : 'browse'
+
+  function setCatalogueTab(next: 'browse' | 'import' | 'audit' | 'images') {
+    if (next === 'browse') setSearchParams({}, { replace: true })
+    else setSearchParams({ tab: next }, { replace: true })
+  }
   const [productGroupFilter, setProductGroupFilter] = useState<'all' | 'doors_fronts' | 'carcasses' | 'accessories'>('all')
   const [viewType, setViewType] = useState<CatalogueViewType>('table')
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null)
@@ -199,6 +211,10 @@ export default function AdminCatalogue() {
   const filteredProducts = products
     .filter((p) => {
       if (categoryFilter && p.category_id !== categoryFilter) return false
+      if (catalogProgramFilter !== 'all') {
+        const prog = p.catalog_program ?? CATALOG_PROGRAM.LAMTEK
+        if (prog !== catalogProgramFilter) return false
+      }
       if (!matchesProductGroup(p.category_id)) return false
       if (activeOnly && !p.active) return false
       if (stockOnly && (p.is_stock === false)) return false
@@ -498,68 +514,120 @@ export default function AdminCatalogue() {
 
   return (
     <div className="admin-page">
-      <p className="page-intro">Product catalogue. Export to CSV/XLSX or import from file. Use filters to see products by category.</p>
+      <p className="page-intro">
+        Browse Lamtek and Tealbury products in one place. Use <strong>Import &amp; export</strong> for Lamtek CSV/XLSX and the Tealbury customer workbook; <strong>Audit</strong> and <strong>Images</strong> for tools that are used less often.
+      </p>
 
-      <div className="admin-catalogue-import-export card admin-card">
-        <h2>Import / Export</h2>
-        <div className="admin-import-export-actions">
-          <div className="admin-export-buttons">
-            <span className="admin-export-label">Export:</span>
-            <button type="button" className="btn btn-outline btn-small" onClick={handleExportCsv}>
-              Download CSV
-            </button>
-            <button type="button" className="btn btn-outline btn-small" onClick={handleExportXlsx}>
-              Download XLSX
-            </button>
-          </div>
-          <div className="admin-import-buttons">
-            <span className="admin-export-label">Import:</span>
-            <Link to="/admin/catalogue/import" className="btn btn-small">
-              Napwood pricelist (Excel)
-            </Link>
-            <label className="btn btn-outline btn-small">
-              {importing ? 'Importing…' : 'From CSV'}
-              <input
-                ref={csvInputRef}
-                type="file"
-                accept=".csv"
-                className="admin-file-input"
-                disabled={importing}
-                onChange={handleImportCsv}
-              />
-            </label>
-            <label className="btn btn-outline btn-small">
-              {importing ? '…' : 'From XLS/XLSX'}
-              <input
-                ref={xlsxInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="admin-file-input"
-                disabled={importing}
-                onChange={handleImportXlsx}
-              />
-            </label>
-          </div>
-        </div>
-        <p className="admin-import-hint">
-          Export columns: category_slug, category_name, name, description, sku, unit_price, active, image_url, image_alt, is_stock. Import uses the same columns; categories are created if missing; products are matched by SKU for updates.
-        </p>
-        {importResult && (
-          <div className={`admin-import-result ${importResult.errors.length ? 'has-errors' : ''}`}>
-            <strong>Result:</strong> {importResult.inserted} inserted, {importResult.updated} updated, {importResult.skipped} skipped.
-            {importResult.errors.length > 0 && (
-              <ul className="admin-import-errors">
-                {importResult.errors.slice(0, 10).map((msg, i) => (
-                  <li key={i}>{msg}</li>
-                ))}
-                {importResult.errors.length > 10 && <li>… and {importResult.errors.length - 10} more</li>}
-              </ul>
-            )}
-          </div>
-        )}
+      <div className="admin-catalogue-tabs" role="tablist" aria-label="Catalogue sections">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={catalogueTab === 'browse'}
+          className={`btn btn-small ${catalogueTab === 'browse' ? '' : 'btn-outline'}`}
+          onClick={() => setCatalogueTab('browse')}
+        >
+          Browse
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={catalogueTab === 'import'}
+          className={`btn btn-small ${catalogueTab === 'import' ? '' : 'btn-outline'}`}
+          onClick={() => setCatalogueTab('import')}
+        >
+          Import &amp; export
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={catalogueTab === 'audit'}
+          className={`btn btn-small ${catalogueTab === 'audit' ? '' : 'btn-outline'}`}
+          onClick={() => setCatalogueTab('audit')}
+        >
+          Audit
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={catalogueTab === 'images'}
+          className={`btn btn-small ${catalogueTab === 'images' ? '' : 'btn-outline'}`}
+          onClick={() => setCatalogueTab('images')}
+        >
+          Images
+        </button>
       </div>
 
-      <div className="card admin-card admin-catalogue-audit">
+      {catalogueTab === 'import' && (
+        <div className="admin-catalogue-import-export card admin-card" style={{ marginTop: '1rem' }}>
+          <h2>Import &amp; export</h2>
+
+          <h3 className="admin-card-subtitle" style={{ marginTop: 0 }}>
+            Lamtek catalogue (CSV or Excel)
+          </h3>
+          <p className="admin-muted">
+            Standard portal format: same columns as export. Updates products by SKU; creates categories from <code>category_slug</code> / <code>category_name</code>. Lamtek component rows use the default catalogue program unless you set it in the sheet (future).
+          </p>
+          <div className="admin-import-export-actions">
+            <div className="admin-export-buttons">
+              <span className="admin-export-label">Export:</span>
+              <button type="button" className="btn btn-outline btn-small" onClick={handleExportCsv}>
+                Download CSV
+              </button>
+              <button type="button" className="btn btn-outline btn-small" onClick={handleExportXlsx}>
+                Download XLSX
+              </button>
+            </div>
+            <div className="admin-import-buttons">
+              <span className="admin-export-label">Import:</span>
+              <label className="btn btn-outline btn-small">
+                {importing ? 'Importing…' : 'From CSV'}
+                <input
+                  ref={csvInputRef}
+                  type="file"
+                  accept=".csv"
+                  className="admin-file-input"
+                  disabled={importing}
+                  onChange={handleImportCsv}
+                />
+              </label>
+              <label className="btn btn-outline btn-small">
+                {importing ? '…' : 'From XLS/XLSX'}
+                <input
+                  ref={xlsxInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="admin-file-input"
+                  disabled={importing}
+                  onChange={handleImportXlsx}
+                />
+              </label>
+            </div>
+          </div>
+          <p className="admin-import-hint">
+            Columns: category_slug, category_name, name, description, sku, unit_price, active, image_url, image_alt, is_stock.
+          </p>
+          {importResult && (
+            <div className={`admin-import-result ${importResult.errors.length ? 'has-errors' : ''}`}>
+              <strong>Result:</strong> {importResult.inserted} inserted, {importResult.updated} updated, {importResult.skipped} skipped.
+              {importResult.errors.length > 0 && (
+                <ul className="admin-import-errors">
+                  {importResult.errors.slice(0, 10).map((msg, i) => (
+                    <li key={i}>{msg}</li>
+                  ))}
+                  {importResult.errors.length > 10 && <li>… and {importResult.errors.length - 10} more</li>}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <hr className="admin-catalogue-tab-divider" style={{ margin: '1.25rem 0', border: 0, borderTop: '1px solid var(--admin-border, #e5e7eb)' }} />
+
+          <CatalogueTealburyImportBlock />
+        </div>
+      )}
+
+      {catalogueTab === 'audit' && (
+        <div className="card admin-card admin-catalogue-audit" style={{ marginTop: '1rem' }}>
         <h2>Catalogue audit</h2>
         <p className="admin-muted">
           Upload your master spreadsheet (CSV or XLSX with the same columns as export). The audit compares by <strong>SKU</strong>: missing in DB (in file but not in catalogue), extra in DB (in catalogue but not in file), and duplicate SKUs (same SKU more than once in the database).
@@ -633,8 +701,10 @@ export default function AdminCatalogue() {
           </div>
         )}
       </div>
+      )}
 
-      <div className="card admin-card admin-product-images-card">
+      {catalogueTab === 'images' && (
+      <div className="card admin-card admin-product-images-card" style={{ marginTop: '1rem' }}>
         <h2>Product images</h2>
         <p className="admin-muted">
           Lamtek product reference:{' '}
@@ -765,6 +835,7 @@ export default function AdminCatalogue() {
           </div>
         )}
       </div>
+      )}
 
       {imageReviewModalIndex != null && imageMatchResults?.[imageReviewModalIndex] && (
         <div className="admin-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="image-review-title" onClick={(ev) => ev.target === ev.currentTarget && setImageReviewModalIndex(null)}>
@@ -829,6 +900,8 @@ export default function AdminCatalogue() {
         </div>
       )}
 
+      {catalogueTab === 'browse' && (
+      <>
       <div className="admin-filters admin-catalogue-toolbar">
         <label>
           Search
@@ -851,6 +924,18 @@ export default function AdminCatalogue() {
             {categoriesByParent.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
+          </select>
+        </label>
+        <label>
+          Catalogue
+          <select
+            value={catalogProgramFilter}
+            onChange={(e) => setCatalogProgramFilter(e.target.value as typeof catalogProgramFilter)}
+            className="admin-select"
+          >
+            <option value="all">All</option>
+            <option value={CATALOG_PROGRAM.LAMTEK}>Lamtek</option>
+            <option value={CATALOG_PROGRAM.TEALBURY}>Tealbury</option>
           </select>
         </label>
         <label>
@@ -1400,6 +1485,8 @@ export default function AdminCatalogue() {
           ))}
         </ul>
       </div>
+      </>
+      )}
     </div>
   )
 }

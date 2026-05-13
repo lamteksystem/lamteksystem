@@ -2,11 +2,28 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+/** GitHub Pages project sites use `/<repo>/`; local dev uses `/`. Set `VITE_PAGES_BASE` in CI. */
+function viteBase(): string {
+  const raw = process.env.VITE_PAGES_BASE?.trim()
+  if (!raw || raw === '/') return '/'
+  return raw.endsWith('/') ? raw : `${raw}/`
+}
+
 export default defineConfig({
+  base: viteBase(),
   plugins: [react()],
   server: {
-    port: 5173,
-    allowedHosts: ['.ngrok-free.app', '.loca.lt', 'localhost', '127.0.0.1'],
+    // Listen on all interfaces so localhost / 127.0.0.1 / LAN work reliably (Windows IPv4/IPv6 quirks).
+    host: true,
+    port: Number(process.env.VITE_DEV_PORT || process.env.PORT || 5175),
+    strictPort: true,
+    allowedHosts: true,
+  },
+  preview: {
+    host: true,
+    port: Number(process.env.VITE_DEV_PORT || process.env.PORT || 5175),
+    strictPort: true,
+    allowedHosts: true,
   },
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
 })

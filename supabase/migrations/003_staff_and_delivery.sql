@@ -1,6 +1,6 @@
 -- Staff backend: staff profiles, order delivery/processing fields, RLS for staff
 
--- Staff profiles (Trade Mouldings staff who can use the admin backend)
+-- Staff profiles (Lamtek staff who can use the admin backend)
 create table if not exists public.staff_profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null unique,
@@ -74,3 +74,4 @@ create policy "Staff insert customer_profiles" on public.customer_profiles
 
 -- Optional: staff read documents
 -- Already covered by authenticated read.
+

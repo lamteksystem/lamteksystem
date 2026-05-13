@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Assign product images from a local folder (e.g. Dropbox) to products in the catalogue.
  * Matches images to products by SKU, name, description, category, numbers, keywords, then uploads
  * to Supabase storage and sets product.image_url.
@@ -139,7 +139,7 @@ function scoreMatch(filenameBase, search, options = {}) {
 
   let score = 0
 
-  // 0) Parent folder name matches category – boost products in that category (e.g. "Accessories Handles" -> Handles)
+  // 0) Parent folder name matches category â€“ boost products in that category (e.g. "Accessories Handles" -> Handles)
   if (folderHint && folderHint.folderNorm && folderHint.folderTokens && folderHint.folderTokens.length > 0) {
     const catNorm = (search.categoryNorm || '').toLowerCase()
     const catSlug = (search.categorySlug || '').toLowerCase()
@@ -317,7 +317,7 @@ async function main() {
   const folderPath = process.argv[2]
   if (!folderPath) {
     console.error('Usage: npm run assign-images -- "C:\\path\\to\\images"')
-    console.error('Example: npm run assign-images -- "C:\\Users\\You\\Dropbox\\Trade Mouldings\\product-images"')
+    console.error('Example: npm run assign-images -- "C:\\Users\\You\\Dropbox\\Lamtek\\product-images"')
     process.exit(1)
   }
 
@@ -405,7 +405,7 @@ async function main() {
 
     let safeStorageName = base.replace(/[^a-zA-Z0-9._-]/g, '_') + ext
     let fileBuffer = readFileSync(filePath)
-    const maxSizeBytes = 4 * 1024 * 1024 // 4MB – resize if larger when sharp available
+    const maxSizeBytes = 4 * 1024 * 1024 // 4MB â€“ resize if larger when sharp available
     if (fileBuffer.length > maxSizeBytes) {
       try {
         const sharp = (await import('sharp')).default
@@ -415,7 +415,7 @@ async function main() {
           .toBuffer()
         safeStorageName = base.replace(/[^a-zA-Z0-9._-]/g, '_') + '.jpg'
       } catch (_) {
-        // sharp not installed or failed – upload original
+        // sharp not installed or failed â€“ upload original
       }
     }
     const contentType = safeStorageName.endsWith('.png') ? 'image/png' : safeStorageName.endsWith('.webp') ? 'image/webp' : safeStorageName.endsWith('.gif') ? 'image/gif' : 'image/jpeg'
@@ -459,7 +459,7 @@ async function main() {
 
   console.log('\nResult:', assigned, 'assigned', skipped, 'skipped')
   report.forEach((r) => {
-    if (r.action === 'assigned' || r.action === 'would assign') console.log('  ', r.file, '→', r.product, r.score ? `(score ${r.score})` : '')
+    if (r.action === 'assigned' || r.action === 'would assign') console.log('  ', r.file, 'â†’', r.product, r.score ? `(score ${r.score})` : '')
     else console.log('  ', r.file, '-', r.reason || r.action)
   })
 }
@@ -468,3 +468,4 @@ main().catch((e) => {
   console.error(e)
   process.exit(1)
 })
+

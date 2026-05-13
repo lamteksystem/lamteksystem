@@ -1,23 +1,22 @@
--- Main warehouse is Rochdale (Head Office). Consolidate "Main Warehouse" (MAIN) into Rochdale.
--- If ROC already exists: merge product_stock (add MAIN qty into ROC), delete MAIN rows, delete MAIN location.
--- If only MAIN exists: update MAIN to Rochdale details and set code = ROC.
+-- Consolidate default "Main Warehouse" (MAIN) into Lamtek HQ (Kirkby). Idempotent.
+-- If HQ already exists: merge MAIN stock into HQ, remove MAIN row.
+-- If only MAIN exists: promote MAIN to HQ with Kirkby address and phone.
 
 do $$
 declare
   main_id uuid;
-  roc_id uuid;
+  hq_id uuid;
 begin
   select id into main_id from public.locations where code = 'MAIN' limit 1;
-  select id into roc_id from public.locations where code = 'ROC' limit 1;
+  select id into hq_id from public.locations where code = 'HQ' limit 1;
 
   if main_id is null then
-    return; -- nothing to do
+    return;
   end if;
 
-  if roc_id is not null and roc_id != main_id then
-    -- Merge product_stock: add MAIN quantities into ROC (ON CONFLICT sum), then delete MAIN rows
+  if hq_id is not null and hq_id != main_id then
     insert into public.product_stock (product_id, location_id, quantity, updated_at)
-    select product_id, roc_id, quantity, now()
+    select product_id, hq_id, quantity, now()
     from public.product_stock
     where location_id = main_id
     on conflict (product_id, location_id) do update set
@@ -26,14 +25,13 @@ begin
     delete from public.product_stock where location_id = main_id;
     delete from public.locations where id = main_id;
   else
-    -- Update MAIN to Rochdale (Head Office) details
     update public.locations
     set
-      name = 'Rochdale (Head Office)',
-      code = 'ROC',
-      address = 'Unit N1, Kingsway Business Park, Michael Faraday Avenue, Rochdale, Lancashire OL16 4GR',
-      phone = '+44 (0)1706 753600',
-      opening_hours = 'Mon–Thu: 8.30–5.00pm, Fri: 8.30–4.00pm',
+      name = 'Kirkby-in-Ashfield (Head Office)',
+      code = 'HQ',
+      address = 'Lamtek Ltd, Wolsey Drive, Kirkby-in-Ashfield, Nottinghamshire NG17 7JR',
+      phone = '01623 759 856',
+      opening_hours = 'Opening: Mon–Fri 7:15–16:30. Loading: Mon–Thu 7:15–15:45, Fri 7:15–12:45.',
       updated_at = now()
     where id = main_id;
   end if;

@@ -1,4 +1,4 @@
--- Trade Mouldings schema (run in Supabase SQL editor)
+-- Lamtek schema (run in Supabase SQL editor)
 
 -- Customer profiles (extends auth.users)
 create table if not exists public.customer_profiles (
@@ -121,3 +121,4 @@ create policy "Users delete own order lines" on public.order_lines
 -- Trigger to create profile on signup (optional; or create via app)
 -- Storage bucket for documents and product images: create in Supabase dashboard
 -- e.g. buckets: documents, product-images (public read for product images)
+

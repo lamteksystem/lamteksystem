@@ -1,4 +1,4 @@
-﻿-- Click & Collect MVP: fulfillment fields on orders.
+-- Click & Collect MVP: fulfillment fields on orders.
 alter table public.orders
   add column if not exists fulfillment_method text not null default 'delivery' check (fulfillment_method in ('delivery','collect')),
   add column if not exists collection_location_id uuid references public.locations(id) on delete set null,

@@ -8,8 +8,8 @@ import BrandLogo from '@/components/BrandLogo'
 
 const DEMO_CUSTOMER_EMAIL = 'demo@lamtek.co.uk'
 const DEMO_CUSTOMER_PASSWORD = 'Demo123!'
-const DEMO_ADMIN_EMAIL = 'owners-demo@lamtek.co.uk'
-const DEMO_ADMIN_PASSWORD = 'Lamtek-26'
+const DEMO_ADMIN_EMAIL = 'lamteksystem@gmail.com'
+const DEMO_ADMIN_PASSWORD = 'LamtekSystem26'
 
 function parseHashParams(hash: string): Record<string, string> {
   const params: Record<string, string> = {}
@@ -35,7 +35,9 @@ export default function Login() {
     return (
       host.includes('demo.lamtek.co.uk') ||
       host.includes('lamtek-demo') ||
-      host.includes('vercel.app')
+      host.includes('vercel.app') ||
+      host === 'localhost' ||
+      host === '127.0.0.1'
     )
   }, [])
   const [email, setEmail] = useState('')
@@ -139,7 +141,7 @@ export default function Login() {
           </p>
         </div>
         {showDemoCredentials && (
-          <div className="card" style={{ marginTop: '0.9rem', background: 'var(--tm-bg)' }}>
+          <div className="card" style={{ marginTop: '0.9rem', background: 'var(--lamtek-bg)' }}>
             <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Demo access</h3>
             <p className="admin-muted" style={{ marginTop: 0 }}>
               Use these demo credentials to explore both customer and admin flows.
@@ -176,3 +178,4 @@ export default function Login() {
     </div>
   )
 }
+

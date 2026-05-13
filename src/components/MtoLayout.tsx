@@ -52,7 +52,7 @@ export default function MtoLayout() {
     { to: '/ordering', label: 'Lighting', hash: 'lighting' },
     { to: '/ordering', label: 'Wirework', hash: 'wirework' },
     { to: '/ordering', label: 'Fittings', hash: 'fittings' },
-    { to: '/ordering/mto/mouldings-accessories', label: 'Mouldings & Accessories' },
+    { to: '/ordering/mto/mouldings-accessories', label: 'Trims & pelmets (MTO)' },
   ]
 
   return (

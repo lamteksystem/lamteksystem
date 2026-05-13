@@ -7,6 +7,7 @@ import {
   type ShipmentRow,
   type LocationRow,
   type NotificationRuleSettingsRow,
+  type PickListRow,
   COURIER_OPTIONS,
   ORDER_LINK_REASONS,
 } from '@/types/database'
@@ -24,7 +25,9 @@ import { recalcOrderTotals } from '@/lib/orders'
 import { insertOrderEvent } from '@/lib/orderEvents'
 import { useStaff } from '@/hooks/useStaff'
 import { allocateStockForOrderShipmentAtomic } from '@/lib/stock'
+import { lamtekPortalLocations } from '@/lib/lamtekLocations'
 import { usePermission } from '@/hooks/usePermission'
+import { createPickListFromOrder } from '@/lib/pickLists'
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   quotation: 'Quotation',
@@ -191,7 +194,10 @@ export default function AdminOrderDetail() {
   const [orderEvents, setOrderEvents] = useState<OrderEventRow[]>([])
   const [historyTab, setHistoryTab] = useState<'status' | 'audit'>('status')
   const [locations, setLocations] = useState<LocationRow[]>([])
+  /** Hide legacy TM-era depots while DB migrations catch up */
+  const selectableLocations = useMemo(() => lamtekPortalLocations(locations), [locations])
   const [shipments, setShipments] = useState<ShipmentRow[]>([])
+  const [pickLists, setPickLists] = useState<PickListRow[]>([])
   const [customerOrders, setCustomerOrders] = useState<LinkedOrderPreview[]>([])
   const [childLinkedOrders, setChildLinkedOrders] = useState<LinkedOrderPreview[]>([])
   const [notificationRules, setNotificationRules] = useState<NotificationRuleSettingsRow[]>([])
@@ -211,6 +217,7 @@ export default function AdminOrderDetail() {
   const [showAdvancedPanels, setShowAdvancedPanels] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [trackingEmailSending, setTrackingEmailSending] = useState(false)
+  const [pickListBusy, setPickListBusy] = useState(false)
   const auditViewLoggedRef = useRef<string | null>(null)
 
   function dateInputToIso(d: string): string {
@@ -331,13 +338,14 @@ export default function AdminOrderDetail() {
 
   async function load() {
     if (!orderId) return
-    const [orderRes, linesRes, eventsRes, locationsRes, shipmentsRes, notificationRulesRes] = await Promise.all([
+    const [orderRes, linesRes, eventsRes, locationsRes, shipmentsRes, notificationRulesRes, pickListsRes] = await Promise.all([
       supabase.from('orders').select('*').eq('id', orderId).single(),
       supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price').eq('order_id', orderId),
       supabase.from('order_events').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
       supabase.from('locations').select('*').eq('active', true).order('sort_order').order('name'),
       supabase.from('shipments').select('*').eq('order_id', orderId).order('shipped_at', { ascending: false }),
       supabase.from('notification_rule_settings').select('*'),
+      supabase.from('pick_lists').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
     ])
     if (orderRes.data) {
       setOrder(orderRes.data as OrderRow)
@@ -409,6 +417,7 @@ export default function AdminOrderDetail() {
     const locs = (locationsRes.data ?? []) as LocationRow[]
     setLocations(locs)
     setShipments((shipmentsRes.data ?? []) as ShipmentRow[])
+    setPickLists((pickListsRes.data ?? []) as PickListRow[])
     setNotificationRules((notificationRulesRes.data ?? []) as NotificationRuleSettingsRow[])
     setShipForm((f) => ({
       ...f,
@@ -417,6 +426,27 @@ export default function AdminOrderDetail() {
       location_id: f.location_id || (locs[0]?.id ?? ''),
     }))
     setLoading(false)
+  }
+
+  async function generatePickList() {
+    if (!orderId || !canEditOrders || isArchived) return
+    setPickListBusy(true)
+    setActionError(null)
+    try {
+      const latestShipment = shipments[0] ?? null
+      const { pickListId } = await createPickListFromOrder({
+        orderId,
+        shipmentId: latestShipment?.id ?? null,
+        locationId: latestShipment?.location_id ?? shipForm.location_id ?? null,
+        actorUserId: staffProfile?.user_id ?? null,
+      })
+      await load()
+      navigate(`/admin/pick-lists/${pickListId}`)
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Could not generate pick list.')
+    } finally {
+      setPickListBusy(false)
+    }
   }
 
   const customerNotificationState = useMemo(() => {
@@ -1618,6 +1648,67 @@ export default function AdminOrderDetail() {
       </div>
 
       <div className="card admin-card">
+        <div className="admin-workflow-section-head">
+          <h2>Pick lists</h2>
+          <span className="admin-muted">{pickLists.length} linked</span>
+        </div>
+        <p className="admin-muted" style={{ marginTop: 0 }}>
+          Generate a warehouse pick list from this order, then track picked quantities.
+        </p>
+        <div className="admin-order-processing-actions" style={{ marginBottom: '0.75rem' }}>
+          <button
+            type="button"
+            className="btn btn-small"
+            onClick={generatePickList}
+            disabled={pickListBusy || isArchived}
+          >
+            {pickListBusy ? 'Generating…' : 'Generate pick list'}
+          </button>
+          {pickLists[0] && (
+            <>
+              <Link to={`/admin/pick-lists/${pickLists[0].id}`} className="btn btn-small btn-outline">Open latest pick list</Link>
+              <Link to={`/admin/pick-lists/${pickLists[0].id}/print`} target="_blank" rel="noopener noreferrer" className="btn btn-small btn-outline">
+                Print latest pick list
+              </Link>
+            </>
+          )}
+        </div>
+        {pickLists.length === 0 ? (
+          <p className="admin-muted" style={{ marginBottom: 0 }}>No pick lists generated yet.</p>
+        ) : (
+          <div className="admin-table-wrap admin-table-wrap--compact">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Pick list</th>
+                  <th>Status</th>
+                  <th>Generated</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pickLists.map((pickList) => (
+                  <tr key={pickList.id}>
+                    <td>{pickList.id.slice(0, 8)}</td>
+                    <td>{pickList.status}</td>
+                    <td>{new Date(pickList.generated_at).toLocaleString()}</td>
+                    <td>
+                      <div className="admin-order-processing-actions">
+                        <Link to={`/admin/pick-lists/${pickList.id}`} className="btn btn-small btn-outline">Open</Link>
+                        <Link to={`/admin/pick-lists/${pickList.id}/print`} target="_blank" rel="noopener noreferrer" className="btn btn-small btn-outline">
+                          Print
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="card admin-card">
         <div className="admin-card-heading-row">
           <h2 style={{ marginBottom: 0 }}>Advanced order panels</h2>
           <button
@@ -1740,13 +1831,13 @@ export default function AdminOrderDetail() {
 
           {delivery.fulfillment_method === 'collect' && (
             <>
-              <label>Collection depot</label>
+              <label>Collection point</label>
               <select
                 value={delivery.collection_location_id}
                 onChange={(e) => setDelivery((d) => ({ ...d, collection_location_id: e.target.value }))}
               >
                 <option value="">— Select —</option>
-                {locations.map((l) => (
+                {selectableLocations.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.code ? `${l.code} — ` : ''}{l.name}
                   </option>
@@ -2436,7 +2527,7 @@ export default function AdminOrderDetail() {
           )}
           <div className="admin-inline-form--stack" style={{ marginTop: '0.75rem' }}>
             <select value={shipForm.location_id} onChange={(e) => setShipForm((f) => ({ ...f, location_id: e.target.value }))}>
-              {locations.map((l) => (
+              {selectableLocations.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.code ? `${l.code} — ` : ''}{l.name}
                 </option>

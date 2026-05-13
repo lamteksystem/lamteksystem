@@ -8,6 +8,7 @@ import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import type { ProductRow } from '@/types/database'
 import type { CategoryRow } from '@/types/database'
 import type { LocationRow } from '@/types/database'
+import { lamtekPortalLocations } from '@/lib/lamtekLocations'
 import type { ProductStockRow } from '@/types/database'
 
 const STOCK_COLUMNS = [
@@ -67,7 +68,9 @@ export default function AdminStock() {
 
   const loadLocations = useCallback(async () => {
     const { data } = await supabase.from('locations').select('*').order('sort_order').order('name')
-    setLocations(data ?? [])
+    const locs = lamtekPortalLocations((data ?? []) as LocationRow[])
+    setLocations(locs)
+    setLocationId((prev) => (prev && locs.some((l) => l.id === prev) ? prev : (locs[0]?.id ?? '')))
   }, [])
 
   const loadData = useCallback(async (locId: string) => {

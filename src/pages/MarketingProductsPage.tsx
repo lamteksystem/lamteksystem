@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import MarketingHeader from '@/components/MarketingHeader'
+import MarketingHeroBackdrop from '@/components/marketing/MarketingHeroBackdrop'
+import { publicAsset } from '@/lib/basePath'
 
 const TRADITIONAL_STYLES = [
   'Abbotsbury',
@@ -41,6 +43,7 @@ export default function MarketingProductsPage() {
       <MarketingHeader />
       <main className="marketing-main marketing-main--wide">
         <section className="marketing-hero marketing-hero--image card">
+          <MarketingHeroBackdrop variant="media" />
           <div className="marketing-hero-copy">
             <p className="marketing-kicker">Trade kitchens &amp; bedrooms</p>
             <h1>Flat-pack carcasses and complete solutions</h1>
@@ -62,12 +65,25 @@ export default function MarketingProductsPage() {
           </div>
           <div className="marketing-hero-media">
             <img
-              src="/marketing/kitchen-navy.png"
+              src={publicAsset('marketing/kitchen-navy.png')}
               alt="Shaker-style kitchen with navy cabinetry"
               loading="eager"
               className="marketing-hero-photo"
             />
           </div>
+        </section>
+
+        <section className="marketing-brand-blocks" aria-label="Lamtek service routes">
+          <article className="marketing-brand-block marketing-brand-block--lamtek">
+            <h2>Lamtek</h2>
+            <p>Carcasses, components, and trade purchasing with account-based pricing in the portal.</p>
+            <a href="https://www.lamtek.co.uk/" target="_blank" rel="noreferrer" className="btn btn-outline">lamtek.co.uk</a>
+          </article>
+          <article className="marketing-brand-block marketing-brand-block--complete">
+            <h2>Lamtek Complete</h2>
+            <p>Complete kitchen ranges and door-led solutions for trade projects and installations.</p>
+            <a href="https://lamtekcomplete.co.uk/" target="_blank" rel="noreferrer" className="btn">lamtekcomplete.co.uk</a>
+          </article>
         </section>
 
         <section className="card marketing-prose-block">
@@ -79,9 +95,44 @@ export default function MarketingProductsPage() {
           </p>
         </section>
 
+        <section className="marketing-illustration-grid">
+          <article className="marketing-illustration-card">
+            <div className="marketing-illustration-icon" aria-hidden>
+              <svg viewBox="0 0 48 48">
+                <rect x="7" y="8" width="34" height="28" rx="4" />
+                <path d="M14 18h20M14 24h12M14 30h16" />
+              </svg>
+            </div>
+            <h3>Structured product data</h3>
+            <p>Popular products are visible publicly, while account holders unlock full catalogue and trade pricing.</p>
+          </article>
+          <article className="marketing-illustration-card">
+            <div className="marketing-illustration-icon" aria-hidden>
+              <svg viewBox="0 0 48 48">
+                <path d="M7 26h34v12H7z" />
+                <path d="M10 18h28v8H10zM14 11h20v7H14z" />
+              </svg>
+            </div>
+            <h3>Trade-focused manufacturing</h3>
+            <p>Rapid Cab assembly, robust specifications, and supply confidence for installers and merchants.</p>
+          </article>
+          <article className="marketing-illustration-card">
+            <div className="marketing-illustration-icon" aria-hidden>
+              <svg viewBox="0 0 48 48">
+                <circle cx="13" cy="24" r="5" />
+                <circle cx="24" cy="24" r="5" />
+                <circle cx="35" cy="24" r="5" />
+                <path d="M8 36h32" />
+              </svg>
+            </div>
+            <h3>Two-brand pathway</h3>
+            <p>Use Lamtek for components and Lamtek Complete for full-kitchen programmes in one connected journey.</p>
+          </article>
+        </section>
+
         <section className="marketing-split card">
           <div className="marketing-split-media">
-            <img src="/marketing/kitchen-hadfield.png" alt="Bright kitchen with cream and blue-grey cabinetry" loading="lazy" />
+            <img src={publicAsset('marketing/kitchen-hadfield.png')} alt="Bright kitchen with cream and blue-grey cabinetry" loading="lazy" />
           </div>
           <div className="marketing-split-copy">
             <h2>Bedrooms and living spaces</h2>

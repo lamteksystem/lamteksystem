@@ -363,7 +363,7 @@ export default function AdminLocations() {
                 <div className="admin-modal-form-row">
                   <label>
                     Name
-                    <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required placeholder="e.g. Rochdale (Head Office)" />
+                    <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required placeholder="e.g. Kirkby-in-Ashfield (Head Office)" />
                   </label>
                   <label>
                     Code

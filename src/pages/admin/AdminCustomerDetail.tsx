@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import type { CustomerProfileRow, CustomerNoteRow, OrderRow, CustomerGroupRow, CustomerLocationRow, TradeTypeRow, CompanyTypeRow, OpportunityRow, ActivityRow, AccountTransactionRow } from '@/types/database'
@@ -386,7 +386,7 @@ export default function AdminCustomerDetail() {
       </div>
 
       {!profile.staff_portal_access_consent_at ? (
-        <div className="card admin-card" style={{ borderColor: 'var(--tm-gold, #b8860b)', marginBottom: '1rem' }}>
+        <div className="card admin-card" style={{ borderColor: 'var(--lamtek-gold, #b8860b)', marginBottom: '1rem' }}>
           <p style={{ margin: 0 }}>
             <strong>Staff portal access not recorded.</strong> This customer must accept the authorisation under{' '}
             <em>My account → Staff portal access</em> before anyone can use <strong>View as customer</strong>.
@@ -574,7 +574,7 @@ export default function AdminCustomerDetail() {
           {accountError && (
             <div className="admin-confirm-box" role="alert">
               <p>
-                Accounting data isn’t available yet. ({accountError}) Run the accounting migrations to enable statements and balances.
+                Accounting data isn't available yet. ({accountError}) Run the accounting migrations to enable statements and balances.
               </p>
             </div>
           )}
@@ -895,3 +895,4 @@ export default function AdminCustomerDetail() {
     </div>
   )
 }
+

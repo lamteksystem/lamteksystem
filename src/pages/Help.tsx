@@ -18,7 +18,7 @@ const HELP_SECTIONS: HelpSection[] = [
     steps: [
       'Use the top search bar to quickly find a product, order reference, download, or support ticket.',
       'Go to `Products` to browse the catalogue and open product details.',
-      'Choose `Create Order`, then follow the ordering flow to build your quote/order.',
+      'Choose `Create Order`, pick `Manual order` or `Guided Order`, then build your quote/order.',
       'Use `Cart` to review your lines and totals before submitting.',
       'Check `Downloads` for brochures, technical data, and pricelists.',
       'Use `Support` to raise a ticket (question, issue, or returns). You can upload files on ticket replies.',
@@ -31,7 +31,7 @@ const HELP_SECTIONS: HelpSection[] = [
       'Ordering is designed to be step-by-step so you can build exactly what you need and avoid missing details.',
     steps: [
       'Go to `Create Order` from the top navigation.',
-      'Select the ordering mode (standard or guided, if shown).',
+      'At `Create order`, pick `Manual order` (browse freely) or `Guided Order` (step-by-step).',
       'Set your date/range inputs as prompted.',
       'Add your items using the product picker.',
       'Review the cart to confirm quantities, options, and totals.',

@@ -1,0 +1,471 @@
+/**
+ * Admin / staff workspace — visual language aligned with marketing (burgundy + cream).
+ * Everything is scoped under `.admin-app` so customer UI is unchanged.
+ */
+.admin-app {
+  --admin-cream: #fffaf9;
+  --admin-cream-mid: #f8f3f5;
+  --admin-rail-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  --admin-topbar-h: linear-gradient(90deg, rgba(103, 39, 50, 0.35) 0%, rgba(103, 39, 50, 0.08) 42%, transparent 100%);
+}
+
+/* Main canvas: soft radiants + cream (marketing-style stack) */
+.admin-app .admin-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  margin: 0 auto;
+  max-width: none;
+  width: 100%;
+  isolation: isolate;
+  overflow-x: clip;
+  background:
+    radial-gradient(980px 420px at 96% -8%, rgba(103, 39, 50, 0.14), transparent 58%),
+    radial-gradient(720px 380px at -6% 40%, rgba(138, 58, 73, 0.1), transparent 52%),
+    radial-gradient(560px 320px at 48% 102%, rgba(103, 39, 50, 0.06), transparent 48%),
+    linear-gradient(185deg, var(--admin-cream) 0%, var(--lamtek-bg) 45%, var(--admin-cream-mid) 100%);
+}
+
+/* SVG decor — sits under scrollable admin content */
+.admin-app .admin-main-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.admin-app .admin-main-backdrop-svg {
+  position: absolute;
+  inset: -12% -8% auto -8%;
+  width: 116%;
+  height: min(118vh, 1100px);
+  min-height: 520px;
+  opacity: 0.55;
+}
+
+.admin-app .admin-main-inner {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: clamp(1rem, 2.2vw, 1.75rem);
+}
+
+/* Sidebar: slight depth + faint brand wash */
+.admin-app .admin-sidebar {
+  background-color: #141013;
+  box-shadow: var(--admin-rail-shadow);
+  border-right: 1px solid rgba(138, 58, 73, 0.22);
+  background-image:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.05) 0%, transparent 38%),
+    linear-gradient(180deg, #181215 0%, #141013 100%);
+}
+
+/* Top bar — soft brand highlight (reads more “designed” than flat black) */
+.admin-app .admin-topbar {
+  background-color: #141013;
+  background-image:
+    var(--admin-topbar-h),
+    linear-gradient(180deg, #1c1518 0%, #141013 100%);
+  border-bottom: 1px solid rgba(138, 58, 73, 0.32);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Page chrome */
+.admin-app .admin-page .page-intro {
+  max-width: 62ch;
+  line-height: 1.55;
+  color: var(--lamtek-text-muted);
+}
+
+.admin-app .admin-page-header h1,
+.admin-app .admin-page-title {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--lamtek-text);
+}
+
+/* Page header — “hero strip” on listings (matches marketing card language) */
+.admin-app .admin-page-header,
+.admin-app .admin-orders-header {
+  margin-bottom: 1.35rem;
+  padding: 1rem 1.2rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--lamtek-border) 78%, var(--lamtek-gold) 22%);
+  background:
+    radial-gradient(900px 120px at 0% 0%, rgba(103, 39, 50, 0.1), transparent 55%),
+    linear-gradient(165deg, #ffffff 0%, var(--admin-cream-mid) 100%);
+  box-shadow:
+    0 6px 22px rgba(103, 39, 50, 0.07),
+    0 0 0 1px rgba(255, 255, 255, 0.75) inset;
+}
+
+.admin-app .admin-page-header + .admin-filters,
+.admin-app .admin-page-header + .admin-orders-quick-filters,
+.admin-app .admin-orders-header + .admin-orders-quick-filters {
+  margin-top: -0.25rem;
+}
+
+/* Route content — light entrance */
+.admin-app .admin-page {
+  animation: admin-route-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.admin-app .admin-dashboard {
+  animation: admin-route-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes admin-route-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Filter row — cohesive bar */
+.admin-app .admin-filters {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.35rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--lamtek-border) 85%, var(--lamtek-gold) 15%);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(103, 39, 50, 0.05);
+}
+
+.admin-app .admin-filter-input,
+.admin-app .admin-filters select,
+.admin-app .admin-filters input {
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--lamtek-border) 80%, var(--lamtek-gold) 20%);
+}
+
+.admin-app .admin-orders-quick-filters {
+  padding: 0.65rem 0.95rem;
+  margin-bottom: 1.35rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--lamtek-border) 85%, var(--lamtek-gold) 15%);
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(103, 39, 50, 0.05);
+}
+
+.admin-app .admin-orders-quick-filters .btn-small.active {
+  background: linear-gradient(180deg, var(--lamtek-gold-light), var(--lamtek-gold));
+  border-color: var(--lamtek-gold);
+  color: var(--lamtek-white);
+}
+
+
+/* Cards: marketing-style border + inner highlight */
+.admin-app .admin-card,
+.admin-app .card.admin-card {
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--lamtek-border) 82%, var(--lamtek-gold) 18%);
+  background: var(--lamtek-surface);
+  box-shadow:
+    0 4px 18px rgba(103, 39, 50, 0.07),
+    0 0 0 1px rgba(255, 255, 255, 0.65) inset;
+}
+
+.admin-app .admin-card--interactive:hover {
+  border-color: color-mix(in srgb, var(--lamtek-gold) 45%, var(--lamtek-border) 55%);
+  box-shadow:
+    0 8px 26px rgba(103, 39, 50, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+}
+
+/* Tables — stronger frame + zebra + header band */
+.admin-app .table-wrap,
+.admin-app .admin-table-wrap {
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--lamtek-border) 82%, var(--lamtek-gold) 18%);
+  background: var(--lamtek-surface);
+  box-shadow:
+    0 6px 24px rgba(103, 39, 50, 0.07),
+    0 0 0 1px rgba(255, 255, 255, 0.72) inset;
+  overflow: hidden;
+}
+
+.admin-app .admin-table thead th {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--lamtek-bg) 88%, var(--lamtek-gold) 12%) 0%,
+    color-mix(in srgb, var(--lamtek-bg) 94%, var(--lamtek-gold) 6%) 100%
+  );
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.admin-app .admin-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--lamtek-bg) 96%, var(--lamtek-gold) 4%);
+}
+
+.admin-app .admin-table tbody tr:hover {
+  background: color-mix(in srgb, var(--lamtek-bg) 86%, var(--lamtek-gold) 14%);
+}
+
+/* Detail forms — replace legacy amber underline with brand */
+.admin-app .admin-detail-section-title {
+  border-bottom-color: color-mix(in srgb, var(--lamtek-gold) 55%, var(--lamtek-border) 45%);
+  letter-spacing: 0.06em;
+}
+
+/* ========== Dashboard ========== */
+.admin-app .admin-dashboard {
+  --admin-dashboard-radius: 14px;
+}
+
+.admin-app .admin-dashboard-hero {
+  margin-bottom: var(--admin-dashboard-gap);
+  padding: 1.35rem 1.5rem 1.45rem;
+  border-radius: 18px;
+  border: 2px solid color-mix(in srgb, var(--lamtek-border) 65%, var(--lamtek-gold) 35%);
+  background:
+    radial-gradient(720px 220px at 100% 0%, rgba(103, 39, 50, 0.1), transparent 62%),
+    linear-gradient(155deg, #ffffff 0%, var(--admin-cream-mid) 100%);
+  box-shadow:
+    0 18px 44px rgba(103, 39, 50, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.75) inset;
+}
+
+.admin-app .admin-dashboard-hero-meta {
+  font-weight: 500;
+  color: var(--lamtek-text-muted);
+}
+
+.admin-app .admin-dashboard-hero-lead {
+  margin: 0.4rem 0 0;
+  max-width: 58ch;
+  line-height: 1.55;
+  color: var(--lamtek-text-muted);
+  font-size: 0.96rem;
+}
+
+.admin-app .admin-stat-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-inline: auto;
+  margin-bottom: 0.55rem;
+}
+
+.admin-app .admin-dashboard-attention {
+  background: linear-gradient(135deg, rgba(103, 39, 50, 0.14) 0%, rgba(168, 82, 99, 0.1) 100%);
+  border: 1px solid rgba(103, 39, 50, 0.28);
+  border-radius: var(--admin-dashboard-radius);
+  box-shadow: 0 8px 24px rgba(103, 39, 50, 0.08);
+}
+
+.admin-app .admin-dashboard-attention-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--lamtek-gold);
+}
+
+.admin-app .admin-dashboard-attention-text strong {
+  color: var(--lamtek-gold);
+}
+
+.admin-app .admin-dashboard-attention-btn {
+  background: var(--lamtek-gold);
+  color: var(--lamtek-white);
+  border-radius: 999px;
+  padding-inline: 1rem;
+}
+
+.admin-app .admin-dashboard-attention-btn:hover {
+  background: var(--lamtek-gold-light);
+  color: var(--lamtek-white);
+}
+
+.admin-app .admin-stat-card {
+  border-radius: var(--admin-dashboard-radius);
+  border: 1px solid color-mix(in srgb, var(--lamtek-border) 82%, var(--lamtek-gold) 18%);
+  background:
+    linear-gradient(165deg, #ffffff 0%, var(--admin-cream) 100%);
+  box-shadow:
+    0 6px 20px rgba(103, 39, 50, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.72) inset;
+}
+
+.admin-app .admin-stat-card-icon svg {
+  color: var(--lamtek-gold);
+  opacity: 0.95;
+}
+
+.admin-app .admin-stat-card--link:hover .admin-stat-card-icon svg {
+  color: var(--lamtek-gold-light);
+}
+
+.admin-app .admin-dashboard-section {
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--lamtek-border) 82%, var(--lamtek-gold) 18%);
+  background: var(--lamtek-surface);
+  box-shadow:
+    0 6px 22px rgba(103, 39, 50, 0.07),
+    0 0 0 1px rgba(255, 255, 255, 0.75) inset;
+}
+
+.admin-app .admin-dashboard-section-head h2,
+.admin-app .admin-dashboard-section h2 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.admin-app .admin-dashboard-section-link {
+  border-radius: 999px;
+  padding: 0.25rem 0.85rem;
+  background: color-mix(in srgb, var(--lamtek-gold) 9%, transparent);
+  font-weight: 600;
+}
+
+.admin-app .admin-dashboard-section-link:hover {
+  background: color-mix(in srgb, var(--lamtek-gold) 16%, transparent);
+  text-decoration: none;
+}
+
+.admin-app .admin-dashboard-table-wrap {
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--lamtek-border) 88%, var(--lamtek-gold) 12%);
+  overflow: hidden;
+}
+
+.admin-app .admin-dashboard-table thead {
+  background: color-mix(in srgb, var(--lamtek-bg) 94%, var(--lamtek-gold) 6%);
+}
+
+/* Quick actions — icon-led tiles */
+.admin-app .admin-quick-action-card {
+  border-radius: 14px;
+  padding: 1.15rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--lamtek-border) 78%, var(--lamtek-gold) 22%);
+  background:
+    linear-gradient(180deg, #ffffff 0%, var(--admin-cream-mid) 100%);
+  box-shadow: 0 4px 16px rgba(103, 39, 50, 0.07);
+}
+
+.admin-app .admin-quick-action-card:hover {
+  border-color: var(--lamtek-gold);
+  box-shadow: 0 10px 28px rgba(103, 39, 50, 0.12);
+}
+
+.admin-app .admin-quick-action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lamtek-gold);
+}
+
+.admin-app .admin-quick-action-icon svg {
+  stroke-width: 2;
+}
+
+.admin-app .admin-quick-action-card:hover .admin-quick-action-icon {
+  color: var(--lamtek-gold-light);
+}
+
+.admin-app .admin-dashboard-demo-sequence {
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--lamtek-gold) 38%, var(--lamtek-border) 62%);
+  background: color-mix(in srgb, var(--lamtek-surface) 92%, var(--lamtek-gold) 8%);
+}
+
+.admin-app .admin-dashboard-actions-group {
+  margin-bottom: 1.1rem;
+}
+
+.admin-app .admin-dashboard-actions-group:last-child {
+  margin-bottom: 0;
+}
+
+.admin-app .admin-dashboard-demo-sequence-intro {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.admin-app .admin-dashboard-actions-group-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--lamtek-text-muted);
+}
+
+/* Empty / loading states feel intentional */
+.admin-app .admin-dashboard-empty {
+  border-radius: 12px;
+  border: 1px dashed var(--lamtek-border);
+  background: color-mix(in srgb, var(--lamtek-bg) 96%, var(--lamtek-gold) 4%);
+}
+
+.admin-app .admin-loading-state p {
+  font-weight: 500;
+  color: var(--lamtek-text-muted);
+}
+
+/* Dark theme: keep depth without pastel cream wash */
+[data-theme="dark"] .admin-app .admin-main {
+  background:
+    radial-gradient(900px 400px at 100% -6%, rgba(103, 39, 50, 0.22), transparent 58%),
+    radial-gradient(640px 360px at -4% 45%, rgba(138, 58, 73, 0.12), transparent 52%),
+    linear-gradient(185deg, #141011 0%, var(--lamtek-bg) 48%, #121013 100%);
+}
+
+[data-theme="dark"] .admin-app .admin-dashboard-hero {
+  border-color: color-mix(in srgb, var(--lamtek-border) 72%, var(--lamtek-gold) 28%);
+  background:
+    radial-gradient(700px 200px at 100% 0%, rgba(103, 39, 50, 0.35), transparent 58%),
+    linear-gradient(165deg, var(--lamtek-surface) 0%, #221a1d 100%);
+}
+
+[data-theme="dark"] .admin-app .admin-stat-card {
+  background: linear-gradient(165deg, var(--lamtek-surface) 0%, #1c1517 100%);
+}
+
+[data-theme="dark"] .admin-app .admin-quick-action-card {
+  background: linear-gradient(180deg, var(--lamtek-surface) 0%, #1a1416 100%);
+}
+
+[data-theme="dark"] .admin-app .admin-main-backdrop-svg {
+  opacity: 0.34;
+}
+
+[data-theme="dark"] .admin-app .admin-page-header,
+[data-theme="dark"] .admin-app .admin-orders-header {
+  background:
+    radial-gradient(900px 120px at 0% 0%, rgba(103, 39, 50, 0.28), transparent 55%),
+    linear-gradient(165deg, var(--lamtek-surface) 0%, #1e1618 100%);
+  border-color: color-mix(in srgb, var(--lamtek-border) 72%, var(--lamtek-gold) 28%);
+}
+
+[data-theme="dark"] .admin-app .admin-filters,
+[data-theme="dark"] .admin-app .admin-orders-quick-filters {
+  background: rgba(18, 14, 15, 0.72);
+  border-color: color-mix(in srgb, var(--lamtek-border) 75%, var(--lamtek-gold) 25%);
+}
+
+.admin-app .admin-catalogue-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-app .admin-page,
+  .admin-app .admin-dashboard {
+    animation: none;
+  }
+}

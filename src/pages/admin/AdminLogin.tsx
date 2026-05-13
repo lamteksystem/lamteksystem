@@ -7,8 +7,8 @@ import BrandLogo from '@/components/BrandLogo'
 
 const DEMO_CUSTOMER_EMAIL = 'demo@lamtek.co.uk'
 const DEMO_CUSTOMER_PASSWORD = 'Demo123!'
-const DEMO_ADMIN_EMAIL = 'owners-demo@lamtek.co.uk'
-const DEMO_ADMIN_PASSWORD = 'Lamtek-26'
+const DEMO_ADMIN_EMAIL = 'lamteksystem@gmail.com'
+const DEMO_ADMIN_PASSWORD = 'LamtekSystem26'
 
 export default function AdminLogin() {
   const { user, loading } = useAuth()
@@ -18,12 +18,15 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [confirmNotice, setConfirmNotice] = useState('')
   const showDemoCredentials = useMemo(() => {
     const host = window.location.hostname.toLowerCase()
     return (
       host.includes('demo.lamtek.co.uk') ||
       host.includes('lamtek-demo') ||
-      host.includes('vercel.app')
+      host.includes('vercel.app') ||
+      host === 'localhost' ||
+      host === '127.0.0.1'
     )
   }, [])
 
@@ -49,7 +52,11 @@ export default function AdminLogin() {
     const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
     setSubmitting(false)
     if (err) {
-      setError(err.message ?? 'Login failed')
+      if (err.message?.toLowerCase().includes('email not confirmed')) {
+        setError('Email not confirmed yet. Use "Resend confirmation" below, then confirm and sign in again.')
+      } else {
+        setError(err.message ?? 'Login failed')
+      }
       return
     }
     const { data: profile } = await supabase
@@ -64,6 +71,32 @@ export default function AdminLogin() {
     }
   }
 
+  async function resendConfirmation() {
+    setConfirmNotice('')
+    setError('')
+    if (!email) {
+      setError('Enter your staff email first, then use Resend confirmation.')
+      return
+    }
+    const redirectTo = `${window.location.origin}/admin/login`
+    const { error: resendErr } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: redirectTo },
+    })
+    if (resendErr) {
+      setError(resendErr.message)
+      return
+    }
+    setConfirmNotice('Confirmation email sent. Open it, confirm your address, then sign in again.')
+  }
+
+  async function quickFillLamtekAdmin() {
+    setEmail(DEMO_ADMIN_EMAIL)
+    setPassword(DEMO_ADMIN_PASSWORD)
+    setConfirmNotice('')
+  }
+
   return (
     <div className="login-page admin-login-page">
       <div className="login-card card admin-login-card">
@@ -76,6 +109,7 @@ export default function AdminLogin() {
         <p className="login-subtitle">Sign in with your Lamtek staff email to access the admin dashboard, orders, and customers.</p>
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="login-error">{error}</div>}
+          {confirmNotice && <div className="admin-muted" style={{ marginBottom: '0.55rem' }}>{confirmNotice}</div>}
           <label>
             Staff email <span className="required">*</span>
           </label>
@@ -100,6 +134,14 @@ export default function AdminLogin() {
           <button type="submit" className="btn btn-block" disabled={submitting}>
             {submitting ? 'Signing in…' : 'Sign in to admin'}
           </button>
+          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-outline btn-small" onClick={resendConfirmation}>
+              Resend confirmation
+            </button>
+            <button type="button" className="btn btn-outline btn-small" onClick={quickFillLamtekAdmin}>
+              Use Lamtek admin credentials
+            </button>
+          </div>
         </form>
         <p className="login-footer">
           <Link to="/login">Customer login</Link>
@@ -107,7 +149,7 @@ export default function AdminLogin() {
           <a href="mailto:info@lamtek.co.uk">Need access?</a>
         </p>
         {showDemoCredentials && (
-          <div className="card" style={{ marginTop: '0.9rem', background: 'var(--tm-bg)' }}>
+          <div className="card" style={{ marginTop: '0.9rem', background: 'var(--lamtek-bg)' }}>
             <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Demo access</h3>
             <div style={{ display: 'grid', gap: '0.55rem' }}>
               <div>
@@ -141,3 +183,4 @@ export default function AdminLogin() {
     </div>
   )
 }
+

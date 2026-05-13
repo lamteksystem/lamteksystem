@@ -1,6 +1,28 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import type { LucideIcon } from 'lucide-react'
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  BookOpen,
+  Calendar,
+  ClipboardCheck,
+  ClipboardList,
+  FileText,
+  Kanban,
+  MapPin,
+  Package,
+  ScanBarcode,
+  PlusCircle,
+  PoundSterling,
+  ShoppingCart,
+  Users,
+  Zap,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { withBasePath } from '@/lib/basePath'
 import { useStaff } from '@/hooks/useStaff'
 
 type RecentOrder = {
@@ -11,33 +33,34 @@ type RecentOrder = {
   total_inc_vat: number
 }
 
-const WORKFLOW_ACTIONS = [
+const WORKFLOW_ACTIONS: { heading: string; items: { to: string; label: string; Icon: LucideIcon }[] }[] = [
   {
     heading: 'Orders',
     items: [
-      { to: '/admin/orders/processing', label: 'Process orders', icon: '⚡' },
-      { to: '/admin/orders', label: 'All orders', icon: '📋' },
-      { to: '/admin/create-order', label: 'Create order', icon: '➕' },
-      { to: '/admin/orders/reminders', label: 'Reminders', icon: '🔔' },
+      { to: '/admin/orders/processing', label: 'Process orders', Icon: Zap },
+      { to: '/admin/orders', label: 'All orders', Icon: ClipboardList },
+      { to: '/admin/create-order', label: 'Create order', Icon: PlusCircle },
+      { to: '/admin/pick-lists', label: 'Pick lists', Icon: ScanBarcode },
+      { to: '/admin/orders/reminders', label: 'Reminders', Icon: Bell },
     ],
   },
   {
     heading: 'Customers & CRM',
     items: [
-      { to: '/admin/customers', label: 'Customers', icon: '👥' },
-      { to: '/admin/crm/open-orders', label: 'Open orders', icon: '🛒' },
-      { to: '/admin/crm/activity', label: 'Activity', icon: '📰' },
-      { to: '/admin/crm/pipeline', label: 'Pipeline', icon: '📈' },
+      { to: '/admin/customers', label: 'Customers', Icon: Users },
+      { to: '/admin/crm/open-orders', label: 'Open orders', Icon: ShoppingCart },
+      { to: '/admin/crm/activity', label: 'Activity', Icon: Activity },
+      { to: '/admin/crm/pipeline', label: 'Pipeline', Icon: Kanban },
     ],
   },
   {
-    heading: 'Catalogue & Operations',
+    heading: 'Catalogue & operations',
     items: [
-      { to: '/admin/catalogue', label: 'Catalogue', icon: '📦' },
-      { to: '/admin/stock', label: 'Stock take', icon: '📊' },
-      { to: '/admin/locations', label: 'Locations', icon: '📍' },
-      { to: '/admin/uploads', label: 'Brochure & files', icon: '📄' },
-      { to: '/admin/reports', label: 'Reports', icon: '📌' },
+      { to: '/admin/catalogue', label: 'Catalogue', Icon: BookOpen },
+      { to: '/admin/stock', label: 'Stock take', Icon: ClipboardCheck },
+      { to: '/admin/locations', label: 'Locations', Icon: MapPin },
+      { to: '/admin/uploads', label: 'Brochure & files', Icon: FileText },
+      { to: '/admin/reports', label: 'Reports', Icon: BarChart3 },
     ],
   },
 ]
@@ -150,7 +173,7 @@ export default function AdminDashboard() {
         <div className="admin-dashboard-hero-text">
           <h1 className="admin-dashboard-hero-title">{greeting}, {displayName}</h1>
           <p className="admin-dashboard-hero-meta">{dateStr}</p>
-          <p className="admin-muted" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
+          <p className="admin-dashboard-hero-lead">
             Use this as your daily workspace: process orders first, then follow up customers, then maintain stock and catalogue.
           </p>
         </div>
@@ -158,7 +181,9 @@ export default function AdminDashboard() {
 
       {stats.ordersPlaced > 0 && (
         <div className="admin-dashboard-attention">
-          <span className="admin-dashboard-attention-icon" aria-hidden>⚠</span>
+          <span className="admin-dashboard-attention-icon" aria-hidden>
+            <AlertTriangle size={22} strokeWidth={2} />
+          </span>
           <span className="admin-dashboard-attention-text">
             <strong>{stats.ordersPlaced}</strong> order{stats.ordersPlaced !== 1 ? 's' : ''} placed and awaiting processing
           </span>
@@ -170,36 +195,48 @@ export default function AdminDashboard() {
 
       <section className="admin-dashboard-metrics" aria-label="Key metrics">
         <Link to="/admin/orders" className="admin-stat-card admin-stat-card--link admin-stat-card--orders">
-          <span className="admin-stat-card-icon" aria-hidden>📋</span>
+          <span className="admin-stat-card-icon" aria-hidden>
+            <ClipboardList size={24} strokeWidth={2} />
+          </span>
           <span className="admin-stat-value">{stats.ordersCount}</span>
           <span className="admin-stat-label">Total orders</span>
           <span className="admin-stat-card-hint">View all →</span>
         </Link>
         <Link to="/admin/orders/processing" className="admin-stat-card admin-stat-card--link admin-stat-card--placed">
-          <span className="admin-stat-card-icon" aria-hidden>⚡</span>
+          <span className="admin-stat-card-icon" aria-hidden>
+            <Zap size={24} strokeWidth={2} />
+          </span>
           <span className="admin-stat-value">{stats.ordersPlaced}</span>
           <span className="admin-stat-label">Awaiting process</span>
           <span className="admin-stat-card-hint">Process →</span>
         </Link>
         <div className="admin-stat-card admin-stat-card--today">
-          <span className="admin-stat-card-icon" aria-hidden>📅</span>
+          <span className="admin-stat-card-icon" aria-hidden>
+            <Calendar size={24} strokeWidth={2} />
+          </span>
           <span className="admin-stat-value">{stats.ordersToday}</span>
           <span className="admin-stat-label">Orders today</span>
         </div>
         <Link to="/admin/customers" className="admin-stat-card admin-stat-card--link admin-stat-card--customers">
-          <span className="admin-stat-card-icon" aria-hidden>👥</span>
+          <span className="admin-stat-card-icon" aria-hidden>
+            <Users size={24} strokeWidth={2} />
+          </span>
           <span className="admin-stat-value">{stats.customersCount}</span>
           <span className="admin-stat-label">Customers</span>
           <span className="admin-stat-card-hint">View →</span>
         </Link>
         <Link to="/admin/catalogue" className="admin-stat-card admin-stat-card--link admin-stat-card--products">
-          <span className="admin-stat-card-icon" aria-hidden>📦</span>
+          <span className="admin-stat-card-icon" aria-hidden>
+            <Package size={24} strokeWidth={2} />
+          </span>
           <span className="admin-stat-value">{stats.productsCount}</span>
           <span className="admin-stat-label">Products</span>
           <span className="admin-stat-card-hint">Catalogue →</span>
         </Link>
         <div className="admin-stat-card admin-stat-card--revenue">
-          <span className="admin-stat-card-icon" aria-hidden>£</span>
+          <span className="admin-stat-card-icon" aria-hidden>
+            <PoundSterling size={24} strokeWidth={2} />
+          </span>
           <span className="admin-stat-value">{formatCurrency(stats.revenuePaid)}</span>
           <span className="admin-stat-label">Paid / invoiced value</span>
         </div>
@@ -257,20 +294,27 @@ export default function AdminDashboard() {
         <section className="admin-dashboard-section admin-dashboard-actions">
           <h2>Workflow shortcuts</h2>
           <div className="admin-dashboard-demo-sequence">
-            <p style={{ margin: 0 }}>
-              Demo sequence: <Link to="/admin/orders/processing">Process orders</Link> →{' '}
-              <Link to="/admin/orders">open an order</Link> and update status/delivery →{' '}
-              <Link to="/admin/customers">open customer</Link> for CRM/accounting →{' '}
-              <Link to="/admin/tickets">review tickets</Link>.
+            <p className="admin-dashboard-demo-sequence-intro">
+              <strong>Sales-ready walk-through:</strong> open the{' '}
+              <a href={withBasePath('/site/products')} target="_blank" rel="noopener noreferrer">
+                public trade site (new tab)
+              </a>
+              , then sign in via <Link to="/login">customer login</Link> to show ordering and account. Back in admin:{' '}
+              <Link to="/admin/orders/processing">process orders</Link>,{' '}
+              <Link to="/admin/pick-lists">warehouse pick lists</Link>,{' '}
+              <Link to="/admin/crm/open-orders">CRM open orders</Link>,{' '}
+              <Link to="/admin/reports">reports</Link>.
             </p>
           </div>
           {WORKFLOW_ACTIONS.map((group) => (
-            <div key={group.heading} style={{ marginBottom: '1rem' }}>
+            <div key={group.heading} className="admin-dashboard-actions-group">
               <p className="admin-dashboard-actions-group-title">{group.heading}</p>
               <div className="admin-dashboard-actions-grid">
-                {group.items.map(({ to, label, icon }) => (
+                {group.items.map(({ to, label, Icon }) => (
                   <Link key={to} to={to} className="admin-quick-action-card">
-                    <span className="admin-quick-action-icon" aria-hidden>{icon}</span>
+                    <span className="admin-quick-action-icon" aria-hidden>
+                      <Icon size={22} strokeWidth={2} />
+                    </span>
                     <span className="admin-quick-action-label">{label}</span>
                   </Link>
                 ))}

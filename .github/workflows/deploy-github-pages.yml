@@ -1,0 +1,75 @@
+# Build the Vite app and deploy to GitHub Pages (static hosting).
+#
+# One-time (requires your click in GitHub):
+# 1) Repo → Settings → Pages → Build and deployment → Source: **GitHub Actions**.
+# 2) Repo → Settings → Secrets and variables → Actions → New repository secret:
+#    VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (same values as local `.env` for the portal).
+# 3) Supabase → Authentication → URL configuration: add your GitHub Pages site URL
+#    (e.g. https://OWNER.github.io/REPO/ and optional wildcard) to Site URL / Redirect URLs.
+#
+# Triggers: push to `main`, or Actions → Deploy GitHub Pages → Run workflow.
+# Live URL: repo → Settings → Pages, or the job summary after deploy.
+
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set Vite base for GitHub Pages
+        run: |
+          REPO="${{ github.event.repository.name }}"
+          OWNER="${{ github.repository_owner }}"
+          if [ "$REPO" = "${OWNER}.github.io" ]; then
+            echo "VITE_PAGES_BASE=/" >> "$GITHUB_ENV"
+          else
+            echo "VITE_PAGES_BASE=/${REPO}/" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install and build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: SPA fallback + Jekyll bypass
+        run: |
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

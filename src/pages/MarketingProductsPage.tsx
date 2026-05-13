@@ -160,10 +160,16 @@ export default function MarketingProductsPage() {
           <h3 className="marketing-subheading">Traditional</h3>
           <div className="marketing-range-grid">
             {TRADITIONAL_STYLES.map((name) => (
-              <article key={name} className="marketing-range-card">
+              <a
+                key={name}
+                href="https://lamtekcomplete.co.uk/our-kitchens/"
+                target="_blank"
+                rel="noreferrer"
+                className="marketing-range-card"
+              >
                 <h3>{name}</h3>
-                <p>Traditional kitchen style</p>
-              </article>
+                <p>Traditional kitchen style — see range on lamtekcomplete.co.uk</p>
+              </a>
             ))}
           </div>
           <h3 className="marketing-subheading" style={{ marginTop: '1.5rem' }}>
@@ -171,10 +177,16 @@ export default function MarketingProductsPage() {
           </h3>
           <div className="marketing-range-grid">
             {MODERN_STYLES.map((name) => (
-              <article key={name} className="marketing-range-card">
+              <a
+                key={name}
+                href="https://lamtekcomplete.co.uk/our-kitchens/"
+                target="_blank"
+                rel="noreferrer"
+                className="marketing-range-card"
+              >
                 <h3>{name}</h3>
-                <p>Modern kitchen style</p>
-              </article>
+                <p>Modern kitchen style — see range on lamtekcomplete.co.uk</p>
+              </a>
             ))}
           </div>
           <p className="marketing-muted marketing-footnote">

@@ -68,6 +68,7 @@ import AdminCatalogue from '@/pages/admin/AdminCatalogue'
 import AdminDocumentUploads from '@/pages/admin/AdminDocumentUploads'
 import AdminCreateUser from '@/pages/admin/AdminCreateUser'
 import AdminUsers from '@/pages/admin/AdminUsers'
+import AdminAccountApplications from '@/pages/admin/AdminAccountApplications'
 import AdminPermissions from '@/pages/admin/AdminPermissions'
 import AdminStock from '@/pages/admin/AdminStock'
 import AdminLocations from '@/pages/admin/AdminLocations'
@@ -214,6 +215,7 @@ export default function App() {
         <Route path="tickets/:ticketId" element={<AdminTicketDetail />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="users/create" element={<AdminCreateUser />} />
+        <Route path="applications" element={<AdminAccountApplications />} />
         <Route path="permissions" element={<AdminPermissions />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="*" element={<NotFound />} />

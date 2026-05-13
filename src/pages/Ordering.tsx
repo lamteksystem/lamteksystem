@@ -814,10 +814,7 @@ export default function Ordering() {
           <div className={`ordering-grid products-view--${viewType}`}>
             {productsInCategory.length === 0 ? (
               <div className="card">
-                <p>No products loaded yet. Add categories and products in Supabase to see them here.</p>
-                <p className="downloads-placeholder">
-                  Products can include name, description, SKU, unit price, and image. Use the <code>products</code> and <code>categories</code> tables.
-                </p>
+                <p>No products to display in this category yet. Try clearing filters or browsing a different category.</p>
               </div>
             ) : (
               productsInCategory.map((product) => {

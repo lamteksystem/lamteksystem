@@ -79,10 +79,7 @@ export default function Downloads() {
           <div className="downloads-list">
             {filtered.length === 0 ? (
               <div className="card">
-                <p>No documents yet. Lamtek can add brochures and price lists in the dashboard.</p>
-                <p className="downloads-placeholder">
-                  You can place PDFs (e.g. Kitchen_Brochure_2026.pdf, UK_TM_Pricelist_Jun_2025_V3.pdf, Door_Finder_Poster_UK_May_23_V2.pdf) in Supabase Storage and link them in the <code>documents</code> table.
-                </p>
+                <p>No documents are available yet. Lamtek will add the latest brochures, technical sheets, and pricelists here as they are released.</p>
               </div>
             ) : (
               filtered.map((doc) => (

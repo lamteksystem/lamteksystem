@@ -1,8 +1,49 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import MarketingHeader from '@/components/MarketingHeader'
 import MarketingHeroBackdrop from '@/components/marketing/MarketingHeroBackdrop'
 import MarketingHeroExtraCard from '@/components/marketing/MarketingHeroExtraCard'
 import { publicAsset } from '@/lib/basePath'
+import { supabase } from '@/lib/supabase'
+
+type DepotRow = {
+  code: string | null
+  name: string | null
+  address: string | null
+  phone: string | null
+  opening_hours: string | null
+}
+
+/**
+ * Load Lamtek group depots (HQ, LC, TB) from the live `locations` table so the
+ * public marketing pages stay in sync with admin edits. Falls back silently when
+ * the DB is unavailable or the policy blocks anonymous reads.
+ */
+function useGroupDepots() {
+  const [depots, setDepots] = useState<Record<string, DepotRow>>({})
+
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('locations')
+      .select('code,name,address,phone,opening_hours')
+      .eq('active', true)
+      .in('code', ['HQ', 'LC', 'TB'])
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        const next: Record<string, DepotRow> = {}
+        for (const row of data as DepotRow[]) {
+          if (row.code) next[row.code] = row
+        }
+        setDepots(next)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return depots
+}
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -261,6 +302,11 @@ export function MarketingDownloadsPage() {
 }
 
 export function MarketingDepotsPage() {
+  const depots = useGroupDepots()
+  const hq = depots.HQ
+  const address = hq?.address ?? 'Lamtek Ltd, Wolsey Drive, Kirkby-in-Ashfield, Nottinghamshire NG17 7JR'
+  const phone = hq?.phone ?? '01623 759 856'
+  const hours = hq?.opening_hours ?? 'Opening: Mon–Fri 7:15–16:30. Loading: Mon–Thu 7:15–15:45, Fri 7:15–12:45.'
   return (
     <Wrapper>
       <section className="marketing-hero card">
@@ -274,21 +320,13 @@ export function MarketingDepotsPage() {
           <p>
             <strong>Address</strong>
             <br />
-            Lamtek Ltd
-            <br />
-            Wolsey Drive
-            <br />
-            Kirkby-in-Ashfield
-            <br />
-            Nottinghamshire NG17 7JR
+            {address}
           </p>
           <p>
-            <strong>Phone</strong> <a href="tel:01623759856">01623 759 856</a>
+            <strong>Phone</strong> <a href={`tel:${phone.replace(/\s/g, '')}`}>{phone}</a>
           </p>
           <p>
-            <strong>Opening hours</strong> Mon–Fri 7:15–16:30
-            <br />
-            <strong>Loading hours</strong> Mon–Thu 7:15–15:45 · Fri 7:15–12:45
+            <strong>Hours</strong> {hours}
           </p>
           <p>
             <a href="https://www.lamtek.co.uk/contact" className="admin-link" target="_blank" rel="noreferrer">
@@ -406,54 +444,75 @@ export function MarketingDepotsDetailPage() {
           </p>
         </div>
       </section>
-      <section className="marketing-grid">
-        <article className="card">
-          <h2>Lamtek Ltd (carcasses &amp; components)</h2>
-          <p>Call: <a href="tel:01623759856">01623 759 856</a></p>
-          <p>
-            Lamtek Ltd, Wolsey Drive, Kirkby-in-Ashfield, Nottinghamshire NG17 7JR
-          </p>
-          <p>
-            <a href="https://www.lamtek.co.uk/contact" target="_blank" rel="noreferrer">
-              lamtek.co.uk/contact
-            </a>
-          </p>
-          <p>
-            <a href="mailto:info@lamtek.co.uk?subject=Lamtek%20enquiry">info@lamtek.co.uk</a>
-          </p>
-        </article>
-        <article className="card">
-          <h2>Lamtek Complete (doors &amp; complete kitchens to trade)</h2>
-          <p>Call: <a href="tel:01543466454">01543 466454</a></p>
-          <p>Laminating Technology Ltd, Wolsey Drive, Kirkby-in-Ashfield, Nottinghamshire NG17 7JR</p>
-          <p>
-            <a href="https://lamtekcomplete.co.uk/" target="_blank" rel="noreferrer">
-              lamtekcomplete.co.uk
-            </a>
-          </p>
-          <p>
-            <a href="mailto:info@lamtekcomplete.co.uk?subject=Lamtek%20Complete%20enquiry">info@lamtekcomplete.co.uk</a>
-          </p>
-        </article>
-        <article className="card">
-          <h2>Tealbury (bespoke kitchens &amp; living)</h2>
-          <p>Call / email: <a href="mailto:hello@tealbury.co.uk">hello@tealbury.co.uk</a></p>
-          <p>Laminating Technology Ltd (Tealbury), Wolsey Drive, Kirkby-in-Ashfield, Nottinghamshire NG17 7JR</p>
-          <p>
-            <a href="https://tealbury.co.uk/" target="_blank" rel="noreferrer">
-              tealbury.co.uk
-            </a>
-          </p>
-        </article>
-        <article className="card">
-          <h2>Portal support</h2>
-          <p>For this ordering portal, contact your account team or use the email you were given at onboarding.</p>
-          <p>
-            <a href="mailto:info@lamtek.co.uk?subject=Trade%20portal%20enquiry">info@lamtek.co.uk</a>
-          </p>
-        </article>
-      </section>
+      <GroupContactGrid />
     </Wrapper>
+  )
+}
+
+function GroupContactGrid() {
+  const depots = useGroupDepots()
+  const hq = depots.HQ
+  const lc = depots.LC
+  const tb = depots.TB
+
+  return (
+    <section className="marketing-grid">
+      <article className="card">
+        <h2>Lamtek Ltd (carcasses &amp; components)</h2>
+        <p>
+          Call:{' '}
+          <a href={`tel:${(hq?.phone ?? '01623759856').replace(/\s/g, '')}`}>
+            {hq?.phone ?? '01623 759 856'}
+          </a>
+        </p>
+        <p>{hq?.address ?? 'Lamtek Ltd, Wolsey Drive, Kirkby-in-Ashfield, Nottinghamshire NG17 7JR'}</p>
+        <p>
+          <a href="https://www.lamtek.co.uk/contact" target="_blank" rel="noreferrer">
+            lamtek.co.uk/contact
+          </a>
+        </p>
+        <p>
+          <a href="mailto:info@lamtek.co.uk?subject=Lamtek%20enquiry">info@lamtek.co.uk</a>
+        </p>
+      </article>
+      <article className="card">
+        <h2>Lamtek Complete (doors &amp; complete kitchens to trade)</h2>
+        <p>
+          Call:{' '}
+          <a href={`tel:${(lc?.phone ?? '01543466454').replace(/\s/g, '')}`}>
+            {lc?.phone ?? '01543 466454'}
+          </a>
+        </p>
+        <p>{lc?.address ?? 'Laminating Technology Ltd, Wolsey Drive, Kirkby-in-Ashfield, Nottinghamshire NG17 7JR'}</p>
+        <p>
+          <a href="https://lamtekcomplete.co.uk/" target="_blank" rel="noreferrer">
+            lamtekcomplete.co.uk
+          </a>
+        </p>
+        <p>
+          <a href="mailto:info@lamtekcomplete.co.uk?subject=Lamtek%20Complete%20enquiry">info@lamtekcomplete.co.uk</a>
+        </p>
+      </article>
+      <article className="card">
+        <h2>Tealbury (bespoke kitchens &amp; living)</h2>
+        <p>
+          Call / email: <a href="mailto:hello@tealbury.co.uk">hello@tealbury.co.uk</a>
+        </p>
+        <p>{tb?.address ?? 'Laminating Technology Ltd (Tealbury), Wolsey Drive, Kirkby-in-Ashfield, Nottinghamshire NG17 7JR'}</p>
+        <p>
+          <a href="https://tealbury.co.uk/" target="_blank" rel="noreferrer">
+            tealbury.co.uk
+          </a>
+        </p>
+      </article>
+      <article className="card">
+        <h2>Portal support</h2>
+        <p>For this ordering portal, contact your account team or use the email you were given at onboarding.</p>
+        <p>
+          <a href="mailto:info@lamtek.co.uk?subject=Trade%20portal%20enquiry">info@lamtek.co.uk</a>
+        </p>
+      </article>
+    </section>
   )
 }
 

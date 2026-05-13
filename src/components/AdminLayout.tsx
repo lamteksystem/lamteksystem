@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   ClipboardList,
   FileText,
   Landmark,
@@ -576,6 +577,14 @@ export default function AdminLayout() {
                     <NavLink to="/admin/users/create" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
                       <span className="admin-nav-icon">+</span>
                       {!sidebarCollapsed && <span>Create team user</span>}
+                    </NavLink>
+                  )}
+                  {canViewUsers && (
+                    <NavLink to="/admin/applications" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+                      <span className="admin-nav-icon">
+                        <ClipboardCheck size={16} strokeWidth={2} aria-hidden />
+                      </span>
+                      {!sidebarCollapsed && <span>Account applications</span>}
                     </NavLink>
                   )}
                   {canViewTickets && (

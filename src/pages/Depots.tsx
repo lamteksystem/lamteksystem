@@ -33,10 +33,12 @@ export default function Depots() {
             lamtek.co.uk/contact
           </a>{' '}
           and the in-portal{' '}
-          <Link to="/site/depots-details">Lamtek / Lamtek Complete contact sheet</Link>.           Depots below come from your live account database (Lamtek Ltd, Lamtek Complete, Tealbury, and any extra sites
-          your team configures). Apply the latest Supabase migrations so legacy depot names are replaced with current
-          Lamtek group sites.
-        </p>
+            <Link to="/site/depots-details">Lamtek / Lamtek Complete contact sheet</Link>.
+          </p>
+          <p className="page-intro">
+            Sites below are kept up to date by Lamtek and include Lamtek Ltd, Lamtek Complete, Tealbury, and any
+            additional servicing depots configured for your account.
+          </p>
       </div>
       {loading ? (
         <p className="muted">Loading…</p>

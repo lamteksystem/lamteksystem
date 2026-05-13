@@ -80,9 +80,6 @@ function Section({ s }: { s: HelpSection }) {
             <li key={idx}>{step}</li>
           ))}
         </ol>
-        <p className="help-muted" style={{ marginTop: '0.75rem' }}>
-          Screenshot placeholders (coming next): this section will include visual examples of what you should click and what you should see.
-        </p>
       </details>
     </section>
   )

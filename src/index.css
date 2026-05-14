@@ -2100,21 +2100,33 @@ input, select, textarea {
   .marketing-nav a:last-child {
     border-bottom: none;
   }
-  /* In-menu CTA: visible only on mobile */
-  .marketing-nav-cta {
+  /* In-menu CTA: visible only on mobile. Selectors target each state to win
+     over the .marketing-nav a:not(.active) / a:hover / a.active colours that
+     are set with high specificity in marketing-refresh.css (light + dark). */
+  .marketing-header .marketing-nav a.marketing-nav-cta,
+  .marketing-header .marketing-nav a.marketing-nav-cta:hover,
+  .marketing-header .marketing-nav a.marketing-nav-cta:focus-visible,
+  .marketing-header .marketing-nav a.marketing-nav-cta.active {
     display: inline-flex;
     justify-content: center;
     margin-top: 0.6rem;
     padding: 0.65rem 1rem;
     background: var(--lamtek-gold, #b8923a);
-    color: #fff;
+    color: #ffffff;
     border-radius: 8px;
     text-decoration: none;
     font-weight: 600;
+    border-bottom: none;
   }
-  .marketing-nav-cta:hover,
-  .marketing-nav-cta:focus-visible {
+  .marketing-header .marketing-nav a.marketing-nav-cta:hover,
+  .marketing-header .marketing-nav a.marketing-nav-cta:focus-visible {
     background: color-mix(in srgb, var(--lamtek-gold, #b8923a) 86%, #000);
+  }
+  [data-theme="dark"] .marketing-header .marketing-nav a.marketing-nav-cta,
+  [data-theme="dark"] .marketing-header .marketing-nav a.marketing-nav-cta:hover,
+  [data-theme="dark"] .marketing-header .marketing-nav a.marketing-nav-cta:focus-visible,
+  [data-theme="dark"] .marketing-header .marketing-nav a.marketing-nav-cta.active {
+    color: #ffffff;
   }
 }
 @media (max-width: 1180px) {

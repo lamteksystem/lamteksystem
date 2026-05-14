@@ -51,11 +51,16 @@
   background: radial-gradient(circle at 35% 35%, rgba(138, 58, 73, 0.26), rgba(103, 39, 50, 0.08));
 }
 
-.marketing-header,
 .marketing-main,
 .marketing-footer {
   position: relative;
   z-index: 1;
+}
+/* Header sits above .marketing-main so the mobile slide-down menu (an absolutely
+   positioned child of the header) overlays page content reliably on iOS Safari. */
+.marketing-header {
+  position: relative;
+  z-index: 60;
 }
 
 /* Same vertical rhythm as page top inset (replaces index.css `margin-top: 0.5rem` on hero alone) */

@@ -1345,6 +1345,8 @@ input, select, textarea {
   align-items: center;
   gap: 0.75rem 1rem;
   flex-wrap: nowrap;
+  position: relative;
+  z-index: 60;
 }
 .marketing-header-end {
   flex-shrink: 0;
@@ -2081,7 +2083,7 @@ input, select, textarea {
     overflow: hidden;
     max-height: 0;
     transition: max-height 0.22s ease, padding 0.22s ease;
-    z-index: 30;
+    z-index: 200;
   }
   .marketing-nav.marketing-nav--open {
     max-height: 540px;

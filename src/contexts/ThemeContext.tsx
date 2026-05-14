@@ -66,7 +66,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!initialised || theme !== 'auto') return
     const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => applyTheme('auto')
+    const onChange = () => {
+      setResolvedTheme(resolveTheme('auto'))
+      applyTheme('auto')
+    }
     media.addEventListener('change', onChange)
     return () => media.removeEventListener('change', onChange)
   }, [initialised, theme])

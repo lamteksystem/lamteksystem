@@ -29,6 +29,17 @@ Workflow: `.github/workflows/deploy-github-pages.yml`
 - On every **push** to `main`
 - Manually: **Actions** → **Deploy GitHub Pages** → **Run workflow**
 
+## Keep demo in sync with local dev
+
+After code or migration changes:
+
+```bash
+npm run ship -- "describe your change"
+```
+
+That runs `npm run build`, `npm run db:push:remote`, commits, and pushes to `main` (which triggers this workflow).  
+**Demo:** https://lamteksystem.github.io/lamteksystem/
+
 After a successful run, open **Settings → Pages** or the workflow run summary for the public URL.
 
 ## How paths work

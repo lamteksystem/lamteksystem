@@ -1,0 +1,24 @@
+---
+description: Keep GitHub main and GitHub Pages in sync after Lamtek portal work
+globs:
+alwaysApply: true
+---
+
+# Ship to GitHub + GitHub Pages
+
+After **meaningful local changes** in this repo (features, fixes, migrations, manual/docs the user cares about on demo):
+
+1. **Migrations** — apply to remote Supabase:
+   - `npm run db:push:remote`
+   - Do not skip when `supabase/migrations/*.sql` changed.
+2. **Verify build** — `npm run build` if TypeScript/React changed.
+3. **Commit** — stage relevant files only (never `.env`, `.secrets/`, `dist/`, `supabase/.temp/`).
+4. **Push** — `git push origin main` (triggers **Deploy GitHub Pages** on push to `main`).
+5. **Confirm deploy** — `gh run watch --workflow deploy-github-pages.yml` or check Actions until green.
+
+**Demo URL:** https://lamteksystem.github.io/lamteksystem/  
+**Local dev:** http://localhost:5173/ (`VITE_DEV_PORT=5173 npm run dev`)
+
+If the user asks to keep demo in sync, run the full ship flow without waiting to be asked again for push/deploy.
+
+Optional one-shot: `npm run ship -- "commit message"` (see `scripts/ship-to-github.mjs`).

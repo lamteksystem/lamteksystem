@@ -27,6 +27,7 @@
     "supabase:push": "npx supabase db push",
     "db:migrate": "npx supabase db push",
     "db:push:remote": "node --env-file=.env scripts/push-migrations.mjs",
+    "ship": "node scripts/ship-to-github.mjs",
     "db:clear-products": "node --env-file=.env scripts/clear-all-products.mjs",
     "deploy:vercel": "vercel deploy --prod --yes",
     "supabase:status": "npx supabase status",

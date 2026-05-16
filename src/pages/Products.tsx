@@ -235,7 +235,7 @@ export default function Products() {
   }, [categories, products])
 
   const filtered = useMemo(() => {
-    let list = products.filter((p) => {
+    const list = products.filter((p) => {
       const inCategory = !selectedCategory || p.category_id === selectedCategory
       if (!inCategory) return false
       if (!productMatchesSearch(p, search)) return false

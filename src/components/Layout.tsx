@@ -250,29 +250,30 @@ export default function Layout() {
     </div>
   ) : null
 
+  const customerPath = location.pathname
+  const sidebarGroupForceOpen = {
+    shop: customerPath === '/' || customerPath.startsWith('/products') || customerPath.startsWith('/ordering'),
+    ordering: customerPath.startsWith('/ordering'),
+    resources: customerPath.startsWith('/downloads') || customerPath.startsWith('/depots'),
+    account: customerPath.startsWith('/account') || customerPath.startsWith('/search') || customerPath.startsWith('/help'),
+  } as const
+
+  const sidebarActiveGroup =
+    (Object.keys(sidebarGroupForceOpen) as Array<keyof typeof sidebarGroupForceOpen>).find(
+      (k) => sidebarGroupForceOpen[k]
+    ) ?? null
+
+  useEffect(() => {
+    if (!useSidebarMenu || !sidebarAccordion || !sidebarActiveGroup) return
+    setSidebarGroupOpen(sidebarActiveGroup, true)
+  }, [useSidebarMenu, sidebarAccordion, sidebarActiveGroup, setSidebarGroupOpen])
+
   if (useSidebarMenu) {
-    const customerPath = location.pathname
     const createOrderNavActive =
       customerPath === '/ordering/start' || customerPath === '/ordering' || customerPath.startsWith('/ordering/mto')
 
-    const groupForceOpen = {
-      shop: customerPath === '/' || customerPath.startsWith('/products') || customerPath.startsWith('/ordering'),
-      ordering: customerPath.startsWith('/ordering'),
-      resources: customerPath.startsWith('/downloads') || customerPath.startsWith('/depots'),
-      account: customerPath.startsWith('/account') || customerPath.startsWith('/search') || customerPath.startsWith('/help'),
-    } as const
-
-    const activeGroup = (Object.keys(groupForceOpen) as Array<keyof typeof groupForceOpen>).find((k) => groupForceOpen[k]) ?? null
-
-    useEffect(() => {
-      if (!sidebarAccordion) return
-      if (!activeGroup) return
-      // In accordion mode, keep only the active group open.
-      setSidebarGroupOpen(activeGroup, true)
-    }, [activeGroup, sidebarAccordion, setSidebarGroupOpen])
-
-    function groupOpen(groupId: keyof typeof groupForceOpen) {
-      if (groupForceOpen[groupId]) return true
+    function groupOpen(groupId: keyof typeof sidebarGroupForceOpen) {
+      if (sidebarGroupForceOpen[groupId]) return true
       return sidebarGroups?.[groupId] ?? false
     }
 

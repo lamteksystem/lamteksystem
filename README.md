@@ -41,7 +41,7 @@ So your job is only: **get the app talking to your Supabase project** and, if yo
 | ☐ | Have a Supabase project | So the app has a database and auth. |
 | ☐ | Put Supabase URL + anon key in `.env` | So the app can connect. |
 | ☐ | Run the database migrations | So tables (users, orders, products, etc.) exist. |
-| ☐ | Run the app: `npm install` then `npm run dev` | So you can open the site at http://localhost:5173 |
+| ☐ | Run the app: `npm ci` then `npm run dev` | So you can open the site at http://localhost:5173 |
 | ☐ | (Optional) Create storage buckets + run storage SQL | Only if you want Downloads (PDFs) or product images. |
 | ☐ | (Optional) Create a test customer or admin user | So you can log in. |
 | ☐ | (Optional) Add products / run seed / import pricelist | So the ordering page has something to sell. |
@@ -170,6 +170,8 @@ Right after migrations, the **products** table is empty (or has only what’s in
 ## Quick reference
 
 - **Repository:** [github.com/lamteksystem/lamteksystem](https://github.com/lamteksystem/lamteksystem) · org: [github.com/lamteksystem](https://github.com/lamteksystem)
+- **Developer toolchain (npm, ESLint, Husky, CI, ship):** [docs/DEV_PLAYBOOK.md](docs/DEV_PLAYBOOK.md)
+- **GitHub Pages demo:** https://lamteksystem.github.io/lamteksystem/
 - **First-time GitHub + Supabase:** [docs/SETUP_GITHUB_AND_SUPABASE.md](docs/SETUP_GITHUB_AND_SUPABASE.md) (push access and DB migrations)
 - **GitHub + Supabase + terminal in Cursor:** [docs/WORKSPACE_IDENTITY.md](docs/WORKSPACE_IDENTITY.md) — new terminals run `lamteksystem` + optional Supabase token file; set Chrome in `scripts/identity.config.json`
 - **Supabase (Lamtek):** [Dashboard](https://supabase.com/dashboard/project/jhmepthfxnpmwpjobumj) — set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env` (this Vite app does **not** use `NEXT_PUBLIC_*`).

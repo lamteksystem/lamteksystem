@@ -11,7 +11,7 @@ After **meaningful local changes** in this repo (features, fixes, migrations, ma
 1. **Migrations** — apply to remote Supabase:
    - `npm run db:push:remote`
    - Do not skip when `supabase/migrations/*.sql` changed.
-2. **Verify build** — `npm run build` if TypeScript/React changed.
+2. **Verify** — `npm run validate` (lint, typecheck, test, build) when TypeScript/React changed.
 3. **Commit** — stage relevant files only (never `.env`, `.secrets/`, `dist/`, `supabase/.temp/`).
 4. **Push** — `git push origin main` (triggers **Deploy GitHub Pages** on push to `main`).
 5. **Confirm deploy** — `gh run watch --workflow deploy-github-pages.yml` or check Actions until green.

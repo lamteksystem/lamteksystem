@@ -79,7 +79,7 @@ function looksLikeTocSectionBedroom(row: unknown[]) {
 function isLikelySku(s: string): boolean {
   if (!s || s.length > 48) return false
   if (/^code$/i.test(s)) return false
-  return /^[A-Z0-9][A-Z0-9./\-]*$/i.test(s)
+  return /^[A-Z0-9][A-Z0-9./-]*$/i.test(s)
 }
 
 /** Tealbury customer workbook SKUs (e.g. B50D(2), CBD80). */

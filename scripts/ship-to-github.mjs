@@ -30,6 +30,13 @@ function run(cmd, args, opts = {}) {
   if ((r.status ?? 1) !== 0) process.exit(r.status ?? 1)
 }
 
+console.log('→ Lint & typecheck…')
+run('npm', ['run', 'lint'])
+run('npm', ['run', 'typecheck'])
+
+console.log('→ Unit tests…')
+run('npm', ['run', 'test'])
+
 console.log('→ Building…')
 run('npm', ['run', 'build'])
 

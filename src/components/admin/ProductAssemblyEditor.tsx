@@ -131,85 +131,96 @@ export default function ProductAssemblyEditor({
           <ProductAssemblyBreakdown productId={product.id} />
           {canEdit && (
             <div className="product-assembly-editor-add card admin-card">
-              <h4 className="admin-modal-form-section-title">Add component line</h4>
-              <label>
-                Component product (SKU)
-                <input
-                  type="search"
-                  list="assembly-component-products"
-                  value={componentPicker}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setComponentPicker(v)
-                    const match = pickerProducts.find(
-                      (p) => p.sku === v || `${p.sku} — ${p.name}` === v || p.id === v
-                    )
-                    if (match) {
-                      setAddProductId(match.id)
-                      const cat = categoryMap.get(match.category_id)
-                      setAddRole(inferComponentRoleFromProduct(match, cat?.slug))
-                    }
-                  }}
-                  placeholder="Search SKU or name…"
-                />
-              </label>
-              <datalist id="assembly-component-products">
-                {pickerProducts.slice(0, 500).map((p) => (
-                  <option key={p.id} value={`${p.sku ?? p.id} — ${p.name}`} />
-                ))}
-              </datalist>
-              <div className="admin-modal-form-row admin-modal-form-row--equal">
-                <label>
-                  Part type
-                  <select
-                    value={addRole}
-                    onChange={(e) => setAddRole(e.target.value as AssemblyComponentRole)}
-                    className="admin-select"
-                  >
-                    {(Object.keys(ASSEMBLY_COMPONENT_ROLE_LABELS) as AssemblyComponentRole[]).map((role) => (
-                      <option key={role} value={role}>
-                        {ASSEMBLY_COMPONENT_ROLE_LABELS[role]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Qty per complete unit
+              <h4 className="product-assembly-editor-add-title">Add component line</h4>
+              <div className="product-assembly-editor-add-form">
+                <label className="product-assembly-editor-field product-assembly-editor-field--full">
+                  <span className="product-assembly-editor-field-label">Component product (SKU)</span>
                   <input
-                    type="number"
-                    min={1}
-                    value={addQty}
-                    onChange={(e) => setAddQty(e.target.value)}
+                    type="search"
+                    list="assembly-component-products"
+                    className="admin-input"
+                    value={componentPicker}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setComponentPicker(v)
+                      const match = pickerProducts.find(
+                        (p) => p.sku === v || `${p.sku} — ${p.name}` === v || p.id === v
+                      )
+                      if (match) {
+                        setAddProductId(match.id)
+                        const cat = categoryMap.get(match.category_id)
+                        setAddRole(inferComponentRoleFromProduct(match, cat?.slug))
+                      } else if (!v.trim()) {
+                        setAddProductId('')
+                      }
+                    }}
+                    placeholder="Search SKU or name…"
                   />
                 </label>
-              </div>
-              <button
-                type="button"
-                className="btn"
-                disabled={busy || !addProductId}
-                onClick={() => void handleAddLine()}
-              >
-                Add to breakdown
-              </button>
-              {bom.assembly_lines.length > 0 && (
-                <ul className="product-assembly-editor-lines">
-                  {bom.assembly_lines.map((line) => (
-                    <li key={line.id}>
-                      <span>
-                        {ASSEMBLY_COMPONENT_ROLE_LABELS[line.component_role]} ×{line.quantity} —{' '}
-                        <code>{line.product?.sku}</code>
-                      </span>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline"
-                        disabled={busy}
-                        onClick={() => void handleRemoveLine(line.id)}
-                      >
-                        Remove
-                      </button>
-                    </li>
+                <datalist id="assembly-component-products">
+                  {pickerProducts.slice(0, 500).map((p) => (
+                    <option key={p.id} value={`${p.sku ?? p.id} — ${p.name}`} />
                   ))}
-                </ul>
+                </datalist>
+                <div className="product-assembly-editor-add-row">
+                  <label className="product-assembly-editor-field">
+                    <span className="product-assembly-editor-field-label">Part type</span>
+                    <select
+                      value={addRole}
+                      onChange={(e) => setAddRole(e.target.value as AssemblyComponentRole)}
+                      className="admin-select"
+                    >
+                      {(Object.keys(ASSEMBLY_COMPONENT_ROLE_LABELS) as AssemblyComponentRole[]).map((role) => (
+                        <option key={role} value={role}>
+                          {ASSEMBLY_COMPONENT_ROLE_LABELS[role]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="product-assembly-editor-field">
+                    <span className="product-assembly-editor-field-label">Qty per complete unit</span>
+                    <input
+                      type="number"
+                      min={1}
+                      className="admin-input"
+                      value={addQty}
+                      onChange={(e) => setAddQty(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="product-assembly-editor-add-actions">
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={busy || !addProductId}
+                    onClick={() => void handleAddLine()}
+                  >
+                    Add to breakdown
+                  </button>
+                </div>
+              </div>
+              {bom.assembly_lines.length > 0 && (
+                <div className="product-assembly-editor-lines-wrap">
+                  <p className="product-assembly-editor-lines-heading">Lines in this breakdown</p>
+                  <ul className="product-assembly-editor-lines">
+                    {bom.assembly_lines.map((line) => (
+                      <li key={line.id}>
+                        <span className="product-assembly-editor-line-text">
+                          {ASSEMBLY_COMPONENT_ROLE_LABELS[line.component_role]} ×{line.quantity} —{' '}
+                          <code>{line.product?.sku}</code>
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline"
+                          disabled={busy}
+                          onClick={() => void handleRemoveLine(line.id)}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           )}

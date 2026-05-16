@@ -1,5 +1,5 @@
 /**
- * Customer and cost price resolution using segment-based rules and promotions.
+ * Customer and cost price resolution using segment-based rules, optional per-account discount %, and promotions.
  * Use resolveCustomerPrice when showing prices or creating order lines.
  * Use resolveCostPrice for staff-only cost display and margin calculations.
  */
@@ -17,6 +17,14 @@ export interface CustomerSegmentIds {
   customer_location_id: string | null
   trade_type_id: string | null
   company_type_id: string | null
+}
+
+/** Extra % off applied after segment rules; null if absent or not positive. */
+export function normalizeAccountDiscountPercent(value: unknown): number | null {
+  if (value == null) return null
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.min(100, Math.max(0, n))
 }
 
 /** Fetch active customer price rules that could apply, ordered by priority desc. */
@@ -80,7 +88,7 @@ function applyCustomerRule(price: number, rule: CustomerPriceRuleRow): number {
 
 /**
  * Resolve effective customer unit price for a product given customer segment and order context.
- * Returns base product price with all applicable rules applied in priority order.
+ * Returns base product price with all applicable rules applied in priority order, then optional per-account discount %.
  */
 export async function resolveCustomerPrice(params: {
   productId: string
@@ -89,8 +97,11 @@ export async function resolveCustomerPrice(params: {
   segment: CustomerSegmentIds
   orderTotalExVat: number
   collectionIds?: string[]
+  /** Applied after all matching customer_price_rules (0–100). Null/omit = none. */
+  accountDiscountPercent?: number | null
 }): Promise<number> {
-  const { productId, categoryId, baseUnitPrice, segment, orderTotalExVat, collectionIds } = params
+  const { productId, categoryId, baseUnitPrice, segment, orderTotalExVat, collectionIds, accountDiscountPercent } =
+    params
   let price = baseUnitPrice
   const rules = await fetchApplicableCustomerPriceRules(segment)
   let productIdsInCollection: Set<string> | undefined
@@ -111,6 +122,10 @@ export async function resolveCustomerPrice(params: {
       productIdsInCollection
     )
     if (applies) price = applyCustomerRule(price, rule)
+  }
+  const acct = normalizeAccountDiscountPercent(accountDiscountPercent)
+  if (acct != null) {
+    price = Math.max(0, price * (1 - acct / 100))
   }
   return Math.round(price * 100) / 100
 }

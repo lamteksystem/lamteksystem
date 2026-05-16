@@ -428,6 +428,12 @@ export default function Account() {
               <p><strong>Company</strong> {profile.company_name}</p>
               <p><strong>Contact</strong> {profile.contact_name ?? '—'}</p>
               {profile.payment_terms && <p><strong>Payment terms</strong> {profile.payment_terms}</p>}
+              {profile.account_discount_percent != null && Number(profile.account_discount_percent) > 0 && (
+                <p>
+                  <strong>Account pricing discount</strong>{' '}
+                  {Number(profile.account_discount_percent)}% off unit prices after Lamtek’s standard pricing rules (applied at checkout).
+                </p>
+              )}
               <button type="button" className="btn btn-outline btn-small" onClick={() => setEditing(true)}>Edit profile</button>
             </>
           ) : (

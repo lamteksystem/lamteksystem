@@ -23,6 +23,7 @@ export default function AdminCreateUser() {
   const [customerLocationId, setCustomerLocationId] = useState('')
   const [tradeTypeId, setTradeTypeId] = useState('')
   const [companyTypeId, setCompanyTypeId] = useState('')
+  const [accountDiscountPercent, setAccountDiscountPercent] = useState('')
   const [groups, setGroups] = useState<CustomerGroupRow[]>([])
   const [locations, setLocations] = useState<CustomerLocationRow[]>([])
   const [tradeTypes, setTradeTypes] = useState<TradeTypeRow[]>([])
@@ -83,6 +84,15 @@ export default function AdminCreateUser() {
           customer_location_id: type === 'customer' && customerLocationId ? customerLocationId : undefined,
           trade_type_id: type === 'customer' && tradeTypeId ? tradeTypeId : undefined,
           company_type_id: type === 'customer' && companyTypeId ? companyTypeId : undefined,
+          ...(type === 'customer'
+            ? (() => {
+                const raw = accountDiscountPercent.trim()
+                if (raw === '') return {}
+                const n = parseFloat(raw)
+                if (!Number.isFinite(n) || n <= 0) return {}
+                return { account_discount_percent: Math.min(100, n) }
+              })()
+            : {}),
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -97,6 +107,7 @@ export default function AdminCreateUser() {
       setCompanyName('')
       setContactName('')
       setDisplayName('')
+      setAccountDiscountPercent('')
     } catch (err) {
       setMessage({ type: 'err', text: err instanceof Error ? err.message : 'Request failed' })
     }
@@ -225,6 +236,19 @@ export default function AdminCreateUser() {
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
+              </label>
+              <label title="Extra % off resolved prices after sell rules; optional. Leave blank to set later on the customer profile.">
+                Account discount (%)
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  value={accountDiscountPercent}
+                  onChange={(e) => setAccountDiscountPercent(e.target.value)}
+                  placeholder="Optional"
+                  className="admin-create-user-select"
+                />
               </label>
             </div>
           )}

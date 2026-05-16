@@ -27,6 +27,12 @@ export interface CategoryRow {
   parent_id: string | null
 }
 
+export interface ProductCategoryRow {
+  product_id: string
+  category_id: string
+  is_primary: boolean
+}
+
 export interface ProductRow {
   id: string
   category_id: string
@@ -387,6 +393,8 @@ export interface CustomerProfileRow {
   customer_location_id?: string | null
   trade_type_id?: string | null
   company_type_id?: string | null
+  /** Extra % off resolved sell price after segment rules (0–100); null = none. */
+  account_discount_percent?: number | null
   phone?: string | null
   email_override?: string | null
   website?: string | null
@@ -541,6 +549,16 @@ export interface CustomerNoteRow {
   created_at: string
 }
 
+export type AssemblyComponentRole =
+  | 'unit'
+  | 'door'
+  | 'drawer'
+  | 'hinge'
+  | 'hinge_plate'
+  | 'leg_kit'
+  | 'fittings'
+  | 'other'
+
 export interface AssemblyRow {
   id: string
   name: string
@@ -551,6 +569,8 @@ export interface AssemblyRow {
   collection_slug: string | null
   sort_order: number
   active: boolean
+  /** Sellable complete product this BOM represents (Tealbury complete unit, etc.). */
+  product_id: string | null
   created_at: string
   updated_at: string
 }
@@ -561,6 +581,7 @@ export interface AssemblyLineRow {
   product_id: string
   quantity: number
   sort_order: number
+  component_role: AssemblyComponentRole
 }
 
 export type AssemblyWithLines = AssemblyRow & {

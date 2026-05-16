@@ -6,6 +6,7 @@ import { useImpersonation } from '@/contexts/ImpersonationContext'
 import { useAdminUi } from '@/contexts/AdminUiContext'
 import { usePermission } from '@/hooks/usePermission'
 import AdminMainBackdrop from '@/components/admin/AdminMainBackdrop'
+import AdminQuickActionsFab from '@/components/admin/AdminQuickActionsFab'
 import {
   Archive,
   ArrowUpRight,
@@ -26,6 +27,7 @@ import {
   Package,
   PanelsTopLeft,
   PoundSterling,
+  BookOpen,
   Settings,
   Ticket,
   Users,
@@ -89,7 +91,7 @@ export default function AdminLayout() {
   const { pageTitle, breadcrumb } = (() => {
     if (location.pathname === '/admin') return { pageTitle: 'Today', breadcrumb: [] }
     if (location.pathname === '/admin/orders' && location.search.includes('archive=archived')) return { pageTitle: 'Archived orders', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Archived orders' }] }
-    if (location.pathname === '/admin/orders') return { pageTitle: 'Orders', breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Orders' }] }
+    if (location.pathname === '/admin/orders') return { pageTitle: 'Orders & quotes', breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Orders & quotes' }] }
     if (location.pathname === '/admin/pick-lists') {
       return {
         pageTitle: 'Pick lists',
@@ -159,6 +161,7 @@ export default function AdminLayout() {
       return { pageTitle: 'Notifications', breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Notifications' }] }
     }
     if (location.pathname === '/admin/create-order') return { pageTitle: 'Create order', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Create order' }] }
+    if (location.pathname === '/admin/create-quote') return { pageTitle: 'Create quote', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Create quote' }] }
     if (location.pathname === '/admin/catalogue') return { pageTitle: 'Catalogue', breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Catalogue' }] }
     if (location.pathname === '/admin/stock') return { pageTitle: 'Stock take', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/catalogue', label: 'Catalogue' }, { label: 'Stock take' }] }
     if (location.pathname === '/admin/locations') return { pageTitle: 'Locations', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/stock', label: 'Stock take' }, { label: 'Locations' }] }
@@ -169,6 +172,12 @@ export default function AdminLayout() {
     if (location.pathname === '/admin/users/create') return { pageTitle: 'Create team user', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/users', label: 'Team users' }, { label: 'Create user' }] }
     if (location.pathname === '/admin/permissions') return { pageTitle: 'Permissions', breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Permissions' }] }
     if (location.pathname === '/admin/settings') return { pageTitle: 'Settings', breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Settings' }] }
+    if (location.pathname === '/admin/support-manual') {
+      return {
+        pageTitle: 'Support manual',
+        breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Support manual' }],
+      }
+    }
     return { pageTitle: 'Admin', breadcrumb: [] }
   })()
 
@@ -185,10 +194,11 @@ export default function AdminLayout() {
   const { allowed: canViewTickets } = usePermission('tickets.view', 'view')
 
   function pathToScope(path: string): string | null {
-    if (path === '/admin' || path === '/admin/settings' || path === '/admin/notifications') return null
+    if (path === '/admin' || path === '/admin/settings' || path === '/admin/support-manual' || path === '/admin/notifications') return null
     if (
       path.startsWith('/admin/orders') ||
       path === '/admin/create-order' ||
+      path === '/admin/create-quote' ||
       path.startsWith('/admin/pick-lists') ||
       path.startsWith('/admin/package-labels')
     )
@@ -250,7 +260,7 @@ export default function AdminLayout() {
 
   const activeGroup = useMemo(() => {
     const path = location.pathname
-    if (path.startsWith('/admin/orders') || path === '/admin/create-order') return 'orders'
+    if (path.startsWith('/admin/orders') || path === '/admin/create-order' || path === '/admin/create-quote') return 'orders'
     if (path.startsWith('/admin/customers') || path.startsWith('/admin/crm')) return 'customers'
     if (
       path.startsWith('/admin/catalogue') ||
@@ -307,6 +317,7 @@ export default function AdminLayout() {
             const forceOpen =
               location.pathname.startsWith('/admin/orders') ||
               location.pathname === '/admin/create-order' ||
+              location.pathname === '/admin/create-quote' ||
               location.pathname.startsWith('/admin/pick-lists') ||
               location.pathname.startsWith('/admin/package-labels')
             const open = groupIsOpen(groupId, forceOpen)
@@ -319,7 +330,7 @@ export default function AdminLayout() {
                     aria-expanded={open}
                     onClick={() => setGroupOpen(groupId, !open)}
                   >
-                    <span>Orders</span>
+                    <span>Orders &amp; quotes</span>
                     <span className="admin-nav-group-chevron" aria-hidden>
                       {open ? <ChevronDown size={14} strokeWidth={2} /> : <ChevronRight size={14} strokeWidth={2} />}
                     </span>
@@ -330,7 +341,7 @@ export default function AdminLayout() {
                     <span className="admin-nav-icon">
                       <ClipboardList size={16} strokeWidth={2} aria-hidden />
                     </span>
-                    {!sidebarCollapsed && <span>Orders</span>}
+                    {!sidebarCollapsed && <span>All orders &amp; quotes</span>}
                   </NavLink>
                   <NavLink
                     to="/admin/orders?archive=archived"
@@ -369,6 +380,10 @@ export default function AdminLayout() {
                   <NavLink to="/admin/create-order" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
                     <span className="admin-nav-icon">+</span>
                     {!sidebarCollapsed && <span>Create order</span>}
+                  </NavLink>
+                  <NavLink to="/admin/create-quote" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+                    <span className="admin-nav-icon">+</span>
+                    {!sidebarCollapsed && <span>Create quote</span>}
                   </NavLink>
                 </div>
               </div>
@@ -631,6 +646,12 @@ export default function AdminLayout() {
               </span>
               {!sidebarCollapsed && <span>Settings</span>}
             </NavLink>
+            <NavLink to="/admin/support-manual" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+              <span className="admin-nav-icon">
+                <BookOpen size={16} strokeWidth={2} aria-hidden />
+              </span>
+              {!sidebarCollapsed && <span>Support manual</span>}
+            </NavLink>
           </div>
         </nav>
       </aside>
@@ -678,8 +699,9 @@ export default function AdminLayout() {
                 <option value="/admin">Today</option>
                 {canViewOrders && <option value="/admin/orders/processing">Process orders</option>}
                 {canViewOrders && <option value="/admin/pick-lists">Pick lists</option>}
-                {canViewOrders && <option value="/admin/orders">All orders</option>}
+                {canViewOrders && <option value="/admin/orders">Orders &amp; quotes</option>}
                 {canViewOrders && <option value="/admin/create-order">Create order</option>}
+                {canViewOrders && <option value="/admin/create-quote">Create quote</option>}
                 {canViewCustomers && <option value="/admin/customers">Customers</option>}
                 {canViewCustomers && <option value="/admin/crm/open-orders">CRM open orders</option>}
                 {canViewCatalogue && <option value="/admin/catalogue">Catalogue</option>}
@@ -688,6 +710,7 @@ export default function AdminLayout() {
                 {canViewTickets && <option value="/admin/tickets">Support tickets</option>}
                 {canViewUsers && <option value="/admin/users">Team users</option>}
                 <option value="/admin/settings">Settings</option>
+                <option value="/admin/support-manual">Support manual</option>
               </select>
             </label>
             <div className={`admin-dropdown ${viewAsOpen ? 'open' : ''}`}>
@@ -736,6 +759,9 @@ export default function AdminLayout() {
                 <Link to="/admin/settings" className="admin-dropdown-item" onClick={() => setUserMenuOpen(false)}>
                   Settings
                 </Link>
+                <Link to="/admin/support-manual" className="admin-dropdown-item" onClick={() => setUserMenuOpen(false)}>
+                  Support manual
+                </Link>
                 <Link to="/" className="admin-dropdown-item" onClick={() => setUserMenuOpen(false)}>
                   Customer portal
                 </Link>
@@ -772,6 +798,8 @@ export default function AdminLayout() {
           onClick={() => { setUserMenuOpen(false); setViewAsOpen(false); }}
         />
       )}
+
+      <AdminQuickActionsFab />
 
       {viewAsConsentBlock && (
         <div

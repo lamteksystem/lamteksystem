@@ -34,6 +34,7 @@
     "create-demo-orders": "node --env-file=.env scripts/create-demo-orders.js",
     "seed-rich-demo": "node --env-file=.env scripts/seed-rich-demo.js",
     "import-pricelist": "node --env-file=.env scripts/import-pricelist-pdf.js",
+    "import-pricelists": "node --env-file=.env scripts/import-pricelists.mjs",
     "import-lamtek-pricelists": "node --env-file=.env scripts/import-lamtek-trade-pricelists.js",
     "assign-images": "node --env-file=.env scripts/assign-product-images.js",
     "authorize:lamtek": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/authorize-lamtek-context.ps1"

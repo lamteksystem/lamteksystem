@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useAdminUi, type TableDensity, type DateFormat } from '@/contexts/AdminUiContext'
+import { useAdminUi, type TableDensity, type DateFormat, type AdminOrderLinePricingMode } from '@/contexts/AdminUiContext'
 import { useTheme, type ThemeId } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 import { downloadFullBackupXlsx } from '@/lib/catalogue-import-export'
@@ -20,6 +20,8 @@ export default function AdminSettings() {
     setRowsPerPage,
     defaultOrderStatusFilter,
     setDefaultOrderStatusFilter,
+    adminOrderLinePricingDefault,
+    setAdminOrderLinePricingDefault,
     resetPrefs,
   } = useAdminUi()
   const { theme, setTheme } = useTheme()
@@ -209,6 +211,21 @@ export default function AdminSettings() {
               </select>
             </label>
             <p className="admin-settings-hint">When you open the Orders page, this status will be pre-selected.</p>
+            <label className="admin-settings-row">
+              <span className="admin-settings-label">Default: new lines use…</span>
+              <select
+                value={adminOrderLinePricingDefault}
+                onChange={(e) => setAdminOrderLinePricingDefault(e.target.value as AdminOrderLinePricingMode)}
+                className="admin-settings-select"
+              >
+                <option value="catalogue">Catalogue list price</option>
+                <option value="customer_rules">Customer pricing (rules + account discount)</option>
+              </select>
+            </label>
+            <p className="admin-settings-hint">
+              Applies when you add catalogue lines on <strong>Order detail</strong> and choose &quot;Use my default&quot; there.
+              You can override per order without changing this setting.
+            </p>
             <div className="admin-inline-form--stack" style={{ marginTop: '0.75rem' }}>
               <button
                 type="button"
@@ -219,7 +236,7 @@ export default function AdminSettings() {
               </button>
             </div>
             <p className="admin-settings-hint">
-              Resets sidebar, table density, date format, rows per page, and default order status filter to defaults.
+              Resets sidebar, table density, date format, rows per page, default order status filter, and default order line pricing to defaults.
             </p>
           </div>
         </section>

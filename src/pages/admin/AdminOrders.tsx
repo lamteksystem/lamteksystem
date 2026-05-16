@@ -314,16 +314,20 @@ export default function AdminOrders() {
   return (
     <div className="admin-page">
       <div className="admin-orders-header">
-        <h1 className="admin-page-title">Orders</h1>
+        <h1 className="admin-page-title">Orders &amp; quotes</h1>
         <p className="page-intro">
-          Process orders, update status, edit lines, and manage delivery from one place.
+          Quotations and placed orders live here. Create a quote for pricing only, then convert to an order when the customer confirms.
+          Process status, lines, delivery, and invoicing from one place.
         </p>
-        <div className="admin-page-header-actions">
-          <Link to="/admin/orders/processing" className="btn btn-small">
-            Process orders
+        <div className="admin-page-header-actions admin-orders-quick-create">
+          <Link to="/admin/create-quote" className="btn btn-small">
+            Quick quote
           </Link>
           <Link to="/admin/create-order" className="btn btn-outline btn-small">
-            Create order
+            Quick order
+          </Link>
+          <Link to="/admin/orders/processing" className="btn btn-outline btn-small">
+            Process orders
           </Link>
           <Link to="/admin/orders?archive=archived" className="btn btn-outline btn-small">
             Archived orders

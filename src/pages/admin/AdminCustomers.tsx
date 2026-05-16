@@ -66,7 +66,8 @@ export default function AdminCustomers() {
         <p className="page-intro">Find customers quickly, review account health, and jump straight to orders.</p>
         <div className="admin-page-header-actions">
           <Link to="/admin/orders" className="btn btn-outline btn-small">All orders</Link>
-          <Link to="/admin/create-order" className="btn btn-small">Create order for customer</Link>
+          <Link to="/admin/create-quote" className="btn btn-small">Create quote</Link>
+          <Link to="/admin/create-order" className="btn btn-small btn-outline">Create order</Link>
         </div>
       </div>
 
@@ -134,7 +135,7 @@ export default function AdminCustomers() {
                         if (col.id === 'balance') return <td key={col.id}>£{Number(c.balance_outstanding).toFixed(2)}</td>
                         if (col.id === 'credit_limit') return <td key={col.id}>{c.credit_limit != null ? `£${Number(c.credit_limit).toFixed(2)}` : '—'}</td>
                         if (col.id === 'website') return <td key={col.id}>{c.website ? <a href={c.website} target="_blank" rel="noopener noreferrer">{c.website}</a> : '—'}</td>
-                        if (col.id === 'actions') return <td key={col.id} className="admin-table-actions"><Link to={`/admin/customers/${c.user_id}`}>View</Link><Link to={`/admin/orders?customer=${c.user_id}`}>Orders</Link><Link to={`/admin/create-order?customer=${c.user_id}`}>Create order</Link></td>
+                        if (col.id === 'actions') return <td key={col.id} className="admin-table-actions"><Link to={`/admin/customers/${c.user_id}`}>View</Link><Link to={`/admin/orders?customer=${c.user_id}`}>Orders</Link><Link to={`/admin/create-quote?customer=${c.user_id}`}>Create quote</Link><Link to={`/admin/create-order?customer=${c.user_id}`}>Create order</Link></td>
                         return <td key={col.id}>—</td>
                       })}
                     </tr>

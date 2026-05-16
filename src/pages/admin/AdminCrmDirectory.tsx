@@ -93,7 +93,10 @@ export default function AdminCrmDirectory() {
                 <Link to={`/admin/customers/${c.user_id}`} className="btn btn-small btn-outline">
                   View &amp; add notes
                 </Link>
-                <Link to={`/admin/create-order?customer=${c.user_id}`} className="btn btn-small">
+                <Link to={`/admin/create-quote?customer=${c.user_id}`} className="btn btn-small">
+                  Create quote
+                </Link>
+                <Link to={`/admin/create-order?customer=${c.user_id}`} className="btn btn-small btn-outline">
                   Create order
                 </Link>
               </div>

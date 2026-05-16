@@ -1,20 +1,28 @@
 import { supabase } from '@/lib/supabase'
 import { recalcOrderTotals } from '@/lib/orders'
-import { resolveCustomerPrice, type CustomerSegmentIds } from '@/lib/pricing'
+import { resolveCustomerPrice, normalizeAccountDiscountPercent, type CustomerSegmentIds } from '@/lib/pricing'
 import type { OrderLineRow, ProductRow } from '@/types/database'
 
-async function getCustomerSegment(customerUserId: string): Promise<CustomerSegmentIds> {
+async function getCustomerPricingContext(customerUserId: string): Promise<{
+  segment: CustomerSegmentIds
+  accountDiscountPercent: number | null
+}> {
   const { data } = await supabase
     .from('customer_profiles')
-    .select('customer_group_id, customer_location_id, trade_type_id, company_type_id')
+    .select('customer_group_id, customer_location_id, trade_type_id, company_type_id, account_discount_percent')
     .eq('user_id', customerUserId)
     .maybeSingle()
 
+  const raw = data?.account_discount_percent
+
   return {
-    customer_group_id: data?.customer_group_id ?? null,
-    customer_location_id: data?.customer_location_id ?? null,
-    trade_type_id: data?.trade_type_id ?? null,
-    company_type_id: data?.company_type_id ?? null,
+    segment: {
+      customer_group_id: data?.customer_group_id ?? null,
+      customer_location_id: data?.customer_location_id ?? null,
+      trade_type_id: data?.trade_type_id ?? null,
+      company_type_id: data?.company_type_id ?? null,
+    },
+    accountDiscountPercent: normalizeAccountDiscountPercent(raw),
   }
 }
 
@@ -30,7 +38,7 @@ async function getProductsMap(productIds: string[]): Promise<Map<string, Product
 }
 
 /**
- * Reprice a draft order for the current customer using `customer_price_rules`.
+ * Reprice draft order lines using `customer_price_rules` and optional `account_discount_percent` on the customer profile.
  * - Runs two passes to reduce dependency issues when promotions use `min_order_total_ex_vat`.
  * - Updates `order_lines.unit_price` and then recalculates order totals.
  */
@@ -41,8 +49,8 @@ export async function repriceDraftOrderLinesForCustomer(params: {
 }): Promise<void> {
   const { orderId, customerUserId, collectionIds } = params
 
-  const [segment, orderRes, linesRes] = await Promise.all([
-    getCustomerSegment(customerUserId),
+  const [{ segment, accountDiscountPercent }, orderRes, linesRes] = await Promise.all([
+    getCustomerPricingContext(customerUserId),
     supabase.from('orders').select('total_ex_vat').eq('id', orderId).maybeSingle(),
     supabase.from('order_lines').select('id, product_id, quantity').eq('order_id', orderId),
   ])
@@ -68,6 +76,7 @@ export async function repriceDraftOrderLinesForCustomer(params: {
         segment,
         orderTotalExVat: currentOrderTotalExVat,
         collectionIds,
+        accountDiscountPercent,
       })
       resolvedByProductId.set(productId, resolved)
     }

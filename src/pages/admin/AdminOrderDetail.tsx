@@ -22,12 +22,14 @@ import {
   getCourierTimeSlotLabel,
 } from '@/lib/courierServices'
 import { recalcOrderTotals } from '@/lib/orders'
+import { repriceDraftOrderLinesForCustomer } from '@/lib/orderPricing'
 import { insertOrderEvent } from '@/lib/orderEvents'
 import { useStaff } from '@/hooks/useStaff'
 import { allocateStockForOrderShipmentAtomic } from '@/lib/stock'
 import { lamtekPortalLocations } from '@/lib/lamtekLocations'
 import { usePermission } from '@/hooks/usePermission'
 import { createPickListFromOrder } from '@/lib/pickLists'
+import { useAdminUi, type AdminOrderLinePricingMode } from '@/contexts/AdminUiContext'
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   quotation: 'Quotation',
@@ -163,6 +165,7 @@ export default function AdminOrderDetail() {
   const [productPickerLoading, setProductPickerLoading] = useState(false)
   const [deliveryWindows, setDeliveryWindows] = useState<DeliveryWindowWithDays[]>([])
   const [cancelConfirm, setCancelConfirm] = useState(false)
+  const [convertQuoteConfirm, setConvertQuoteConfirm] = useState(false)
   const [deletingLineId, setDeletingLineId] = useState<string | null>(null)
   const [setStatusValue, setSetStatusValue] = useState<OrderRow['status'] | ''>('')
   const [setStatusConfirm, setSetStatusConfirm] = useState(false)
@@ -219,6 +222,9 @@ export default function AdminOrderDetail() {
   const [trackingEmailSending, setTrackingEmailSending] = useState(false)
   const [pickListBusy, setPickListBusy] = useState(false)
   const auditViewLoggedRef = useRef<string | null>(null)
+  const { adminOrderLinePricingDefault } = useAdminUi()
+  const [lineAddPricingChoice, setLineAddPricingChoice] = useState<'use_default' | AdminOrderLinePricingMode>('use_default')
+  const [repricingBusy, setRepricingBusy] = useState(false)
 
   function dateInputToIso(d: string): string {
     // Use local noon to avoid timezone date shifting for date-only inputs.
@@ -503,6 +509,10 @@ export default function AdminOrderDetail() {
 
   useEffect(() => {
     load()
+  }, [orderId])
+
+  useEffect(() => {
+    setLineAddPricingChoice('use_default')
   }, [orderId])
 
   useEffect(() => {
@@ -1083,15 +1093,27 @@ export default function AdminOrderDetail() {
       unit_price: prod.unit_price,
       options: {},
     })
-    await recalcTotals()
+    const pricingMode = effectiveLineAddPricingMode()
+    if (pricingMode === 'customer_rules' && order?.user_id) {
+      try {
+        await repriceDraftOrderLinesForCustomer({ orderId, customerUserId: order.user_id })
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : 'Could not apply customer pricing to new line.')
+        await recalcTotals()
+      }
+    } else {
+      if (pricingMode === 'customer_rules' && !order?.user_id) {
+        setActionError('This order has no customer — cannot apply customer pricing. Line added at list price.')
+      }
+      await recalcTotals()
+    }
     insertOrderEvent({
       orderId,
       actorUserId: staffProfile?.user_id ?? null,
       eventType: 'line_added',
       note: `${prod.sku ? `${prod.sku} — ` : ''}${prod.name} × ${productQty}`,
     }).catch(() => {})
-    const { data } = await supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price').eq('order_id', orderId)
-    setLines((data as LineRow[]) ?? [])
+    await reloadOrderLinesFromDb()
     setProductId('')
     setProductQty(1)
     setSelectedProduct(null)
@@ -1118,10 +1140,14 @@ export default function AdminOrderDetail() {
       eventType: 'line_quantity_changed',
       note: `${line.product_snapshot?.sku ? `${String(line.product_snapshot.sku)} — ` : ''}${String(line.product_snapshot?.name ?? 'Line')}: ${line.quantity} → ${newQty}`,
     }).catch(() => {})
-    const { data } = await supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price').eq('order_id', orderId)
-    setLines((data as LineRow[]) ?? [])
-    const { data: o } = await supabase.from('orders').select('*').eq('id', orderId).single()
-    if (o) setOrder(o as OrderRow)
+    if (effectiveLineAddPricingMode() === 'customer_rules' && order?.user_id) {
+      try {
+        await repriceDraftOrderLinesForCustomer({ orderId, customerUserId: order.user_id })
+      } catch {
+        /* keep recalc totals from above */
+      }
+    }
+    await reloadOrderLinesFromDb()
   }
 
   async function updateLinePrice(lineId: string, newPrice: number) {
@@ -1155,10 +1181,14 @@ export default function AdminOrderDetail() {
       eventType: 'line_removed',
       note: 'Line removed',
     }).catch(() => {})
-    const { data } = await supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price').eq('order_id', orderId)
-    setLines((data as LineRow[]) ?? [])
-    const { data: o } = await supabase.from('orders').select('*').eq('id', orderId).single()
-    if (o) setOrder(o as OrderRow)
+    if (effectiveLineAddPricingMode() === 'customer_rules' && order?.user_id) {
+      try {
+        await repriceDraftOrderLinesForCustomer({ orderId, customerUserId: order.user_id })
+      } catch {
+        /* ignore */
+      }
+    }
+    await reloadOrderLinesFromDb()
     setDeletingLineId(null)
   }
 
@@ -1167,6 +1197,40 @@ export default function AdminOrderDetail() {
     await recalcOrderTotals(orderId)
     const { data: o } = await supabase.from('orders').select('*').eq('id', orderId).single()
     if (o) setOrder(o as OrderRow)
+  }
+
+  function effectiveLineAddPricingMode(): AdminOrderLinePricingMode {
+    return lineAddPricingChoice === 'use_default' ? adminOrderLinePricingDefault : lineAddPricingChoice
+  }
+
+  async function reloadOrderLinesFromDb() {
+    if (!orderId) return
+    const [{ data: lineData }, { data: orderData }] = await Promise.all([
+      supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price').eq('order_id', orderId),
+      supabase.from('orders').select('*').eq('id', orderId).single(),
+    ])
+    setLines((lineData as LineRow[]) ?? [])
+    if (orderData) setOrder(orderData as OrderRow)
+  }
+
+  async function applyCustomerPricingToLines() {
+    if (!orderId || !order?.user_id || repricingBusy) return
+    setRepricingBusy(true)
+    setActionError(null)
+    try {
+      await repriceDraftOrderLinesForCustomer({ orderId, customerUserId: order.user_id })
+      await reloadOrderLinesFromDb()
+      insertOrderEvent({
+        orderId,
+        actorUserId: staffProfile?.user_id ?? null,
+        eventType: 'line_price_changed',
+        note: 'Applied customer pricing (rules + account discount) to catalogue lines',
+      }).catch(() => {})
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Could not apply customer pricing.')
+    } finally {
+      setRepricingBusy(false)
+    }
   }
 
   async function setArchived(isArchived: boolean) {
@@ -1275,6 +1339,7 @@ export default function AdminOrderDetail() {
   }
 
   const currentStatus = order!.status
+  const isQuotation = currentStatus === 'quotation'
   const next = nextStatuses(currentStatus)
   const reopen = reopenStatuses(currentStatus)
   const isCancelled = currentStatus === 'cancelled'
@@ -1290,7 +1355,7 @@ export default function AdminOrderDetail() {
         <span className="admin-breadcrumb">
           <Link to="/admin/orders">Orders</Link>
           <span className="admin-breadcrumb-sep">/</span>
-          <span>Order {order!.reference || orderId!.slice(0, 8)}</span>
+          <span>{isQuotation ? 'Quote' : 'Order'} {order!.reference || orderId!.slice(0, 8)}</span>
           {order!.parent_order_id ? (
             <span className="admin-muted" style={{ marginLeft: '0.5rem' }}>
               · Parent:{' '}
@@ -1344,6 +1409,16 @@ export default function AdminOrderDetail() {
               <Link to={`/admin/orders/${orderId}/quote?mode=no-pricing`} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-small">Quote (no pricing)</Link>
             </>
           )}
+          {isQuotation && canEditOrders && !isArchived && (
+            <button
+              type="button"
+              className="btn btn-small"
+              onClick={() => setConvertQuoteConfirm(true)}
+              disabled={saving}
+            >
+              Convert to order
+            </button>
+          )}
           <Link to={`/admin/customers/${order!.user_id}`} className="btn btn-outline btn-small">Customer</Link>
           {['quotation', 'placed', 'invoiced', 'paid'].includes(order!.status) && (
             <Link
@@ -1357,9 +1432,29 @@ export default function AdminOrderDetail() {
         </div>
       </div>
 
+      {isQuotation && (
+        <div className="card admin-card admin-quote-workflow-card" role="note">
+          <h2 style={{ marginTop: 0 }}>Quotation</h2>
+          <p style={{ margin: '0 0 0.75rem' }}>
+            This record is a quote, not a placed order. Add lines and pricing below, print or send the quote to the customer,
+            then use <strong>Convert to order</strong> when they confirm. You can still edit lines while status is Quotation.
+          </p>
+          {canEditOrders && !isArchived && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <Link to={`/admin/orders/${orderId}/quote`} target="_blank" rel="noopener noreferrer" className="btn btn-small">
+                Print quote
+              </Link>
+              <button type="button" className="btn btn-small" onClick={() => setConvertQuoteConfirm(true)} disabled={saving}>
+                Convert to order
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Order actions: reopen, process, set status, cancel */}
       <div className="card admin-card admin-order-actions-card">
-        <h2>Order actions</h2>
+        <h2>{isQuotation ? 'Quote actions' : 'Order actions'}</h2>
         {actionError && (
           <div className="admin-confirm-box" role="alert">
             <p>{actionError}</p>
@@ -1586,6 +1681,31 @@ export default function AdminOrderDetail() {
           )}
 
           {/* Status confirm UI stays here to keep layout stable */}
+          {convertQuoteConfirm && (
+            <div className="admin-confirm-box" role="dialog" aria-labelledby="convert-quote-title">
+              <p id="convert-quote-title">
+                <strong>Convert this quote to a placed order?</strong> Status will change from Quotation to Placed.
+                Lines, pricing, and delivery details are kept. You can invoice and fulfil it like any other order.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-small"
+                  onClick={async () => {
+                    setConvertQuoteConfirm(false)
+                    await setStatus('placed')
+                  }}
+                  disabled={saving}
+                >
+                  Yes, convert to order
+                </button>
+                <button type="button" className="btn btn-outline btn-small" onClick={() => setConvertQuoteConfirm(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           {setStatusConfirm && setStatusValue && setStatusValue !== 'cancelled' && (
             <div className="admin-action-block">
               <h3>Confirm status change</h3>
@@ -2633,6 +2753,48 @@ export default function AdminOrderDetail() {
 
         {canEdit && (
           <div className="admin-add-line">
+            <div className="admin-order-line-pricing-controls" style={{ marginBottom: '0.85rem', paddingBottom: '0.85rem', borderBottom: '1px solid var(--admin-border, #e5e7eb)' }}>
+              <label style={{ display: 'block', maxWidth: 440, marginBottom: '0.5rem' }}>
+                <span className="admin-muted" style={{ fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
+                  When adding catalogue lines
+                </span>
+                <select
+                  value={lineAddPricingChoice}
+                  onChange={(e) =>
+                    setLineAddPricingChoice(e.target.value as 'use_default' | AdminOrderLinePricingMode)
+                  }
+                  className="admin-select"
+                  style={{ width: '100%', maxWidth: 440 }}
+                  disabled={saving || repricingBusy}
+                  title="Choose how unit prices are set when you add a product line. Manual edits to a line still work."
+                >
+                  <option value="use_default">
+                    Use my default ({adminOrderLinePricingDefault === 'catalogue' ? 'list price' : 'customer pricing'})
+                  </option>
+                  <option value="catalogue">Catalogue list price</option>
+                  <option value="customer_rules">Customer pricing (rules + account discount)</option>
+                </select>
+              </label>
+              <p className="admin-muted" style={{ fontSize: '0.8rem', margin: '0 0 0.5rem' }}>
+                Set your usual default under <Link to="/admin/settings">Settings → Advanced</Link>.
+                If you pick customer pricing but this order has no customer account, lines stay at list price.
+              </p>
+              <button
+                type="button"
+                className="btn btn-outline btn-small"
+                disabled={
+                  !order?.user_id ||
+                  repricingBusy ||
+                  saving ||
+                  !canEditLines(order.status) ||
+                  order.is_archived === true
+                }
+                title="Recalculate every catalogue line from rules + account discount for this order’s customer"
+                onClick={() => applyCustomerPricingToLines()}
+              >
+                {repricingBusy ? 'Applying…' : 'Apply customer pricing to all lines'}
+              </button>
+            </div>
             <h3>Add line</h3>
             <div className="admin-add-line-fields">
               <div className="admin-add-line-search-row">

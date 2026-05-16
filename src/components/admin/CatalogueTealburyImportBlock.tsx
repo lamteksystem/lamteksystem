@@ -13,13 +13,16 @@ function csvEscapeCell(v: string): string {
 }
 
 async function ensureTealburyCategoryId(name: string): Promise<string> {
-  const slug = `${TEALBURY_SLUG_PREFIX}${slugifyCategorySegment(name)}`
+  const cleaned = name.trim()
+  let slugCore = slugifyCategorySegment(cleaned)
+  if (slugCore.startsWith('tealbury-')) slugCore = slugCore.slice('tealbury-'.length)
+  const slug = `${TEALBURY_SLUG_PREFIX}${slugCore}`.slice(0, 80)
   const { data: existing, error: selErr } = await supabase.from('categories').select('id').eq('slug', slug).maybeSingle()
   if (selErr) throw selErr
   if (existing?.id) return existing.id
   const { data: ins, error: insErr } = await supabase
     .from('categories')
-    .insert({ name, slug, sort_order: 520 })
+    .insert({ name: cleaned.slice(0, 200), slug, sort_order: 520 })
     .select('id')
     .single()
   if (insErr) throw insErr
@@ -28,9 +31,21 @@ async function ensureTealburyCategoryId(name: string): Promise<string> {
 }
 
 async function purgeTealburyCatalogue(): Promise<void> {
-  const { data: rows, error: selErr } = await supabase.from('products').select('id').eq('catalog_program', CATALOG_PROGRAM.TEALBURY)
-  if (selErr) throw selErr
-  const ids = (rows ?? []).map((r) => r.id)
+  const ids: string[] = []
+  const PAGE = 1000
+  let from = 0
+  while (true) {
+    const { data: page, error: selErr } = await supabase
+      .from('products')
+      .select('id')
+      .eq('catalog_program', CATALOG_PROGRAM.TEALBURY)
+      .range(from, from + PAGE - 1)
+    if (selErr) throw selErr
+    if (!page?.length) break
+    ids.push(...page.map((r) => r.id))
+    if (page.length < PAGE) break
+    from += PAGE
+  }
   if (!ids.length) {
     await removeOrphanTealburyCategories()
     return

@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { getDocumentUrls } from '@/lib/documents'
 import { getProductAvailabilityMeta } from '@/lib/productAvailability'
+import { fetchAssembliesUsingComponent, fetchProductAssemblyBom } from '@/lib/productAssembly'
+import ProductAssemblyBreakdown from '@/components/ProductAssemblyBreakdown'
 import type { CategoryRow, ProductRow, DocumentRow } from '@/types/database'
 import { VAT_RATE } from '@/lib/tax'
 
@@ -66,6 +68,7 @@ export default function ProductDetailModal({
   /** True only after primary pointer pressed down on backdrop (not on card then released on backdrop — that must not dismiss). */
   const pointerBackdropPrimedRef = useRef(false)
   const [assemblies, setAssemblies] = useState<AssemblyWithName[]>([])
+  const [hasBom, setHasBom] = useState(false)
   const [technicalDocs, setTechnicalDocs] = useState<DocumentRow[]>([])
   const [otherDocs, setOtherDocs] = useState<DocumentRow[]>([])
   const [docUrls, setDocUrls] = useState<Record<string, string>>({})
@@ -95,22 +98,17 @@ export default function ProductDetailModal({
     let cancelled = false
     async function load() {
       setLoadingAssemblies(true)
-      const { data: lineData } = await supabase
-        .from('assembly_lines')
-        .select('assembly_id')
-        .eq('product_id', product.id)
-      const assemblyIds = [...new Set((lineData ?? []).map((r) => r.assembly_id))]
-      if (assemblyIds.length > 0 && !cancelled) {
-        const { data: assyData } = await supabase
-          .from('assemblies')
-          .select('id, name')
-          .in('id', assemblyIds)
-          .eq('active', true)
-        setAssemblies((assyData ?? []) as AssemblyWithName[])
-      } else if (!cancelled) {
+      const bom = await fetchProductAssemblyBom(product.id)
+      if (cancelled) return
+      if (bom && bom.assembly_lines.length > 0) {
+        setHasBom(true)
         setAssemblies([])
+      } else {
+        setHasBom(false)
+        const usedIn = await fetchAssembliesUsingComponent(product.id)
+        if (!cancelled) setAssemblies(usedIn)
       }
-      setLoadingAssemblies(false)
+      if (!cancelled) setLoadingAssemblies(false)
     }
     load()
     return () => { cancelled = true }
@@ -351,12 +349,18 @@ export default function ProductDetailModal({
               )}
             </section>
 
-            {/* Components / Used in units – always shown */}
+            {/* Complete unit make-up / component usage */}
             <section className="product-modal-section">
               <h3 className="product-modal-section-title">
-                {componentsFromOptions.length > 0 ? 'Components included' : 'Used in complete units'}
+                {hasBom
+                  ? 'Complete unit make-up'
+                  : componentsFromOptions.length > 0
+                    ? 'Components included'
+                    : 'Used in complete units'}
               </h3>
-              {componentsFromOptions.length > 0 ? (
+              {hasBom ? (
+                <ProductAssemblyBreakdown productId={product.id} />
+              ) : componentsFromOptions.length > 0 ? (
                 <ul className="product-modal-list">
                   {componentsFromOptions.map((item, i) => (
                     <li key={i}>{item}</li>

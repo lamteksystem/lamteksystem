@@ -4,6 +4,9 @@ import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
 export type TableDensity = 'compact' | 'comfortable' | 'spacious'
 export type DateFormat = 'locale' | 'ddmmyyyy' | 'iso'
 
+/** How admin order detail sets unit prices when adding catalogue lines (staff). */
+export type AdminOrderLinePricingMode = 'catalogue' | 'customer_rules'
+
 export interface AdminUiPrefs {
   sidebarCollapsed: boolean
   sidebarAccordion: boolean
@@ -12,6 +15,8 @@ export interface AdminUiPrefs {
   dateFormat: DateFormat
   rowsPerPage: number
   defaultOrderStatusFilter: string
+  /** Default for order detail: list price vs resolve rules + account discount when adding lines. */
+  adminOrderLinePricingDefault: AdminOrderLinePricingMode
 }
 
 const defaults: AdminUiPrefs = {
@@ -27,6 +32,7 @@ const defaults: AdminUiPrefs = {
   dateFormat: 'locale',
   rowsPerPage: 25,
   defaultOrderStatusFilter: '',
+  adminOrderLinePricingDefault: 'catalogue',
 }
 
 const PREF_KEY = 'admin_ui_prefs'
@@ -37,6 +43,7 @@ type AdminUiContextValue = AdminUiPrefs & {
   setDateFormat: (v: DateFormat) => void
   setRowsPerPage: (v: number) => void
   setDefaultOrderStatusFilter: (v: string) => void
+  setAdminOrderLinePricingDefault: (v: AdminOrderLinePricingMode) => void
   updatePrefs: (partial: Partial<AdminUiPrefs>) => void
   resetPrefs: () => void
 }
@@ -89,6 +96,7 @@ export function AdminUiProvider({ children }: { children: ReactNode }) {
     setDateFormat: (v) => setPrefs({ dateFormat: v }),
     setRowsPerPage: (v) => setPrefs({ rowsPerPage: v }),
     setDefaultOrderStatusFilter: (v) => setPrefs({ defaultOrderStatusFilter: v }),
+    setAdminOrderLinePricingDefault: (v) => setPrefs({ adminOrderLinePricingDefault: v }),
     updatePrefs: setPrefs,
     resetPrefs,
   }

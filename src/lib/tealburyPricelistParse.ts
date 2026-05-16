@@ -180,6 +180,10 @@ function mapTealburyCustomerHeaderRow(row: unknown[]): TealburyCustomerColMap | 
     else if (t.includes('d') && t.includes('mm')) d = i
   }
   if (code < 0 || price < 0) return null
+  // Tealbury customer tables always carry at least one H/W/D (mm) dimension column. The Lamtek
+  // workbook uses a freeform "Size" column and a single "Price" column with no mm-labelled
+  // dimensions; without this guard those headers would shadow the multi-finish kitchen parser.
+  if (h < 0 && w < 0 && d < 0) return null
   const desc = code > 0 ? code - 1 : -1
   return { code, price, h, w, d, desc }
 }
@@ -264,7 +268,8 @@ function parseTealburyCustomerCatalogMatrix(
 }
 
 function finalizeTealburyRowPricing(row: TealburyParsedRow): TealburyParsedRow {
-  const fp = (row.options.tealbury_finish_prices_gbp as Record<string, number>) || {}
+  const fp =
+    ((row.options.tealbury_finish_prices_gbp ?? row.options.lamtek_finish_prices_gbp) as Record<string, number>) || {}
   const keys = Object.keys(fp)
   const pricelistKey = keys.find((k) => k === 'Pricelist' || k.startsWith('Pricelist'))
   const vals = Object.values(fp).filter((n) => typeof n === 'number' && n > 0)
@@ -294,38 +299,91 @@ function buildKitchenTableFromHeader(row: unknown[]) {
   return { code: 0, size: 1, desc: 2, finishCols }
 }
 
+function cleanSectionTitle(raw: string): string {
+  return (raw || '')
+    .replace(/…+|\.{3,}/g, '')
+    .replace(/^[\s_\-•]+/, '')
+    .replace(/[\s_\-•]+$/, '')
+    .replace(/\s+/g, ' ')
+    .slice(0, 200)
+    .trim()
+}
+
+function looksLikeInlineSectionBanner(row: unknown[]): boolean {
+  const c0 = trimCell(row[0])
+  if (!c0 || c0.length < 6 || c0.length > 120) return false
+  const c1 = trimCell(row[1])
+  const c2 = trimCell(row[2])
+  const c3 = trimCell(row[3])
+  if (c1 || c2 || c3) return false
+  if (parsePrice(c0) != null) return false
+  if (!c0.includes(' ')) return false
+  const letters = c0.replace(/[^A-Za-z]/g, '')
+  if (!letters.length) return false
+  const upper = letters.replace(/[^A-Z]/g, '').length
+  if (upper / letters.length < 0.75) return false
+  return true
+}
+
+/** Kitchen-style table, or bedroom-shaped header inside a Lamtek kitchen sheet (size col unused). */
+type KitchenFlowTable =
+  | ReturnType<typeof buildKitchenTableFromHeader>
+  | { code: 0; size: -1; desc: 1; finishCols: { label: string; col: number }[] }
+
 function parseKitchenMatrix(data: unknown[][], sheetLabel: string): TealburyParsedRow[] {
   const bySku = new Map<string, TealburyParsedRow>()
-  let section = 'Tealbury kitchen'
-  let table: ReturnType<typeof buildKitchenTableFromHeader> | null = null
+  let section = 'Lamtek kitchen'
+  let table: KitchenFlowTable | null = null
+  let firstTocEntry: string | null = null
+  let firstKitchenHeaderSeen = false
 
   for (let r = 0; r < data.length; r++) {
     const row = data[r]
     if (!Array.isArray(row)) continue
 
     if (looksLikeTocSectionKitchen(row)) {
-      section = trimCell(row[2])
-        .replace(/…+/g, '')
-        .replace(/\s+/g, ' ')
-        .slice(0, 200)
-        .trim()
+      const t = cleanSectionTitle(trimCell(row[2]))
+      const isMeta = /specification|important inform|introduction|^contents$/i.test(t)
+      if (t && !firstTocEntry && !isMeta) firstTocEntry = t
+      if (!isMeta) section = t
       table = null
+      continue
+    }
+
+    if (looksLikeInlineSectionBanner(row)) {
+      section = cleanSectionTitle(trimCell(row[0]))
       continue
     }
 
     if (looksLikeKitchenHeader(row)) {
       table = buildKitchenTableFromHeader(row)
+      if (!firstKitchenHeaderSeen) {
+        firstKitchenHeaderSeen = true
+        if (firstTocEntry) section = firstTocEntry
+      }
+      continue
+    }
+
+    if (looksLikeBedroomHeader(row)) {
+      const sample = data[r + 1]
+      const finishCols: { label: string; col: number }[] = []
+      for (let c = 2; c < Math.min(row.length, 48); c++) {
+        const lab = trimCell(row[c])
+        if (!lab || lab.length > 60) continue
+        if (/^[\d.£]+$/.test(lab)) continue
+        if (!/[a-z]/i.test(lab)) continue
+        if (/^(code|description)$/i.test(lab)) continue
+        if (!Array.isArray(sample) || parsePrice(sample[c]) == null) continue
+        finishCols.push({ label: lab, col: c })
+      }
+      table = { code: 0, size: -1, desc: 1, finishCols }
       continue
     }
 
     if (!table) continue
 
     if (!trimCell(row[table.code]) && trimCell(row[table.desc]).includes('…') && trimCell(row[table.desc]).length > 18) {
-      section = trimCell(row[table.desc])
-        .replace(/…+/g, '')
-        .replace(/\s+/g, ' ')
-        .slice(0, 200)
-        .trim()
+      section = cleanSectionTitle(trimCell(row[table.desc]))
       table = null
       continue
     }
@@ -333,7 +391,7 @@ function parseKitchenMatrix(data: unknown[][], sheetLabel: string): TealburyPars
     const code = trimCell(row[table.code])
     if (!code || !isLikelySku(code)) continue
 
-    const size = trimCell(row[table.size])
+    const size = table.size >= 0 ? trimCell(row[table.size]) : ''
     const desc = trimCell(row[table.desc])
     const finishPrices: Record<string, number> = {}
     for (const f of table.finishCols) {
@@ -350,23 +408,23 @@ function parseKitchenMatrix(data: unknown[][], sheetLabel: string): TealburyPars
       .join('\n')
 
     const baseOpts = {
-      tealbury_sheet: 'kitchen',
-      tealbury_source_sheet: sheetLabel,
-      tealbury_sections: [section],
-      tealbury_finish_prices_gbp: finishPrices,
-      tealbury_sizes: size ? [size] : [],
+      lamtek_sheet: 'kitchen',
+      lamtek_source_sheet: sheetLabel,
+      lamtek_sections: [section],
+      lamtek_finish_prices_gbp: finishPrices,
+      lamtek_sizes: size ? [size] : [],
     } satisfies Record<string, Json>
 
     if (bySku.has(code)) {
       const prev = bySku.get(code)!
       prev.description = `${prev.description}\n---\n${description}`
       prev.unitPrice = Math.min(prev.unitPrice, unitPrice)
-      const prevFin = (prev.options.tealbury_finish_prices_gbp as Record<string, number>) || {}
+      const prevFin = (prev.options.lamtek_finish_prices_gbp as Record<string, number>) || {}
       prev.options = {
         ...prev.options,
-        tealbury_finish_prices_gbp: { ...prevFin, ...finishPrices },
-        tealbury_sections: [...new Set([...((prev.options.tealbury_sections as string[]) || []), section])],
-        tealbury_sizes: [...new Set([...((prev.options.tealbury_sizes as string[]) || []), ...(size ? [size] : [])])],
+        lamtek_finish_prices_gbp: { ...prevFin, ...finishPrices },
+        lamtek_sections: [...new Set([...((prev.options.lamtek_sections as string[]) || []), section])],
+        lamtek_sizes: [...new Set([...((prev.options.lamtek_sizes as string[]) || []), ...(size ? [size] : [])])],
       }
     } else {
       bySku.set(code, {
@@ -389,7 +447,7 @@ function parseKitchenMatrix(data: unknown[][], sheetLabel: string): TealburyPars
 
 function parseBedroomMatrix(data: unknown[][], sheetLabel: string): TealburyParsedRow[] {
   const bySku = new Map<string, TealburyParsedRow>()
-  let section = 'Tealbury bedroom'
+  let section = 'Lamtek bedroom'
   let hdr: { labels: string[]; cols: number[] } | null = null
 
   for (let r = 0; r < data.length; r++) {
@@ -454,21 +512,21 @@ function parseBedroomMatrix(data: unknown[][], sheetLabel: string): TealburyPars
     const description = [`Section: ${section}`, desc ? `Specification: ${desc}` : null].filter(Boolean).join('\n')
 
     const baseOpts = {
-      tealbury_sheet: 'bedroom',
-      tealbury_source_sheet: sheetLabel,
-      tealbury_sections: [section],
-      tealbury_finish_prices_gbp: finishPrices,
+      lamtek_sheet: 'bedroom',
+      lamtek_source_sheet: sheetLabel,
+      lamtek_sections: [section],
+      lamtek_finish_prices_gbp: finishPrices,
     } satisfies Record<string, Json>
 
     if (bySku.has(code)) {
       const prev = bySku.get(code)!
       prev.description = `${prev.description}\n---\n${description}`
       prev.unitPrice = Math.min(prev.unitPrice, unitPrice)
-      const prevFin = (prev.options.tealbury_finish_prices_gbp as Record<string, number>) || {}
+      const prevFin = (prev.options.lamtek_finish_prices_gbp as Record<string, number>) || {}
       prev.options = {
         ...prev.options,
-        tealbury_finish_prices_gbp: { ...prevFin, ...finishPrices },
-        tealbury_sections: [...new Set([...((prev.options.tealbury_sections as string[]) || []), section])],
+        lamtek_finish_prices_gbp: { ...prevFin, ...finishPrices },
+        lamtek_sections: [...new Set([...((prev.options.lamtek_sections as string[]) || []), section])],
       }
     } else {
       bySku.set(code, {
@@ -502,17 +560,32 @@ function mergeBySku(rows: TealburyParsedRow[], warnings: string[]): TealburyPars
     k.description = `${k.description}\n---\n${row.description}`
     k.unitPrice = Math.min(k.unitPrice, row.unitPrice)
     k.cost_price = Math.round(k.unitPrice * COST_FACTOR * 100) / 100
-    const kFin = (k.options.tealbury_finish_prices_gbp as Record<string, number>) || {}
-    const rFin = (row.options.tealbury_finish_prices_gbp as Record<string, number>) || {}
+    const kFin =
+      (k.options.tealbury_finish_prices_gbp as Record<string, number> | undefined) ??
+      (k.options.lamtek_finish_prices_gbp as Record<string, number> | undefined) ??
+      {}
+    const rFin =
+      (row.options.tealbury_finish_prices_gbp as Record<string, number> | undefined) ??
+      (row.options.lamtek_finish_prices_gbp as Record<string, number> | undefined) ??
+      {}
+    const finishKey = k.options.tealbury_finish_prices_gbp != null ? 'tealbury_finish_prices_gbp' : 'lamtek_finish_prices_gbp'
+    const sectionKey = k.options.tealbury_sections != null ? 'tealbury_sections' : 'lamtek_sections'
+    const sizeKey = k.options.tealbury_sizes != null ? 'tealbury_sizes' : 'lamtek_sizes'
     k.options = {
       ...k.options,
       ...row.options,
-      tealbury_finish_prices_gbp: { ...kFin, ...rFin },
-      tealbury_sections: [
-        ...new Set([...((k.options.tealbury_sections as string[]) || []), ...((row.options.tealbury_sections as string[]) || [])]),
+      [finishKey]: { ...kFin, ...rFin },
+      [sectionKey]: [
+        ...new Set([
+          ...(((k.options[sectionKey] as string[]) || []) as string[]),
+          ...(((row.options[sectionKey] as string[]) || []) as string[]),
+        ]),
       ],
-      tealbury_sizes: [
-        ...new Set([...((k.options.tealbury_sizes as string[]) || []), ...((row.options.tealbury_sizes as string[]) || [])]),
+      [sizeKey]: [
+        ...new Set([
+          ...(((k.options[sizeKey] as string[]) || []) as string[]),
+          ...(((row.options[sizeKey] as string[]) || []) as string[]),
+        ]),
       ],
     }
   }

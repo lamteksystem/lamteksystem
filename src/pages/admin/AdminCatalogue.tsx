@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import CatalogueTealburyImportBlock from '@/components/admin/CatalogueTealburyImportBlock'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
@@ -6,12 +6,29 @@ import { supabase } from '@/lib/supabase'
 import { useAdminUi } from '@/contexts/AdminUiContext'
 import AdminProductModal from '@/components/admin/AdminProductModal'
 import { ColumnSettings } from '@/components/admin/ColumnSettings'
-import { HorizontalScrollWithArrows } from '@/components/admin/HorizontalScrollWithArrows'
+import {
+  HorizontalScrollWithArrows,
+  HorizontalScrollToolbarArrows,
+  type HorizontalScrollHandle,
+  type HorizontalScrollState,
+} from '@/components/admin/HorizontalScrollWithArrows'
 import { StockMtmSwitch } from '@/components/admin/StockMtmSwitch'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import { useColumnWidths } from '@/hooks/useColumnWidths'
 import { usePermission } from '@/hooks/usePermission'
 import { getProductAvailabilityMeta } from '@/lib/productAvailability'
+import { fetchCompleteProductIds } from '@/lib/productAssembly'
+import {
+  categorySlugMatchesImported,
+  fetchProductCategoryMap,
+  formatCategoryNames,
+  getProductCategoryIds,
+  productMatchesAnyCategorySlug,
+  productMatchesCategoryFilter,
+  saveProductCategories,
+  type ProductCategoryMap,
+} from '@/lib/productCategories'
+import { ProductCategoryMultiSelect } from '@/components/admin/ProductCategoryMultiSelect'
 import type { CategoryRow } from '@/types/database'
 import type { ProductRow } from '@/types/database'
 import {
@@ -40,24 +57,48 @@ const CATALOGUE_COLUMNS = [
   { id: 'description', label: 'Description' },
   { id: 'unit_price', label: 'Default customer price' },
   { id: 'cost_price', label: 'Lamtek cost price' },
-  { id: 'stock', label: 'Stock/MTM' },
+  { id: 'stock', label: 'Stock & qty' },
   { id: 'active', label: 'Active' },
 ]
 
-/** Default min-widths so column titles fit; used when no saved width. */
-const DEFAULT_COLUMN_MIN_WIDTHS: Record<string, number> = {
+/** Default column widths (px) when the user has not resized a column. */
+const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   image: 64,
-  name: 140,
+  name: 240,
   sku: 100,
   category: 120,
-  description: 160,
-  unit_price: 160,
-  cost_price: 180,
-  stock: 100,
+  description: 280,
+  unit_price: 88,
+  cost_price: 88,
+  stock: 120,
   active: 72,
 }
 
+/** Minimum widths while drag-resizing (can be narrower than title text; headers wrap). */
+const COLUMN_RESIZE_MIN_WIDTHS: Record<string, number> = {
+  image: 56,
+  name: 120,
+  sku: 80,
+  category: 100,
+  description: 140,
+  unit_price: 72,
+  cost_price: 72,
+  stock: 100,
+  active: 64,
+}
+
+function catalogueColumnWidth(columnId: string, saved: Record<string, number>): number {
+  const fallback = DEFAULT_COLUMN_WIDTHS[columnId] ?? 100
+  const min = COLUMN_RESIZE_MIN_WIDTHS[columnId] ?? 60
+  const raw = saved[columnId]
+  if (raw == null || !Number.isFinite(raw) || raw < min) return fallback
+  return raw
+}
+
 const CENTER_ALIGN_COLUMNS = new Set(['image', 'stock', 'active', 'unit_price', 'cost_price'])
+
+/** Price columns use wrapped header labels so they can stay narrow. */
+const WRAP_HEADER_COLUMNS = new Set(['unit_price', 'cost_price', 'stock'])
 
 function slugify(name: string): string {
   return name
@@ -80,7 +121,18 @@ export default function AdminCatalogue() {
   const { widths: columnWidths, setWidth, persistWidths } = useColumnWidths('catalogue')
   const [resizingColId, setResizingColId] = useState<string | null>(null)
   const resizeStartRef = useRef({ x: 0, width: 0 })
+  const catalogueScrollRef = useRef<HorizontalScrollHandle>(null)
+  const [catalogueScrollState, setCatalogueScrollState] = useState<HorizontalScrollState>({
+    canScrollLeft: false,
+    canScrollRight: false,
+  })
   const [categories, setCategories] = useState<CategoryRow[]>([])
+  const [productCategoryMap, setProductCategoryMap] = useState<ProductCategoryMap>(new Map())
+  const [categoryEditDraft, setCategoryEditDraft] = useState<{
+    productId: string
+    ids: string[]
+    primary: string
+  } | null>(null)
   const [products, setProducts] = useState<ProductRow[]>([])
   const [loading, setLoading] = useState(true)
   const [categoryFilter, setCategoryFilter] = useState<string>('')
@@ -101,6 +153,7 @@ export default function AdminCatalogue() {
   const [productGroupFilter, setProductGroupFilter] = useState<'all' | 'doors_fronts' | 'carcasses' | 'accessories'>('all')
   const [viewType, setViewType] = useState<CatalogueViewType>('table')
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null)
+  const [completeProductIds, setCompleteProductIds] = useState<Set<string>>(new Set())
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
@@ -121,6 +174,36 @@ export default function AdminCatalogue() {
   const [auditResult, setAuditResult] = useState<CatalogueAuditResult | null>(null)
   const [auditLoading, setAuditLoading] = useState(false)
   const auditFileRef = useRef<HTMLInputElement>(null)
+  /** Delay opening the product modal so double-click inline edit on the same row can cancel it. */
+  const openProductModalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function cancelPendingProductModal() {
+    if (openProductModalTimerRef.current) {
+      clearTimeout(openProductModalTimerRef.current)
+      openProductModalTimerRef.current = null
+    }
+  }
+
+  function scheduleOpenProductModal(p: ProductRow) {
+    if (editingCell) return
+    cancelPendingProductModal()
+    openProductModalTimerRef.current = setTimeout(() => {
+      openProductModalTimerRef.current = null
+      setSelectedProduct(p)
+    }, 420)
+  }
+
+  useEffect(() => {
+    if (!canEditCatalogue) setEditingCell(null)
+  }, [canEditCatalogue])
+
+  useEffect(() => {
+    return () => cancelPendingProductModal()
+  }, [])
+
+  useEffect(() => {
+    if (editingCell) cancelPendingProductModal()
+  }, [editingCell])
 
   async function toggleIsStock(p: ProductRow) {
     if (!canEditCatalogue) return
@@ -132,10 +215,18 @@ export default function AdminCatalogue() {
   }
 
   async function saveInlineEdit(productId: string, field: string, value: string | number | boolean | null) {
-    if (!canEditCatalogue) return
+    if (!canEditCatalogue) {
+      setEditingCell(null)
+      return
+    }
     setInlineSaving(true)
     setEditingCell(null)
-    const payload: Record<string, unknown> = { [field]: value }
+    let v: string | number | boolean | null = value
+    if (field === 'stock_quantity') {
+      const n = typeof value === 'number' ? value : parseInt(String(value), 10)
+      v = Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0
+    }
+    const payload: Record<string, unknown> = { [field]: v }
     const { error } = await supabase.from('products').update(payload).eq('id', productId)
     if (!error) {
       setProducts((prev) =>
@@ -146,13 +237,40 @@ export default function AdminCatalogue() {
   }
 
   async function load() {
-    const [catRes, prodRes] = await Promise.all([
+    const [catRes, prodRes, catMap, completeIds] = await Promise.all([
       supabase.from('categories').select('*').order('sort_order').order('name'),
       supabase.from('products').select('*').order('sort_order').order('name'),
+      fetchProductCategoryMap(),
+      fetchCompleteProductIds(),
     ])
     setCategories(catRes.data ?? [])
     setProducts(prodRes.data ?? [])
+    setProductCategoryMap(catMap)
+    setCompleteProductIds(completeIds)
     setLoading(false)
+  }
+
+  async function saveInlineCategories(productId: string, ids: string[], primary: string) {
+    if (!canEditCatalogue) {
+      setEditingCell(null)
+      setCategoryEditDraft(null)
+      return
+    }
+    setInlineSaving(true)
+    setEditingCell(null)
+    const { error } = await saveProductCategories(productId, ids, primary)
+    if (!error) {
+      setProductCategoryMap((prev) => {
+        const next = new Map(prev)
+        next.set(productId, ids)
+        return next
+      })
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, category_id: primary } : p))
+      )
+    }
+    setCategoryEditDraft(null)
+    setInlineSaving(false)
   }
 
   useEffect(() => {
@@ -163,7 +281,7 @@ export default function AdminCatalogue() {
   columnWidthsRef.current = columnWidths
   useEffect(() => {
     if (!resizingColId) return
-    const minW = DEFAULT_COLUMN_MIN_WIDTHS[resizingColId] ?? 60
+    const minW = COLUMN_RESIZE_MIN_WIDTHS[resizingColId] ?? 60
     const onMove = (e: MouseEvent) => {
       const delta = e.clientX - resizeStartRef.current.x
       const newW = Math.max(minW, resizeStartRef.current.width + delta)
@@ -188,34 +306,46 @@ export default function AdminCatalogue() {
   const categoryMap = new Map(categories.map((c) => [c.id, c]))
   const searchLower = searchFilter.trim().toLowerCase()
 
-  function matchesProductGroup(categoryId: string | null): boolean {
-    if (!categoryId || productGroupFilter === 'all') return true
-    const cat = categoryMap.get(categoryId)
-    if (!cat) return true
-    const slug = (cat as CategoryRow & { slug?: string }).slug ?? ''
-    const slugLower = slug.toLowerCase()
-    if (productGroupFilter === 'doors_fronts') {
-      // Doors, drawer fronts, panels etc.
-      return slugLower === 'doors'
-    }
-    if (productGroupFilter === 'carcasses') {
-      return slugLower === 'carcasses'
-    }
-    if (productGroupFilter === 'accessories') {
-      // Hinges, fittings, legs, plinth, handles, wirework, lighting, fittings
-      return ['hinges-fittings', 'legs-plinth', 'handles', 'wirework', 'fittings', 'lighting'].includes(slugLower)
-    }
-    return true
+  function matchesProductGroup(p: ProductRow): boolean {
+    if (productGroupFilter === 'all') return true
+    const catIds = getProductCategoryIds(p.id, p.category_id, productCategoryMap)
+    return productMatchesAnyCategorySlug(catIds, p.category_id, categoryMap, (slugLower) => {
+      if (productGroupFilter === 'doors_fronts') {
+        return slugLower === 'doors' || categorySlugMatchesImported(slugLower, 'doors')
+      }
+      if (productGroupFilter === 'carcasses') {
+        return slugLower === 'carcasses' || categorySlugMatchesImported(slugLower, 'carcasses')
+      }
+      if (productGroupFilter === 'accessories') {
+        return ['hinges-fittings', 'legs-plinth', 'handles', 'wirework', 'fittings', 'lighting'].some(
+          (b) => slugLower === b || categorySlugMatchesImported(slugLower, b)
+        )
+      }
+      return true
+    })
   }
 
   const filteredProducts = products
     .filter((p) => {
-      if (categoryFilter && p.category_id !== categoryFilter) return false
+      if (categoryFilter) {
+        const catIds = getProductCategoryIds(p.id, p.category_id, productCategoryMap)
+        if (
+          !productMatchesCategoryFilter(
+            catIds,
+            p.category_id,
+            categoryFilter,
+            categoryMap,
+            categorySlugMatchesImported
+          )
+        ) {
+          return false
+        }
+      }
       if (catalogProgramFilter !== 'all') {
         const prog = p.catalog_program ?? CATALOG_PROGRAM.LAMTEK
         if (prog !== catalogProgramFilter) return false
       }
-      if (!matchesProductGroup(p.category_id)) return false
+      if (!matchesProductGroup(p)) return false
       if (activeOnly && !p.active) return false
       if (stockOnly && (p.is_stock === false)) return false
       if (!searchLower) return true
@@ -244,6 +374,16 @@ export default function AdminCatalogue() {
     })
 
   const categoriesByParent = categories.filter((c) => !c.parent_id)
+
+  const visibleCatalogueCols = useMemo(
+    () => columnDefs.filter((c) => isVisible(c.id)),
+    [columnDefs, visibleIds]
+  )
+
+  const catalogueTableWidthPx = useMemo(
+    () => visibleCatalogueCols.reduce((sum, c) => sum + catalogueColumnWidth(c.id, columnWidths), 0),
+    [visibleCatalogueCols, columnWidths]
+  )
 
   const LAMTEK_PRODUCT_IMAGES_LINK = 'https://www.lamtek.co.uk/products'
 
@@ -1017,38 +1157,68 @@ export default function AdminCatalogue() {
       <div className="card admin-card">
         <div className="admin-card-heading-row">
           <h2>Products ({filteredProducts.length})</h2>
-          <ColumnSettings
-            columnDefs={columnDefs}
-            visibleIds={visibleIds}
-            setColumnVisible={setColumnVisible}
-            order={order}
-            setColumnOrder={setColumnOrder}
-            resetToDefault={resetToDefault}
-            tooltip="Column settings – click here to edit columns"
-          />
+          <div className="admin-catalogue-heading-actions">
+            <HorizontalScrollToolbarArrows
+              canScrollLeft={catalogueScrollState.canScrollLeft}
+              canScrollRight={catalogueScrollState.canScrollRight}
+              onScrollLeft={() => catalogueScrollRef.current?.scrollLeft()}
+              onScrollRight={() => catalogueScrollRef.current?.scrollRight()}
+            />
+            <ColumnSettings
+              columnDefs={columnDefs}
+              visibleIds={visibleIds}
+              setColumnVisible={setColumnVisible}
+              order={order}
+              setColumnOrder={setColumnOrder}
+              resetToDefault={resetToDefault}
+              tooltip="Column settings – click here to edit columns"
+            />
+          </div>
         </div>
-        <HorizontalScrollWithArrows>
+        <HorizontalScrollWithArrows
+          ref={catalogueScrollRef}
+          fixedArrows={false}
+          onScrollStateChange={setCatalogueScrollState}
+          className={
+            viewType === 'table'
+              ? 'admin-horizontal-scroll-wrap--catalogue-table'
+              : 'admin-horizontal-scroll-wrap--catalogue-fluid'
+          }
+          innerClassName={viewType === 'table' ? 'admin-catalogue-table-scroll' : undefined}
+          contentStyle={
+            viewType === 'table' ? { minWidth: `${catalogueTableWidthPx}px` } : undefined
+          }
+        >
         {viewType === 'table' ? (
-          <div className={`table-wrap admin-table-wrap admin-table-wrap--${tableDensity}`} style={{ minWidth: columnDefs.filter((c) => isVisible(c.id)).reduce((sum, c) => sum + (columnWidths[c.id] ?? DEFAULT_COLUMN_MIN_WIDTHS[c.id] ?? 100), 0) }}>
-            <table className="admin-table admin-table--has-dividers admin-table--resizable admin-table--sticky-header">
+          <div
+            className={`table-wrap admin-table-wrap admin-catalogue-table-wrap admin-table-wrap--${tableDensity}`}
+            style={{ width: catalogueTableWidthPx, minWidth: catalogueTableWidthPx }}
+          >
+            <table
+              className="admin-table admin-table--has-dividers admin-table--resizable admin-table--sticky-header admin-catalogue-table"
+              style={{ width: catalogueTableWidthPx, minWidth: catalogueTableWidthPx }}
+            >
               <colgroup>
-                {columnDefs.filter((c) => isVisible(c.id)).map((col) => (
+                {visibleCatalogueCols.map((col) => (
                   <col
                     key={col.id}
                     style={{
-                      width: columnWidths[col.id] ? `${columnWidths[col.id]}px` : `${DEFAULT_COLUMN_MIN_WIDTHS[col.id] ?? 100}px`,
-                      minWidth: columnWidths[col.id] ?? DEFAULT_COLUMN_MIN_WIDTHS[col.id] ?? 100,
+                      width: `${catalogueColumnWidth(col.id, columnWidths)}px`,
+                      minWidth: catalogueColumnWidth(col.id, columnWidths),
                     }}
                   />
                 ))}
               </colgroup>
               <thead>
                 <tr>
-                  {columnDefs.filter((c) => isVisible(c.id)).map((col) => (
+                  {visibleCatalogueCols.map((col) => (
                     <th
                       key={col.id}
-                      className={`admin-th ${headerDraggingId === col.id ? 'admin-th--dragging' : ''} ${headerDrop?.targetId === col.id ? `admin-th--drop-${headerDrop.position}` : ''} ${CENTER_ALIGN_COLUMNS.has(col.id) ? 'admin-cell-center' : ''}`}
-                      style={{ width: columnWidths[col.id] ?? DEFAULT_COLUMN_MIN_WIDTHS[col.id] ?? 100, minWidth: columnWidths[col.id] ?? DEFAULT_COLUMN_MIN_WIDTHS[col.id] ?? 100 }}
+                      className={`admin-th ${headerDraggingId === col.id ? 'admin-th--dragging' : ''} ${headerDrop?.targetId === col.id ? `admin-th--drop-${headerDrop.position}` : ''} ${CENTER_ALIGN_COLUMNS.has(col.id) ? 'admin-cell-center' : ''} ${WRAP_HEADER_COLUMNS.has(col.id) ? 'admin-th--header-wrap' : ''}`}
+                      style={{
+                        width: catalogueColumnWidth(col.id, columnWidths),
+                        minWidth: catalogueColumnWidth(col.id, columnWidths),
+                      }}
                       draggable={!!setColumnOrder}
                       onDragStart={(e) => {
                         if (!setColumnOrder) return
@@ -1094,7 +1264,7 @@ export default function AdminCatalogue() {
                           e.stopPropagation()
                           resizeStartRef.current = {
                             x: e.clientX,
-                            width: columnWidths[col.id] ?? DEFAULT_COLUMN_MIN_WIDTHS[col.id] ?? 100,
+                            width: catalogueColumnWidth(col.id, columnWidths),
                           }
                           setResizingColId(col.id)
                         }}
@@ -1116,20 +1286,29 @@ export default function AdminCatalogue() {
                       <tr
                         key={p.id}
                         className="admin-catalogue-table-row"
-                        onClick={() => !editingCell && setSelectedProduct(p)}
+                        onClick={() => {
+                          if (editingCell) return
+                          scheduleOpenProductModal(p)
+                        }}
                         role="button"
                         tabIndex={0}
-                        onKeyDown={(e) => !editingCell && e.key === 'Enter' && setSelectedProduct(p)}
+                        onKeyDown={(e) => {
+                          if (editingCell) return
+                          if (e.key === 'Enter') {
+                            cancelPendingProductModal()
+                            setSelectedProduct(p)
+                          }
+                        }}
                       >
-                        {columnDefs.filter((c) => isVisible(c.id)).map((col) => {
+                        {visibleCatalogueCols.map((col) => {
                           const isEditing = editingCell?.productId === p.id && editingCell?.field === (col.id === 'category' ? 'category_id' : col.id)
                           const onDoubleClick = (e: React.MouseEvent) => {
                             e.stopPropagation()
-                            if (['name', 'sku', 'category', 'description', 'unit_price', 'cost_price', 'active'].includes(col.id))
+                            cancelPendingProductModal()
+                            if (!canEditCatalogue) return
+                            if (['name', 'sku', 'category', 'description', 'unit_price', 'cost_price', 'active'].includes(col.id)) {
                               setEditingCell({ productId: p.id, field: col.id === 'category' ? 'category_id' : col.id })
-                          }
-                          const onClickCell = (e: React.MouseEvent) => {
-                            if (['name', 'sku', 'category', 'description', 'unit_price', 'cost_price', 'active'].includes(col.id)) e.stopPropagation()
+                            }
                           }
                           if (col.id === 'image') {
                             return (
@@ -1144,7 +1323,7 @@ export default function AdminCatalogue() {
                           }
                           if (col.id === 'name') {
                             return (
-                              <td key={col.id} onClick={onClickCell} onDoubleClick={onDoubleClick} className="admin-table-cell-editable" title="Double click to edit">
+                              <td key={col.id} onDoubleClick={onDoubleClick} className="admin-table-cell-editable" title="Double click to edit">
                                 {isEditing ? (
                                   <input
                                     type="text"
@@ -1159,14 +1338,26 @@ export default function AdminCatalogue() {
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                 ) : (
-                                  p.name
+                                  <>
+                                    {p.name}
+                                    {completeProductIds.has(p.id) && (
+                                      <span className="admin-badge admin-badge--bom" title="Has component breakdown defined">
+                                        Complete unit
+                                      </span>
+                                    )}
+                                  </>
                                 )}
                               </td>
                             )
                           }
                           if (col.id === 'sku') {
                             return (
-                              <td key={col.id} onClick={onClickCell} onDoubleClick={onDoubleClick} className="admin-table-cell-editable" title="Double click to edit">
+                              <td
+                                key={col.id}
+                                onDoubleClick={onDoubleClick}
+                                className="admin-table-cell-editable admin-table-cell-sku"
+                                title="Double click to edit"
+                              >
                                 {isEditing ? (
                                   <input
                                     type="text"
@@ -1181,36 +1372,81 @@ export default function AdminCatalogue() {
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                 ) : (
-                                  <code>{p.sku ?? '—'}</code>
+                                  <code className="admin-table-cell-sku-code">{p.sku ?? '—'}</code>
                                 )}
                               </td>
                             )
                           }
                           if (col.id === 'category') {
+                            const catIds = getProductCategoryIds(p.id, p.category_id, productCategoryMap)
+                            const editingCategories =
+                              isEditing ||
+                              (categoryEditDraft?.productId === p.id && editingCell?.field === 'category_id')
                             return (
-                              <td key={col.id} onClick={onClickCell} onDoubleClick={onDoubleClick} className="admin-table-cell-editable" title="Double click to edit">
-                                {isEditing ? (
-                                  <select
-                                    autoFocus
-                                    className="admin-inline-edit-input"
-                                    defaultValue={p.category_id}
-                                    onBlur={(e) => saveInlineEdit(p.id, 'category_id', e.target.value)}
-                                    onChange={(e) => saveInlineEdit(p.id, 'category_id', e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {categories.map((c) => (
-                                      <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                  </select>
+                              <td
+                                key={col.id}
+                                onDoubleClick={(e) => {
+                                  if (!canEditCatalogue) return
+                                  e.stopPropagation()
+                                  const ids = catIds.length > 0 ? catIds : [p.category_id]
+                                  setCategoryEditDraft({
+                                    productId: p.id,
+                                    ids,
+                                    primary: ids[0] ?? p.category_id,
+                                  })
+                                  setEditingCell({ productId: p.id, field: 'category_id' })
+                                }}
+                                className="admin-table-cell-editable admin-table-cell-categories"
+                                title="Double click to edit categories"
+                              >
+                                {editingCategories && categoryEditDraft?.productId === p.id ? (
+                                  <ProductCategoryMultiSelect
+                                    compact
+                                    categories={categories}
+                                    selectedIds={categoryEditDraft.ids}
+                                    primaryId={categoryEditDraft.primary}
+                                    onChange={(ids, primary) =>
+                                      setCategoryEditDraft({ productId: p.id, ids, primary })
+                                    }
+                                  />
                                 ) : (
-                                  categories.find((c) => c.id === p.category_id)?.name ?? '—'
+                                  formatCategoryNames(catIds, categoryMap)
+                                )}
+                                {editingCategories && categoryEditDraft?.productId === p.id && (
+                                  <div className="product-category-inline-actions">
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        void saveInlineCategories(
+                                          p.id,
+                                          categoryEditDraft.ids,
+                                          categoryEditDraft.primary
+                                        )
+                                      }}
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setCategoryEditDraft(null)
+                                        setEditingCell(null)
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
                                 )}
                               </td>
                             )
                           }
                           if (col.id === 'description') {
                             return (
-                              <td key={col.id} onClick={onClickCell} onDoubleClick={onDoubleClick} className="admin-table-cell-desc admin-table-cell-editable" title="Double click to edit">
+                              <td key={col.id} onDoubleClick={onDoubleClick} className="admin-table-cell-desc admin-table-cell-editable" title="Double click to edit">
                                 {isEditing ? (
                                   <input
                                     type="text"
@@ -1232,7 +1468,7 @@ export default function AdminCatalogue() {
                           }
                           if (col.id === 'unit_price') {
                             return (
-                              <td key={col.id} onClick={onClickCell} onDoubleClick={onDoubleClick} className="admin-table-cell-editable admin-cell-center" title="Double click to edit">
+                              <td key={col.id} onDoubleClick={onDoubleClick} className="admin-table-cell-editable admin-cell-center" title="Double click to edit">
                                 {isEditing ? (
                                   <input
                                     type="number"
@@ -1263,7 +1499,7 @@ export default function AdminCatalogue() {
                           }
                           if (col.id === 'cost_price') {
                             return (
-                              <td key={col.id} onClick={onClickCell} onDoubleClick={onDoubleClick} className="admin-table-cell-editable admin-cell-center" title="Double click to edit">
+                              <td key={col.id} onDoubleClick={onDoubleClick} className="admin-table-cell-editable admin-cell-center" title="Double click to edit">
                                 {isEditing ? (
                                   <input
                                     type="number"
@@ -1300,14 +1536,61 @@ export default function AdminCatalogue() {
                             )
                           }
                           if (col.id === 'stock') {
+                            const qtyEditing = editingCell?.productId === p.id && editingCell?.field === 'stock_quantity'
                             return (
-                              <td key={col.id} onClick={(e) => e.stopPropagation()} className="admin-table-cell-stock-mtm admin-cell-center">
-                                <StockMtmSwitch
-                                  isStock={isStock}
-                                  loading={isStockUpdating === p.id}
-                                  onToggle={() => toggleIsStock(p)}
-                                />
-                                <div className="admin-muted" style={{ fontSize: '0.75rem', marginTop: '0.2rem' }} title={availability.detail ?? availability.label}>
+                              <td key={col.id} className="admin-table-cell-stock-mtm admin-cell-center">
+                                <div className="admin-catalogue-stock-switch-wrap" onClick={(e) => e.stopPropagation()}>
+                                  <StockMtmSwitch
+                                    isStock={isStock}
+                                    loading={isStockUpdating === p.id}
+                                    onToggle={() => toggleIsStock(p)}
+                                  />
+                                </div>
+                                <div
+                                  className={
+                                    canEditCatalogue
+                                      ? 'admin-catalogue-stock-qty admin-table-cell-editable'
+                                      : 'admin-catalogue-stock-qty'
+                                  }
+                                  onClick={(e) => e.stopPropagation()}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation()
+                                    cancelPendingProductModal()
+                                    if (!canEditCatalogue) return
+                                    setEditingCell({ productId: p.id, field: 'stock_quantity' })
+                                  }}
+                                  title={canEditCatalogue ? 'Double-click to edit quantity' : undefined}
+                                >
+                                  {qtyEditing ? (
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step={1}
+                                      className="admin-inline-edit-input"
+                                      autoFocus
+                                      defaultValue={p.stock_quantity ?? 0}
+                                      onBlur={(e) => {
+                                        const v = parseInt(e.target.value, 10)
+                                        void saveInlineEdit(p.id, 'stock_quantity', Number.isFinite(v) && v >= 0 ? v : 0)
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          const v = parseInt((e.target as HTMLInputElement).value, 10)
+                                          void saveInlineEdit(p.id, 'stock_quantity', Number.isFinite(v) && v >= 0 ? v : 0)
+                                        }
+                                        if (e.key === 'Escape') setEditingCell(null)
+                                      }}
+                                      onClick={(ev) => ev.stopPropagation()}
+                                    />
+                                  ) : (
+                                    <span className="admin-catalogue-stock-qty-value">Qty: {p.stock_quantity ?? 0}</span>
+                                  )}
+                                </div>
+                                <div
+                                  className="admin-muted admin-catalogue-stock-avail"
+                                  style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}
+                                  title={availability.detail ?? availability.label}
+                                >
                                   {availability.label}
                                 </div>
                               </td>
@@ -1315,7 +1598,7 @@ export default function AdminCatalogue() {
                           }
                           if (col.id === 'active') {
                             return (
-                              <td key={col.id} onClick={onClickCell} onDoubleClick={onDoubleClick} className="admin-table-cell-editable admin-cell-center" title="Double click to edit">
+                              <td key={col.id} onDoubleClick={onDoubleClick} className="admin-table-cell-editable admin-cell-center" title="Double click to edit">
                                 {isEditing ? (
                                   <select
                                     autoFocus
@@ -1355,6 +1638,8 @@ export default function AdminCatalogue() {
                 const isEditing = (field: string) => editingCell?.productId === p.id && editingCell?.field === (field === 'category' ? 'category_id' : field)
                 const startEdit = (e: React.MouseEvent, field: string) => {
                   e.stopPropagation()
+                  cancelPendingProductModal()
+                  if (!canEditCatalogue) return
                   setEditingCell({ productId: p.id, field: field === 'category' ? 'category_id' : field })
                 }
                 const stopProp = (e: React.MouseEvent) => e.stopPropagation()
@@ -1362,10 +1647,19 @@ export default function AdminCatalogue() {
                   <div
                     key={p.id}
                     className={`admin-catalogue-card ${viewType === 'list' ? 'admin-catalogue-card--list' : ''}`}
-                    onClick={() => !editingCell && setSelectedProduct(p)}
+                    onClick={() => {
+                      if (editingCell) return
+                      scheduleOpenProductModal(p)
+                    }}
                     role="button"
                     tabIndex={0}
-                    onKeyDown={(e) => !editingCell && e.key === 'Enter' && setSelectedProduct(p)}
+                    onKeyDown={(e) => {
+                      if (editingCell) return
+                      if (e.key === 'Enter') {
+                        cancelPendingProductModal()
+                        setSelectedProduct(p)
+                      }
+                    }}
                   >
                     {isVisible('image') && (
                       <div className="admin-catalogue-card-image">
@@ -1396,13 +1690,10 @@ export default function AdminCatalogue() {
                         </div>
                       )}
                       {isVisible('category') && viewType !== 'compact' && (
-                        <span className="admin-muted admin-card-editable" onClick={stopProp} onDoubleClick={(e) => startEdit(e, 'category')} title="Double click to edit">
-                          {isEditing('category') ? (
-                            <select className="admin-inline-edit-input" autoFocus defaultValue={p.category_id} onBlur={(e) => saveInlineEdit(p.id, 'category_id', e.target.value)} onChange={(e) => saveInlineEdit(p.id, 'category_id', e.target.value)} onClick={stopProp}>
-                              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                          ) : (
-                            categories.find((c) => c.id === p.category_id)?.name ?? '—'
+                        <span className="admin-muted" onClick={stopProp} title="Open product to edit categories">
+                          {formatCategoryNames(
+                            getProductCategoryIds(p.id, p.category_id, productCategoryMap),
+                            categoryMap
                           )}
                         </span>
                       )}
@@ -1434,8 +1725,47 @@ export default function AdminCatalogue() {
                         </div>
                       )}
                       {isVisible('stock') && (
-                        <div onClick={stopProp} className="admin-catalogue-card-stock">
-                          <StockMtmSwitch isStock={isStock} loading={isStockUpdating === p.id} onToggle={() => toggleIsStock(p)} compact />
+                        <div className="admin-catalogue-card-stock">
+                          <div onClick={stopProp}>
+                            <StockMtmSwitch isStock={isStock} loading={isStockUpdating === p.id} onToggle={() => toggleIsStock(p)} compact />
+                          </div>
+                          <div
+                            className={
+                              canEditCatalogue
+                                ? 'admin-catalogue-card-qty admin-card-editable admin-muted'
+                                : 'admin-catalogue-card-qty admin-muted'
+                            }
+                            onDoubleClick={(e) => {
+                              if (!canEditCatalogue) return
+                              startEdit(e, 'stock_quantity')
+                            }}
+                            title={canEditCatalogue ? 'Double-click to edit quantity' : undefined}
+                          >
+                            {editingCell?.productId === p.id && editingCell?.field === 'stock_quantity' ? (
+                              <input
+                                type="number"
+                                min={0}
+                                step={1}
+                                className="admin-inline-edit-input"
+                                autoFocus
+                                defaultValue={p.stock_quantity ?? 0}
+                                onBlur={(e) => {
+                                  const v = parseInt(e.target.value, 10)
+                                  void saveInlineEdit(p.id, 'stock_quantity', Number.isFinite(v) && v >= 0 ? v : 0)
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const v = parseInt((e.target as HTMLInputElement).value, 10)
+                                    void saveInlineEdit(p.id, 'stock_quantity', Number.isFinite(v) && v >= 0 ? v : 0)
+                                  }
+                                  if (e.key === 'Escape') setEditingCell(null)
+                                }}
+                                onClick={stopProp}
+                              />
+                            ) : (
+                              <>Qty: {p.stock_quantity ?? 0}</>
+                            )}
+                          </div>
                           <div className="admin-muted" style={{ fontSize: '0.75rem', marginTop: '0.2rem' }} title={availability.detail ?? availability.label}>
                             {availability.label}
                           </div>
@@ -1467,8 +1797,10 @@ export default function AdminCatalogue() {
         <AdminProductModal
           product={selectedProduct}
           categories={categories}
+          allProducts={products}
           onClose={() => setSelectedProduct(null)}
           onSaved={() => load()}
+          onCategoriesChange={(next) => setCategories(next)}
         />
       )}
 
@@ -1479,7 +1811,7 @@ export default function AdminCatalogue() {
             <li key={c.id}>
               <strong>{c.name}</strong>
               <span className="admin-muted">
-                {products.filter((p) => p.category_id === c.id).length} products
+                {products.filter((p) => getProductCategoryIds(p.id, p.category_id, productCategoryMap).includes(c.id)).length} products
               </span>
             </li>
           ))}

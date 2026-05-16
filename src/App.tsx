@@ -55,8 +55,10 @@ import AdminInvoicePrint from '@/pages/admin/AdminInvoicePrint'
 import AdminQuotePrint from '@/pages/admin/AdminQuotePrint'
 import AdminPackingSlipPrint from '@/pages/admin/AdminPackingSlipPrint'
 import AdminCreateOrder from '@/pages/admin/AdminCreateOrder'
+import AdminCreateQuote from '@/pages/admin/AdminCreateQuote'
 import AdminLogin from '@/pages/admin/AdminLogin'
 import AdminSettings from '@/pages/admin/AdminSettings'
+import AdminStaffHelp from '@/pages/admin/AdminStaffHelp'
 import AdminCustomerDetail from '@/pages/admin/AdminCustomerDetail'
 import AdminCrmLayout from '@/pages/admin/AdminCrmLayout'
 import AdminCrmOpenOrders from '@/pages/admin/AdminCrmOpenOrders'
@@ -207,6 +209,7 @@ export default function App() {
         <Route path="pick-lists/:pickListId" element={<AdminPickListDetail />} />
         <Route path="package-labels/:labelId/print" element={<AdminPackageLabelPrint />} />
         <Route path="create-order" element={<AdminCreateOrder />} />
+        <Route path="create-quote" element={<AdminCreateQuote />} />
         <Route path="uploads" element={<AdminDocumentUploads />} />
         <Route path="pricing" element={<AdminPricing />} />
         <Route path="reports" element={<AdminReports />} />
@@ -218,6 +221,7 @@ export default function App() {
         <Route path="applications" element={<AdminAccountApplications />} />
         <Route path="permissions" element={<AdminPermissions />} />
         <Route path="settings" element={<AdminSettings />} />
+        <Route path="support-manual" element={<AdminStaffHelp />} />
         <Route path="*" element={<NotFound />} />
       </Route>
       <Route path="*" element={<NotFound />} />

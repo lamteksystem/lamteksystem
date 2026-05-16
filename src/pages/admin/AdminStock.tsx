@@ -10,6 +10,17 @@ import type { CategoryRow } from '@/types/database'
 import type { LocationRow } from '@/types/database'
 import { lamtekPortalLocations } from '@/lib/lamtekLocations'
 import type { ProductStockRow } from '@/types/database'
+import ProductAssemblyBreakdown from '@/components/ProductAssemblyBreakdown'
+import { fetchCompleteProductIds } from '@/lib/productAssembly'
+import {
+  categorySlugMatchesImported,
+  fetchProductCategoryMap,
+  formatCategoryNames,
+  getProductCategoryIds,
+  productMatchesAnyCategorySlug,
+  productMatchesCategoryFilter,
+  type ProductCategoryMap,
+} from '@/lib/productCategories'
 
 const STOCK_COLUMNS = [
   { id: 'image', label: 'Image' },
@@ -25,6 +36,7 @@ type StockLevelFilter = 'all' | 'zero' | 'low'
 type StockLayout = 'sections' | 'flat'
 type StockViewType = 'table' | 'grid' | 'list'
 type ProductGroupFilter = 'all' | 'doors_fronts' | 'carcasses' | 'accessories'
+type StockTakeScope = 'components' | 'complete_packages' | 'all'
 
 function parseQty(s: string): number {
   const n = parseInt(s, 10)
@@ -36,6 +48,7 @@ export default function AdminStock() {
   const [locationId, setLocationId] = useState<string>('')
   const [products, setProducts] = useState<ProductRow[]>([])
   const [categories, setCategories] = useState<CategoryRow[]>([])
+  const [productCategoryMap, setProductCategoryMap] = useState<ProductCategoryMap>(new Map())
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map()) // product_id -> quantity
   const [edits, setEdits] = useState<Map<string, string>>(new Map()) // product_id -> input value
   const [checked, setChecked] = useState<Set<string>>(new Set()) // product_id checked
@@ -48,6 +61,9 @@ export default function AdminStock() {
   const [searchFilter, setSearchFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [productGroupFilter, setProductGroupFilter] = useState<ProductGroupFilter>('all')
+  const [stockTakeScope, setStockTakeScope] = useState<StockTakeScope>('components')
+  const [completeProductIds, setCompleteProductIds] = useState<Set<string>>(new Set())
+  const [expandedBomProductId, setExpandedBomProductId] = useState<string | null>(null)
   const [stockLevelFilter, setStockLevelFilter] = useState<StockLevelFilter>('all')
   const [sortBy, setSortBy] = useState<StockSort>('name_asc')
   const [layoutMode, setLayoutMode] = useState<StockLayout>('sections')
@@ -76,13 +92,17 @@ export default function AdminStock() {
   const loadData = useCallback(async (locId: string) => {
     if (!locId) return
     setLoading(true)
-    const [prodRes, catRes, stockRes] = await Promise.all([
+    const [prodRes, catRes, stockRes, catMap, completeIds] = await Promise.all([
       supabase.from('products').select('*').order('sort_order').order('name'),
       supabase.from('categories').select('*').order('sort_order').order('name'),
       supabase.from('product_stock').select('product_id, quantity').eq('location_id', locId),
+      fetchProductCategoryMap(),
+      fetchCompleteProductIds(),
     ])
     setProducts(prodRes.data ?? [])
     setCategories(catRes.data ?? [])
+    setProductCategoryMap(catMap)
+    setCompleteProductIds(completeIds)
     const map = new Map<string, number>()
     ;(stockRes.data ?? []).forEach((r: { product_id: string; quantity: number }) => map.set(r.product_id, r.quantity))
     setStockMap(map)
@@ -186,7 +206,12 @@ export default function AdminStock() {
   }
 
   async function saveSection(categoryId: string) {
-    const productIds = products.filter((p) => p.category_id === categoryId).map((p) => p.id)
+    const productIds = products
+      .filter((p) => {
+        const ids = getProductCategoryIds(p.id, p.category_id, productCategoryMap)
+        return ids.includes(categoryId) || p.category_id === categoryId
+      })
+      .map((p) => p.id)
     const toSave = productIds.filter((id) => edits.has(id))
     if (toSave.length === 0) {
       setMessage({ type: 'ok', text: 'No changes in this section.' })
@@ -259,23 +284,46 @@ export default function AdminStock() {
 
   const categoryMap = new Map(categories.map((c) => [c.id, c]))
 
-  function matchesProductGroup(categoryId: string | null): boolean {
-    if (!categoryId || productGroupFilter === 'all') return true
-    const cat = categoryMap.get(categoryId)
-    if (!cat) return true
-    const slug = (cat.slug ?? '').toLowerCase()
-    if (productGroupFilter === 'doors_fronts') return slug === 'doors'
-    if (productGroupFilter === 'carcasses') return slug === 'carcasses'
-    if (productGroupFilter === 'accessories') {
-      return ['hinges-fittings', 'legs-plinth', 'handles', 'wirework', 'fittings', 'lighting'].includes(slug)
-    }
-    return true
+  function matchesProductGroup(p: ProductRow): boolean {
+    if (productGroupFilter === 'all') return true
+    const catIds = getProductCategoryIds(p.id, p.category_id, productCategoryMap)
+    return productMatchesAnyCategorySlug(catIds, p.category_id, categoryMap, (slugLower) => {
+      if (productGroupFilter === 'doors_fronts') return categorySlugMatchesImported(slugLower, 'doors')
+      if (productGroupFilter === 'carcasses') return categorySlugMatchesImported(slugLower, 'carcasses')
+      if (productGroupFilter === 'accessories') {
+        const bases = ['hinges-fittings', 'legs-plinth', 'handles', 'wirework', 'fittings', 'lighting']
+        return bases.some((b) => categorySlugMatchesImported(slugLower, b))
+      }
+      return true
+    })
   }
 
   const productsFilteredByGroup = useMemo(
-    () => (productGroupFilter === 'all' ? products : products.filter((p) => matchesProductGroup(p.category_id))),
-    [products, productGroupFilter, categories]
+    () => (productGroupFilter === 'all' ? products : products.filter((p) => matchesProductGroup(p))),
+    [products, productGroupFilter, categories, productCategoryMap]
   )
+
+  const productsAfterCategory = useMemo(() => {
+    if (!categoryFilter) return productsFilteredByGroup
+    return productsFilteredByGroup.filter((p) => {
+      const catIds = getProductCategoryIds(p.id, p.category_id, productCategoryMap)
+      return productMatchesCategoryFilter(
+        catIds,
+        p.category_id,
+        categoryFilter,
+        categoryMap,
+        categorySlugMatchesImported
+      )
+    })
+  }, [productsFilteredByGroup, categoryFilter, categories, productCategoryMap])
+
+  const productsForStockTake = useMemo(() => {
+    if (stockTakeScope === 'all') return productsAfterCategory
+    if (stockTakeScope === 'complete_packages') {
+      return productsAfterCategory.filter((p) => completeProductIds.has(p.id))
+    }
+    return productsAfterCategory.filter((p) => !completeProductIds.has(p.id))
+  }, [productsAfterCategory, stockTakeScope, completeProductIds])
 
   const searchLower = searchFilter.trim().toLowerCase()
   const lowStockThreshold = 5
@@ -319,18 +367,22 @@ export default function AdminStock() {
 
   const byCategory = useMemo(() => {
     const map = new Map<string, ProductRow[]>()
-    productsFilteredByGroup.forEach((p) => {
-      const list = map.get(p.category_id) ?? []
-      list.push(p)
-      map.set(p.category_id, list)
+    productsForStockTake.forEach((p) => {
+      const catIds = getProductCategoryIds(p.id, p.category_id, productCategoryMap)
+      const targetIds = catIds.length > 0 ? catIds : p.category_id ? [p.category_id] : []
+      for (const catId of targetIds) {
+        const list = map.get(catId) ?? []
+        list.push(p)
+        map.set(catId, list)
+      }
     })
     const filteredMap = new Map<string, ProductRow[]>()
     map.forEach((list, catId) => {
-      const filtered = categoryFilter ? (catId === categoryFilter ? filterAndSortProducts(list) : []) : filterAndSortProducts(list)
+      const filtered = filterAndSortProducts(list)
       if (filtered.length > 0) filteredMap.set(catId, filtered)
     })
     return filteredMap
-  }, [productsFilteredByGroup, categoryFilter, filterAndSortProducts])
+  }, [productsForStockTake, filterAndSortProducts, productCategoryMap])
 
   const categoryIds = useMemo(
     () =>
@@ -341,7 +393,9 @@ export default function AdminStock() {
     [categories, byCategory]
   )
 
-  const flatProducts = useMemo(() => filterAndSortProducts(productsFilteredByGroup), [productsFilteredByGroup, filterAndSortProducts])
+  const flatProducts = useMemo(() => filterAndSortProducts(productsForStockTake), [productsForStockTake, filterAndSortProducts])
+
+  const noMatchingProducts = !loading && products.length > 0 && flatProducts.length === 0
 
   if (!locationId && locations.length > 0 && !loading) {
     return (
@@ -392,7 +446,8 @@ export default function AdminStock() {
   return (
     <div className="admin-page admin-stock-page">
       <p className="page-intro">
-        Stock take by location. Work through sections (categories), check off lines as you count, then save each section. Changes sync in real time for other users. Use bulk “Set to” to apply one value to selected rows in a section.
+        Stock take by location. Count <strong>component SKUs</strong> (carcass, door, hinges, leg kit, fittings) — not complete package lines.
+        Tealbury complete units with a defined breakdown are hidden by default; use “Stock count” to view packages and expand “Show parts” for per-component quantities.
       </p>
       {message && (
         <div className={message.type === 'ok' ? 'admin-message-ok' : 'admin-error'} style={{ marginBottom: '1rem' }}>
@@ -433,6 +488,22 @@ export default function AdminStock() {
             {categories.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
+          </select>
+        </label>
+        <label>
+          Stock count
+          <select
+            value={stockTakeScope}
+            onChange={(e) => {
+              setStockTakeScope(e.target.value as StockTakeScope)
+              setExpandedBomProductId(null)
+            }}
+            className="admin-select"
+            title="Components = parts to count in inventory"
+          >
+            <option value="components">Components only (default)</option>
+            <option value="complete_packages">Complete packages only</option>
+            <option value="all">All products</option>
           </select>
         </label>
         <label>
@@ -529,7 +600,12 @@ export default function AdminStock() {
               </button>
             </div>
           </div>
-          {viewType === 'table' && (
+          {noMatchingProducts ? (
+            <p className="admin-muted" style={{ padding: '1rem 0' }}>
+              No products match the current filters. Try clearing category, product group, search, or stock level.
+            </p>
+          ) : null}
+          {!noMatchingProducts && viewType === 'table' && (
             <div className={`admin-table-wrap admin-table-wrap--${tableDensity}`}>
               <table className="admin-table">
                 <thead>
@@ -551,25 +627,60 @@ export default function AdminStock() {
                     const editVal = getEdit(p.id)
                     const inputVal = editVal !== null ? editVal : String(qty)
                     const isStock = p.is_stock !== false
+                    const isComplete = completeProductIds.has(p.id)
+                    const colCount = stockColumnDefs.filter((c) => isStockColVisible(c.id)).length
                     return (
+                      <>
                       <tr key={p.id} className={edits.has(p.id) ? 'admin-stock-row-dirty' : ''}>
                         {stockColumnDefs.filter((c) => isStockColVisible(c.id)).map((col) => {
                           if (col.id === 'image') return <td key={col.id} className="admin-table-cell-image">{p.image_url ? <img src={p.image_url} alt={p.image_alt ?? p.name ?? ''} /> : <span className="admin-muted">—</span>}</td>
-                          if (col.id === 'category') return <td key={col.id}>{categoryMap.get(p.category_id)?.name ?? '—'}</td>
-                          if (col.id === 'product') return <td key={col.id}>{p.name}</td>
+                          if (col.id === 'category') {
+                            const names = formatCategoryNames(
+                              getProductCategoryIds(p.id, p.category_id, productCategoryMap),
+                              categoryMap
+                            )
+                            return <td key={col.id}>{names}</td>
+                          }
+                          if (col.id === 'product') {
+                            const isComplete = completeProductIds.has(p.id)
+                            return (
+                              <td key={col.id}>
+                                {p.name}
+                                {isComplete && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline admin-stock-bom-toggle"
+                                    onClick={() =>
+                                      setExpandedBomProductId((prev) => (prev === p.id ? null : p.id))
+                                    }
+                                  >
+                                    {expandedBomProductId === p.id ? 'Hide parts' : 'Show parts'}
+                                  </button>
+                                )}
+                              </td>
+                            )
+                          }
                           if (col.id === 'sku') return <td key={col.id}>{p.sku ?? '—'}</td>
                           if (col.id === 'stock') return <td key={col.id}><StockMtmSwitch isStock={isStock} loading={isStockUpdating === p.id} onToggle={() => toggleIsStock(p)} /></td>
                           if (col.id === 'quantity') return <td key={col.id} style={{ textAlign: 'right' }}><input type="number" min={0} step={1} value={inputVal} onChange={(e) => setEdit(p.id, e.target.value)} className="admin-input admin-stock-input" /></td>
                           return <td key={col.id}>—</td>
                         })}
                       </tr>
+                      {isComplete && expandedBomProductId === p.id && (
+                        <tr key={`${p.id}-bom`} className="admin-stock-bom-row">
+                          <td colSpan={colCount}>
+                            <ProductAssemblyBreakdown productId={p.id} stockByProductId={stockMap} compact />
+                          </td>
+                        </tr>
+                      )}
+                      </>
                     )
                   })}
                 </tbody>
               </table>
             </div>
           )}
-          {(viewType === 'grid' || viewType === 'list') && (
+          {!noMatchingProducts && (viewType === 'grid' || viewType === 'list') && (
             <div className={`admin-stock-flat-grid admin-stock-view--${viewType}`}>
               {flatProducts.map((p) => {
                 const qty = getQty(p.id)
@@ -583,7 +694,14 @@ export default function AdminStock() {
                         {p.image_url ? <img src={p.image_url} alt="" /> : <span className="admin-muted">—</span>}
                       </span>
                     )}
-                    {isStockColVisible('category') && <span className="admin-stock-flat-cat">{categoryMap.get(p.category_id)?.name ?? '—'}</span>}
+                    {isStockColVisible('category') && (
+                      <span className="admin-stock-flat-cat">
+                        {formatCategoryNames(
+                          getProductCategoryIds(p.id, p.category_id, productCategoryMap),
+                          categoryMap
+                        )}
+                      </span>
+                    )}
                     {isStockColVisible('product') && <span className="admin-stock-flat-name">{p.name}</span>}
                     {isStockColVisible('sku') && <span className="admin-stock-flat-sku">{p.sku ?? '—'}</span>}
                     {isStockColVisible('stock') && (
@@ -607,7 +725,15 @@ export default function AdminStock() {
         </div>
       ) : (
         <div className="admin-stock-sections">
-          {categoryIds.map((catId) => {
+          {noMatchingProducts ? (
+            <div className="card admin-card">
+              <p className="admin-muted">
+                No products match the current filters. Try clearing category, product group, search, or stock level.
+              </p>
+            </div>
+          ) : null}
+          {!noMatchingProducts &&
+            categoryIds.map((catId) => {
             const cat = categoryMap.get(catId)!
             const rows = byCategory.get(catId) ?? []
             const isCollapsed = collapsedSections.has(catId)
@@ -689,7 +815,9 @@ export default function AdminStock() {
                             const inputVal = editVal !== null ? editVal : String(qty)
                             const isSelected = selectedInSection.get(catId)?.has(p.id)
                             const isStock = p.is_stock !== false
+                            const isComplete = completeProductIds.has(p.id)
                             return (
+                              <>
                               <tr key={p.id} className={edits.has(p.id) ? 'admin-stock-row-dirty' : ''}>
                                 <td>
                                   <input
@@ -708,7 +836,20 @@ export default function AdminStock() {
                                     title="Mark as counted"
                                   />
                                 </td>
-                                <td>{p.name}</td>
+                                <td>
+                                  {p.name}
+                                  {isComplete && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline admin-stock-bom-toggle"
+                                      onClick={() =>
+                                        setExpandedBomProductId((prev) => (prev === p.id ? null : p.id))
+                                      }
+                                    >
+                                      {expandedBomProductId === p.id ? 'Hide parts' : 'Show parts'}
+                                    </button>
+                                  )}
+                                </td>
                                 <td>{p.sku ?? '—'}</td>
                                 <td>
                                   <StockMtmSwitch isStock={isStock} loading={isStockUpdating === p.id} onToggle={() => toggleIsStock(p)} />
@@ -728,6 +869,14 @@ export default function AdminStock() {
                                   />
                                 </td>
                               </tr>
+                              {isComplete && expandedBomProductId === p.id && (
+                                <tr key={`${p.id}-bom`} className="admin-stock-bom-row">
+                                  <td colSpan={6}>
+                                    <ProductAssemblyBreakdown productId={p.id} stockByProductId={stockMap} compact />
+                                  </td>
+                                </tr>
+                              )}
+                              </>
                             )
                           })}
                         </tbody>

@@ -22,6 +22,7 @@ interface CreateUserBody {
   customer_location_id?: string
   trade_type_id?: string
   company_type_id?: string
+  account_discount_percent?: number
 }
 
 serve(async (req) => {
@@ -83,7 +84,7 @@ serve(async (req) => {
     )
   }
 
-  const { email, password, type, company_name, contact_name, display_name, customer_group_id, customer_location_id, trade_type_id, company_type_id } = body
+  const { email, password, type, company_name, contact_name, display_name, customer_group_id, customer_location_id, trade_type_id, company_type_id, account_discount_percent } = body
   if (!email || !password || !type) {
     return new Response(
       JSON.stringify({ error: 'Missing email, password or type' }),
@@ -123,6 +124,12 @@ serve(async (req) => {
     )
   }
 
+  let accountDiscountInsert: number | null = null
+  if (typeof account_discount_percent === 'number' && Number.isFinite(account_discount_percent)) {
+    const rounded = Math.min(100, Math.max(0, account_discount_percent))
+    accountDiscountInsert = rounded > 0 ? rounded : null
+  }
+
   if (type === 'customer') {
     const { error: profileError } = await supabaseAdmin
       .from('customer_profiles')
@@ -134,6 +141,7 @@ serve(async (req) => {
         customer_location_id: customer_location_id || null,
         trade_type_id: trade_type_id || null,
         company_type_id: company_type_id || null,
+        account_discount_percent: accountDiscountInsert,
       })
     if (profileError) {
       return new Response(

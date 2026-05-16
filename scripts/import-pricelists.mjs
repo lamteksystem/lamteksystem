@@ -598,9 +598,21 @@ async function ensureCategoryId(supabase, name, slugPrefix) {
 
 async function purgeProgram(supabase, program) {
   console.log(`  purging existing products with catalog_program = '${program}' …`)
-  const { data: rows, error: selErr } = await supabase.from('products').select('id').eq('catalog_program', program)
-  if (selErr) throw selErr
-  const ids = (rows ?? []).map((r) => r.id)
+  const ids = []
+  const PAGE = 1000
+  let from = 0
+  while (true) {
+    const { data: page, error: selErr } = await supabase
+      .from('products')
+      .select('id')
+      .eq('catalog_program', program)
+      .range(from, from + PAGE - 1)
+    if (selErr) throw selErr
+    if (!page?.length) break
+    ids.push(...page.map((r) => r.id))
+    if (page.length < PAGE) break
+    from += PAGE
+  }
   if (!ids.length) {
     console.log('    none to purge.')
     return

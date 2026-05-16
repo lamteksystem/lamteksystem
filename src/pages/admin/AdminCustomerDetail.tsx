@@ -47,6 +47,7 @@ export default function AdminCustomerDetail() {
     customer_location_id: '' as string,
     trade_type_id: '' as string,
     company_type_id: '' as string,
+    account_discount_percent: '',
     phone: '',
     email_override: '',
     website: '',
@@ -86,6 +87,8 @@ export default function AdminCustomerDetail() {
         customer_location_id: p.customer_location_id ?? '',
         trade_type_id: p.trade_type_id ?? '',
         company_type_id: p.company_type_id ?? '',
+        account_discount_percent:
+          p.account_discount_percent != null ? String(p.account_discount_percent) : '',
         phone: p.phone ?? '',
         email_override: p.email_override ?? '',
         website: p.website ?? '',
@@ -331,6 +334,13 @@ export default function AdminCustomerDetail() {
       customer_location_id: editForm.customer_location_id || null,
       trade_type_id: editForm.trade_type_id || null,
       company_type_id: editForm.company_type_id || null,
+      account_discount_percent: (() => {
+        const raw = editForm.account_discount_percent.trim()
+        if (raw === '') return null
+        const n = parseFloat(raw)
+        if (!Number.isFinite(n)) return null
+        return Math.min(100, Math.max(0, n))
+      })(),
       phone: editForm.phone || null,
       email_override: editForm.email_override || null,
       website: editForm.website || null,
@@ -380,7 +390,8 @@ export default function AdminCustomerDetail() {
           <span>{profile.company_name}</span>
         </span>
         <div className="admin-page-header-actions">
-          <Link to={`/admin/create-order?customer=${userId}`} className="btn btn-small">Create order</Link>
+          <Link to={`/admin/create-quote?customer=${userId}`} className="btn btn-small">Create quote</Link>
+          <Link to={`/admin/create-order?customer=${userId}`} className="btn btn-small btn-outline">Create order</Link>
           <Link to="/admin/customers" className="btn btn-outline btn-small">← Customers</Link>
         </div>
       </div>
@@ -423,12 +434,76 @@ export default function AdminCustomerDetail() {
             <p className="admin-muted" style={{ margin: 0 }}>
               {fmtGBP(Number(profile.balance_outstanding || 0))} — derived from account transactions (not editable here).
             </p>
-            <label>Payment terms</label>
+            <label title="Shown on quotes and invoices. Does not change calculated prices—use Pricing → Sell price rules for discounts.">
+              Payment terms
+            </label>
             <input
               value={editForm.payment_terms}
               onChange={(e) => setEditForm((f) => ({ ...f, payment_terms: e.target.value }))}
               placeholder="e.g. Net 7, Net 30, Due on receipt"
             />
+
+            <h3 className="admin-detail-section-title">Pricing segment</h3>
+            <p className="admin-muted" style={{ marginBottom: '0.5rem' }}>
+              Segment fields decide which <strong>sell price rules</strong> match (group, region, trade, legal type).
+              Rule-based discounts are maintained under{' '}
+              <Link to="/admin/pricing">Pricing &amp; margin → Sell price rules</Link>; lists under{' '}
+              <Link to="/admin/pricing">Segments</Link>.
+              Use <strong>Account discount</strong> below for an extra percentage off <em>after</em> those rules (optional).
+            </p>
+            <label title="Commercial pricing tier (e.g. national account). Must match a rule segment when that rule specifies a group.">
+              Customer group
+            </label>
+            <select
+              value={editForm.customer_group_id}
+              onChange={(e) => setEditForm((f) => ({ ...f, customer_group_id: e.target.value }))}
+            >
+              <option value="">— None —</option>
+              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+            <label title="Regional / branch pricing segment used in rules—not the same as stock depot locations.">
+              Location (pricing region)
+            </label>
+            <select
+              value={editForm.customer_location_id}
+              onChange={(e) => setEditForm((f) => ({ ...f, customer_location_id: e.target.value }))}
+            >
+              <option value="">— None —</option>
+              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+            <label title="Trade discriminator for targeted discounts (e.g. kitchen fitter vs retailer).">
+              Trade type
+            </label>
+            <select
+              value={editForm.trade_type_id}
+              onChange={(e) => setEditForm((f) => ({ ...f, trade_type_id: e.target.value }))}
+            >
+              <option value="">— None —</option>
+              {tradeTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <label title="Legal entity shape when rules differentiate Ltd vs sole trader etc.">
+              Company type
+            </label>
+            <select
+              value={editForm.company_type_id}
+              onChange={(e) => setEditForm((f) => ({ ...f, company_type_id: e.target.value }))}
+            >
+              <option value="">— None —</option>
+              {companyTypes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <label title="Extra percentage off resolved unit sell price after every matching sell price rule (0–100). Leave blank for none.">
+              Account discount (%)
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={0.01}
+              value={editForm.account_discount_percent}
+              onChange={(e) => setEditForm((f) => ({ ...f, account_discount_percent: e.target.value }))}
+              placeholder="Optional — applied after segment rules"
+            />
+
             <button
               type="button"
               className={`btn btn-small ${showAdvancedProfile ? 'active' : 'btn-outline'}`}
@@ -474,7 +549,7 @@ export default function AdminCustomerDetail() {
               min={0}
               value={editForm.employee_count}
               onChange={(e) => setEditForm((f) => ({ ...f, employee_count: e.target.value }))}
-              placeholder="Optional (e.g. for pricing rules)"
+              placeholder="Optional CRM field"
             />
             <label>Company notes (internal)</label>
             <textarea
@@ -506,40 +581,6 @@ export default function AdminCustomerDetail() {
               <label>City<input value={editForm.delivery_city} onChange={(e) => setEditForm((f) => ({ ...f, delivery_city: e.target.value }))} placeholder="City" /></label>
               <label>Postcode<input value={editForm.delivery_postcode} onChange={(e) => setEditForm((f) => ({ ...f, delivery_postcode: e.target.value }))} placeholder="Postcode" /></label>
             </div>
-            <h3 className="admin-detail-section-title">Pricing segments</h3>
-            <p className="admin-muted" style={{ marginBottom: '0.5rem' }}>Used for customer price rules and promotions.</p>
-            <label>Customer group</label>
-            <select
-              value={editForm.customer_group_id}
-              onChange={(e) => setEditForm((f) => ({ ...f, customer_group_id: e.target.value }))}
-            >
-              <option value="">— None —</option>
-              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-            <label>Location</label>
-            <select
-              value={editForm.customer_location_id}
-              onChange={(e) => setEditForm((f) => ({ ...f, customer_location_id: e.target.value }))}
-            >
-              <option value="">— None —</option>
-              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-            <label>Trade type</label>
-            <select
-              value={editForm.trade_type_id}
-              onChange={(e) => setEditForm((f) => ({ ...f, trade_type_id: e.target.value }))}
-            >
-              <option value="">— None —</option>
-              {tradeTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <label>Company type</label>
-            <select
-              value={editForm.company_type_id}
-              onChange={(e) => setEditForm((f) => ({ ...f, company_type_id: e.target.value }))}
-            >
-              <option value="">— None —</option>
-              {companyTypes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
             <p className="admin-muted" title="Internal identifier (Supabase auth user_id)">
               Customer ref: <code>{profile.customer_ref ?? '—'}</code>{' '}
               <span className="admin-muted">(user_id: {userId?.slice(0, 8)}…)</span>

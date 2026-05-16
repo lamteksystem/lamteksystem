@@ -1,5 +1,7 @@
 # Lamtek ordering portal — staff & partner manual (extended)
 
+**Last updated:** May 2026 (covers quotes workflow, customer pricing, **complete-unit component breakdown (BOM)**, multi-category catalogue, stock take by component, and pricing & margin guidance).
+
 This manual is for **Lamtek staff** and trusted partners (for example **Tom**) who need to **use the portal**, **onboard customers**, **answer first-line questions**, and **coordinate with IT** without reading source code.  
 **Plain English first:** internal database names and JSON keys appear only in **[§25 Appendix](#25-appendix--technical-reference-for-it-and-authors)**.
 
@@ -10,19 +12,24 @@ This manual is for **Lamtek staff** and trusted partners (for example **Tom**) w
 | If you need… | Start at… |
 |--------------|-----------|
 | **Orientation** — what the app is | [§1](#1-what-this-system-is-for) |
+| **What changed recently** | [§2a](#2a-whats-new-may-2026) |
 | **Vocabulary** for consistent messaging | [§4](#4-words-we-use-expanded-glossary) |
 | **Customer training** — “where do I click?” | [§5](#5-customer-area--full-tour-of-the-sidebar) · [§6](#6-orders-baskets-cart-and-checkout-deep-dive) |
 | **“What does this order status mean?”** | [§7](#7-order-statuses-what-each-stage-means-for-staff-and-customers) |
 | **Delivery vs collection, slots** | [§8](#8-delivery-collection-and-delivery-windows) |
 | **Support / returns** | [§9](#9-support-tickets-customer-view) |
 | **Admin day-to-day** | [§11](#11-admin-sign-in-and-the-today-page) onward |
+| **Quotes vs orders** | [§12](#12-admin--orders-quotes-and-fulfilment) |
+| **Customer pricing (segments + account %)** | [§13](#13-admin--customers-and-crm) · [§16](#16-admin--files-pricing-reports-accounting) |
 | **Trainers / ordering modes / session plans** | [§23](#23-deep-dives-ordering-modes-catalogue-behaviour-training) |
 | **Catalogue / Tealbury Excel** | [§14](#14-admin-catalogue--operations-playbook) |
+| **Complete unit make-up (BOM)** | [§14.6](#146-complete-unit-make-up-tealbury-and-bundles) · [§23.2](#232-components-vs-complete-units-and-bom) |
+| **Stock take — count parts not packages** | [§15.1](#151-stock-take) |
 | **First-line scripts** | [§21](#21-phone-and-email-scripts-extended) |
 | **When something breaks** | [§20](#20-troubleshooting-wide) |
 | **Spreadsheet / SQL names** | [§25](#25-appendix--technical-reference-for-it-and-authors) |
 
-Customer-facing short tips also appear under **Help** and **Support** in the app.
+Customer-facing short tips also appear under **Help** (`/account/help`) and **Support** in the app.
 
 ---
 
@@ -47,11 +54,33 @@ The same website serves **public marketing-style pages**, the **signed-in custom
 |------|--------|
 | **Sales / account managers** | §5–§10, §13, §21–§22 |
 | **Customer service** | §6–§10, §9, §12, §17, §20–§21 |
-| **Warehouse / ops** | §6–§8, §12, §15, pick lists / labels in §12 |
+| **Warehouse / ops** | §6–§8, §12, §15 (component stock take + BOM), pick lists / labels in §12 |
 | **Catalogue owner** | §14, Tealbury Excel behaviour, §20 import rows |
 | **Finance** | §7, §12, §16, accounting permission |
 | **Trainers** | §5–§6, §23 |
 | **IT / implementer** | §25 Appendix, repository files in §24 |
+
+---
+
+## 2a. What’s new (May 2026)
+
+Use this section if you trained on an older build. Behaviour below is live in the current portal.
+
+| Area | What changed |
+|------|----------------|
+| **Orders & quotes** | Sidebar and lists say **Orders & quotes**. Staff can **Create quote**, print/send quotes, then **Convert to order** on the order detail screen when the customer confirms. |
+| **Quick actions** | Red **+** button (bottom-right in Admin) opens **Create quote** or **Create order** from most admin pages. Hidden on create pages and print views. |
+| **Customer pricing** | On each **customer profile**: visible **Pricing segment** (group, region, trade type, company type), **Payment terms**, and optional **Account discount (%)** — extra % off after segment rules. |
+| **Pricing & margin** | Clearer intro text and tab tooltips. **Preview** tab tests sell/cost/margin for one customer + SKU. |
+| **Staff order pricing** | On **order detail**, choose how new lines are priced: catalogue list price vs **customer pricing**; button **Apply customer pricing to all lines**. Default in **Settings → Advanced**. |
+| **Catalogue** | **◀ ▶** scroll buttons beside the column-settings cog; wide table scrolls horizontally without hunting for the scrollbar. Click a row to open a **product modal** (read/edit). Stock qty visible; double-click to edit inline. |
+| **Stock take** | Category and product-group filters match **imported** categories (e.g. Lamtek sheet names), not only legacy seed names like “Units”. Clear message when filters match nothing. |
+| **Customer Help** | `/account/help` updated for baskets, Tealbury path, and pricing FAQs. |
+| **Support manual in Admin** | **Support manual** link below **Settings** in the sidebar (`/admin/support-manual`) — reads `docs/STAFF_HELP_MANUAL.md`. |
+| **Multiple categories** | Catalogue products can be assigned **more than one category**; set **primary** for pricing/export. |
+| **Complete unit make-up (BOM)** | Tealbury **complete** sellable lines can list their **parts**: carcass/cabinet, door/drawer, hinges, hinge plates, leg kit, fittings bag. Defined in **Catalogue → product modal → Complete unit make-up**; shown to customers on the product detail view when configured. |
+| **Stock take — components first** | Default view counts **component SKUs** only (carcass, door, hinges, etc.). **Complete package** lines are hidden unless you change **Stock count** to *Complete packages only* or *All*; use **Show parts** to see per-component quantities for a package. |
+| **Demo / training URL** | Public GitHub Pages build: **https://lamteksystem.github.io/lamteksystem/** (local dev: **http://localhost:5173/**). Add the Pages origin to Supabase Auth if login fails on the demo site. |
 
 ---
 
@@ -85,9 +114,14 @@ Paths are the part **after** your site address (e.g. `https://orders.example.com
 | `/admin` | **Today** — dashboard |
 | `/admin/catalogue` | Catalogue — tabs: Browse, Import & export, Audit, Images |
 | `/admin/catalogue?tab=import` | Opens catalogue on **Import & export** |
-| `/admin/orders` | Order list |
+| `/admin/orders` | **Orders & quotes** list (quotations and placed orders together) |
 | `/admin/orders/processing` | Processing queue |
-| `/admin/create-order` | Place order on behalf of customer |
+| `/admin/create-order` | Place **order** on behalf of customer |
+| `/admin/create-quote` | Place **quote** (quotation) on behalf of customer |
+| `/admin/pricing` | **Pricing & margin** — segments, sell rules, cost rules, preview |
+| `/admin/stock` | **Stock take** by depot |
+| `/admin/settings` | Staff UI preferences (includes default **order line pricing** mode) |
+| `/admin/support-manual` | **Support manual** (this document in the app) |
 | Other `/admin/…` | See §11–§17 |
 
 **Production auth:** if email links fail on the live domain, the Supabase project’s **Authentication → URL configuration** must list that exact **https** origin (and redirects). This is a common post-deploy fix.
@@ -115,13 +149,22 @@ Paths are the part **after** your site address (e.g. `https://orders.example.com
 | **Customer** | Trade user with a **company profile**; uses customer nav, never Admin. |
 | **View as customer** | Staff opens the **customer** portal as that user (support). Consent rules may apply. |
 | **Ticket** | A **Support** thread: question, issue, or return request. |
-| **Segment / pricing rule** | Admin-controlled rules that can change **sell price** for a logged-in customer (e.g. trade vs retail, promotions). |
+| **Segment / pricing rule** | Admin-controlled rules that can change **sell price** when a customer’s **group, location, trade type, and company type** match (see **Pricing & margin → Sell price rules**). |
+| **Account discount (%)** | Optional extra percentage off **after** segment rules, set on the **customer profile** (not on every product). |
+| **Pricing segment** | The four dropdowns on a customer profile: **customer group**, **location (pricing region)**, **trade type**, **company type**. |
+| **Quotation** (record) | An order row with status **quotation** — same underlying table as orders; staff can convert it to **placed** when accepted. |
+| **Customer pricing** (staff orders) | Resolving line prices using segment rules + account discount (same engine as the customer cart). |
 | **Fulfillment** | **Delivery** to an address vs **collection** from a depot — chosen at checkout where enabled. |
 | **Delivery window** | A named slot pattern (weekday, cut-off, lead time) configured by staff for customer selection. |
 | **Snapshot** (order line) | Copy of product name/SKU/price **frozen** on the line when ordered — so old orders stay readable if the catalogue changes later. |
 | **VAT** | UK tax — totals on screen typically show **ex-VAT** and **inc-VAT** where the app displays both. |
 | **Impersonation** | Staff viewing the portal **as** a specific customer user id (for diagnosis). |
 | **Preference** (ordering) | Small settings like **which draft is active** — stored in the **database** per user (not only in the browser). |
+| **Complete unit** | A sellable **package** line (often Tealbury) that is built from several **component** SKUs in the warehouse — e.g. “600mm base unit — Hadfield”. |
+| **Component** (inventory) | A part you **count in stock**: carcass, door front, drawer front, hinge, hinge plate, leg kit, fittings bag, etc. |
+| **Make-up / BOM** | **Bill of materials** — which components and quantities make one complete unit. Maintained in Admin on the complete product. |
+| **Part type** (BOM) | Role of each line: **Unit / carcass**, **Door**, **Drawer**, **Hinge**, **Hinge plate**, **Leg kit**, **Fittings bag**, or **Other**. |
+| **Primary category** | When a product has several categories, the **primary** drives category-scoped pricing rules and spreadsheet export. |
 
 ---
 
@@ -197,11 +240,12 @@ The order appears under **My account → order history** (or your equivalent). T
 
 ### 6.7 Pricing on the line
 
-When the cart loads, the app may **re-apply customer pricing rules** (segments, promotions). If a customer compares the portal to a static PDF:
+When the cart loads, the app may **re-apply customer pricing rules** (segments, promotions) and any **account discount %** set on their profile (shown on **My account** when active). If a customer compares the portal to a static PDF:
 
-- Explain **account-specific pricing** (if you use rules).
+- Explain **account-specific pricing** (segment rules plus optional extra account %).
 - Explain **VAT** shown ex vs inc.
 - For **Tealbury**, explain **range-specific SKUs** if their spreadsheet used a single code column for all ranges.
+- **Browse vs cart:** product lists may show catalogue list prices until the cart reprices — trust the **Cart** totals before submit.
 
 ---
 
@@ -270,19 +314,23 @@ See **§17** — staff use **Admin → Tickets** to respond, change status, and 
 
 ## 10. Downloads, depots, search, profile
 
-### 10.1 Downloads
+### 10.1 Products — detail and make-up
+
+From **Products**, opening a line shows specification, measurements, and — when configured — **Complete unit make-up** (the parts that make up a Tealbury **complete** package). If that section is empty, staff have not linked the BOM yet (§14.6).
+
+### 10.2 Downloads
 
 Customers expect **current** brochures. If a file 404s, the storage path or document row in Admin **Brochure & files** is wrong — re-upload or fix visibility.
 
-### 10.2 Depots
+### 10.3 Depots
 
 Static or database-driven content — use for **opening hours**, **phone**, **what to bring for collection**. Keep in sync with real-world changes.
 
-### 10.3 Global search (if enabled)
+### 10.4 Global search (if enabled)
 
 Typically searches **products** and possibly **orders** — exact scope depends on your build. Teach customers one **keyword** strategy (SKU first).
 
-### 10.4 My account
+### 10.5 My account
 
 Usually includes:
 
@@ -310,20 +358,41 @@ The dashboard shows **headline numbers** (exact cards depend on version), typica
 - **Orders today** — created since midnight (server date).
 - **Customers** — profile rows.
 - **Active products** — products marked active.
-- **Assemblies** — where you use **complete unit** bundles.
+- **Assemblies** — count of **assembly** records (complete-unit bundles); sellable products with a **make-up** also show under **Catalogue** with a **Complete unit** badge.
 - **Revenue (paid / invoiced)** — sum of totals for those statuses — **finance sanity check only** until you agree it matches your ledger.
 
 **Recent orders** table — quick drill into latest activity.
 
-**Workflow shortcuts** — grouped links (Orders, CRM, Catalogue, Stock, Uploads, Reports) match the sidebar; use this page to train “where do I click tomorrow morning?”.
+**Workflow shortcuts** — grouped links (**Orders & quotes**, CRM, Catalogue, Stock, Uploads, Reports) match the sidebar; use this page to train “where do I click tomorrow morning?”.
+
+### 11.3 Quick actions (+ button)
+
+On most Admin pages, a red **+** floating button (bottom-right) opens:
+
+- **Create quote** — starts a quotation for a customer (same flow as sidebar **Create quote**).
+- **Create order** — starts a placed-order path for a customer.
+
+The button is **hidden** while you are already on create-order/create-quote pages or on **print** views (invoice, quote PDF, packing slip) so it does not get in the way.
 
 ---
 
-## 12. Admin — orders and fulfilment
+## 12. Admin — orders, quotes, and fulfilment
 
-### 12.1 All orders
+Quotes and orders share the same system: a **quotation** is an order with status **quotation**. Customers see pricing on quotes; staff convert to **placed** when the job is confirmed.
 
-Search and filter; open an order to see **lines**, **status history**, **notes**, **customer**, **totals**, and **print** actions (**quote**, **invoice**, **packing slip**) where implemented.
+### 12.1 All orders & quotes
+
+Path: **`/admin/orders`** (labelled **Orders & quotes**).
+
+Search and filter by status (including **quotation**). Open a record to see **lines**, **status history**, **customer**, **totals**, and print actions.
+
+| Status filter | Typical use |
+|---------------|-------------|
+| **Quotation** | Open proposals — edit lines, reprint quote, convert when accepted. |
+| **Placed** | Jobs in operations. |
+| **Draft** | Rare in Admin lists — customers usually keep drafts in **baskets**. |
+
+**Archived orders** — separate filter/link where provided.
 
 ### 12.2 Process orders
 
@@ -333,15 +402,40 @@ Operational queue — “what needs doing next”. Train warehouse to start here
 
 Follow-ups (e.g. quotes aging) — use your internal SOP for when to nudge customers.
 
-### 12.4 Create order
+### 12.4 Create order and create quote
 
-Staff builds an order **for** a customer account — useful for phone orders. Ensure the correct **customer** is selected; lines still respect **pricing rules** when repriced for that user.
+| Action | Path | Result |
+|--------|------|--------|
+| **Create order** | `/admin/create-order` or **+ → Create order** | New record for customer; usually progresses to **placed** after lines and delivery details. |
+| **Create quote** | `/admin/create-quote` or **+ → Create quote** | New record with status **quotation**; add lines on order detail; print quote for customer. |
 
-### 12.5 Pick lists and package labels
+Always pick the correct **customer account** first. Wrong customer = wrong pricing segment and delivery defaults.
+
+### 12.5 Quotation detail — convert to order
+
+On an order in **quotation** status, the detail page shows a **Quotation** banner with **Convert to order**. That sets status to **placed** and keeps lines, pricing, and delivery data. Use after written/email confirmation per your sales SOP.
+
+Print links on detail (where enabled): **Quote** (with or without pricing), **Invoice**, **Packing slip** — only when status and permissions allow.
+
+### 12.6 Order detail — how new lines are priced (staff)
+
+When adding catalogue lines on **order detail**, use the controls above **Add line**:
+
+| Option | Behaviour |
+|--------|-----------|
+| **Use my default** | Follows **Settings → Advanced → Default: new lines use…** |
+| **Catalogue list price** | Each new line uses the catalogue **unit price** (staff can still edit a line manually). |
+| **Customer pricing** | After adding, prices are recalculated using **sell price rules + account discount %** for that order’s customer (same as customer cart repricing). |
+
+**Apply customer pricing to all lines** — recalculates **every** catalogue line on the order (use after changing customer, segment, or account discount).
+
+**Note:** Manual **Edit price** on a line always remains available. Customer portal carts reprice automatically on save; staff orders only reprice when you choose customer pricing or press **Apply customer pricing to all lines**.
+
+### 12.7 Pick lists and package labels
 
 Where enabled: generated from fulfilment workflow — print-friendly views for the **warehouse floor**. If a line shows “wrong product”, trace back to **catalogue SKU** and **snapshot** on the order line.
 
-### 12.6 Printing
+### 12.8 Printing
 
 Use browser **Print → Save as PDF** for email attachments if you do not have direct email integration.
 
@@ -353,9 +447,24 @@ Use browser **Print → Save as PDF** for email attachments if you do not have d
 
 Search by company/contact/email; open **customer detail** for:
 
-- Profile fields (segments for **pricing**, delivery region flags, CRM notes if present).
-- **Orders** for that account.
-- **Consent** flags where shown (e.g. staff portal access for impersonation).
+- **Profile** — company, contact, **payment terms**, and **Pricing segment** (always visible on the profile card — not hidden under “advanced”).
+- **Account discount (%)** — optional; applies **after** segment-based sell rules on quotes, orders, and customer cart repricing.
+- **Advanced profile** — billing/delivery addresses, credit limit, internal notes (expand **Show advanced profile fields**).
+- **Account & billing** — statement summary, quick payments/credits where accounting is enabled.
+- **Orders** for that account (links to **Orders & quotes**).
+- **Consent** for **View as customer** (staff portal access) where shown.
+
+**Where to set pricing (cheat sheet):**
+
+| What you want | Where to click |
+|---------------|----------------|
+| Lists for dropdowns (groups, trade types, …) | **Pricing & margin → Segments** |
+| “10% off carcasses for NW retailers in March” | **Pricing & margin → Sell price rules** |
+| “This account always gets an extra 5% off everything” | **Customer profile → Account discount (%)** |
+| “Net 30 on invoices” | **Customer profile → Payment terms** (text on prints) |
+| Test one SKU for one customer | **Pricing & margin → Preview** |
+
+When creating users: **Team users → Create user** can set segment fields for new customers; refine later on the profile.
 
 ### 13.2 CRM sub-areas
 
@@ -377,6 +486,12 @@ Staff with catalogue access: **`/admin/catalogue`**.
 - Filter **Catalogue** to **Lamtek** or **Tealbury** when working one programme to avoid editing the wrong line.
 - Use **Active only** before customer demos so you do not show half-retired stock.
 - **Duplicate SKUs** — fix urgently; they break imports and image uploads.
+- **Table view** — use **◀ ▶** beside the **column settings** cog to scroll wide tables left/right; resize columns by dragging headers; **double-click** many cells to edit inline.
+- **Click a product row** — opens the **product modal** (view details; edit mode if you have catalogue edit permission). Technical JSON options are hidden in view mode.
+- **Complete unit** badge on the name column when a **component breakdown** is linked to that sellable SKU.
+- **Multiple categories** — in the product modal (or double-click the category column in table view), tick every category that applies and choose which is **primary** (used for category-scoped pricing rules and exports). Use **Manage categories** in the modal to add categories on the fly. Stock take lists the product under each assigned category.
+- **Stock column** — shows stocked vs MTM toggle and quantity; double-click quantity to edit when permitted.
+- **Grid / list / compact** views — same filters; table is best for bulk edits.
 
 ### 14.2 Import & export tab — Lamtek file discipline
 
@@ -407,13 +522,49 @@ Run against your **master** spreadsheet:
 - **Mapping CSV** for bulk work from Dropbox folders.
 - **Upload by SKU** for ad-hoc shots — filename = **portal** SKU (remember Tealbury **middle dot** SKUs).
 
+### 14.6 Complete unit make-up (Tealbury and bundles)
+
+A **complete** Tealbury unit is not one physical box in the warehouse — it is sold as one line but **built from parts** your team stocks and picks:
+
+| Part type | Typical examples |
+|-----------|------------------|
+| **Unit / carcass / cabinet** | White, oak, grey carcass SKU for that width |
+| **Door** or **Drawer** | Front for **High line** (door) vs **Drawer line** (door + drawer) |
+| **Hinge** + **Hinge plate** | Brand variants (Blum, Hafele, Titan, Hettich, etc.) |
+| **Leg kit** | Fitted by installer under the carcass |
+| **Fittings bag** | Caps, screws, dampers, small hardware |
+
+**Where to define it (staff):**
+
+1. **Catalogue → Browse** → open the **complete** sellable product (the package SKU customers order).
+2. Section **Complete unit make-up** (view and edit modes).
+3. If empty: click **Define component breakdown**, then **Add component line** for each part:
+   - Search by **SKU or name** (datalist).
+   - Set **Part type** and **Qty per complete unit** (e.g. 2 hinges, 1 carcass).
+4. Save is immediate per line; remove mistaken lines with **Remove**.
+
+**What customers see:** On **Products** (and similar product detail views), section **Complete unit make-up** lists the same parts when a breakdown exists — useful for installers and account managers explaining what is in the price.
+
+**Ordering note:** Customers may still add the **complete** line to the cart as one SKU; warehouse and stock take must track **components** separately (see §15.1).
+
+**Lamtek guided / assembly ordering:** Legacy **assemblies** in the Lamtek ordering wizard are separate rows in the database; linking a sellable **product** to an assembly (via **product_id** on the assembly) is how Admin ties a catalogue SKU to a BOM. If “complete” lines have no make-up, ops cannot infer pick quantities from stock.
+
 ---
 
 ## 15. Admin — stock, locations, delivery windows
 
 ### 15.1 Stock take
 
-Per-product, per-location quantities where your schema supports it — used for **inventory accuracy** and sometimes **allocation**. Train staff to **count first**, adjust in portal second, note reason in internal comms.
+Path: **`/admin/stock`**.
+
+Per-product, per-**location** (depot) quantities — used for **inventory accuracy** and allocation. Workflow:
+
+1. Choose **location** at the top (stock is per depot, not one global number).
+2. Work in **sections** (by category) or **flat** list.
+3. Use **Category** and **Product group** filters — imported Lamtek/Tealbury categories (e.g. “Lamtek — Wall units”) now match when you pick legacy names like **Units** or **Doors**; if nothing shows, clear filters or check the message **“No products match the current filters”**.
+4. **Save section** after counts; realtime sync if two staff count the same depot.
+
+Train staff to **count first**, adjust in portal second, note reason in internal comms.
 
 ### 15.2 Locations
 
@@ -433,13 +584,37 @@ Upload, title, and categorise documents surfaced on **Downloads**. Use consisten
 
 ### 16.2 Pricing & margin
 
-**Segments** (trade type, region, group) and **rules** (discount %, fixed price, date ranges) change what a logged-in customer **pays**. Document who may edit rules — mistakes here are **high impact**.
+Path: **`/admin/pricing`**.
 
-### 16.3 Reports
+| Tab | Purpose |
+|-----|---------|
+| **Segments** | Maintain dropdown lists: customer **groups**, **locations (pricing region)**, **trade types**, **company types**. |
+| **Sell price rules** | Discounts, mark-ups, fixed prices — match customers when segment fields on the rule equal the customer profile (blank on rule = “any”). Scope: all products, category, SKU, or collection. Optional dates and minimum order value for promos. |
+| **Cost rules** | Landed cost for **margin** reporting (does not change customer price unless you also add a sell rule). |
+| **Collections** | Named product ranges for promotions. |
+| **Preview** | Pick customer + product + optional order total — see list price, resolved sell, cost, unit margin. |
+
+**Two layers of customer discount:**
+
+1. **Sell price rules** — apply when segment (and scope/dates) match.
+2. **Account discount (%)** on the **customer profile** — applies to the result for that account only.
+
+Customer **cart** and **Apply customer pricing** on staff orders use the same engine. Document who may edit rules — mistakes are **high impact**.
+
+### 16.3 Staff settings affecting orders
+
+**Settings → Advanced → Default: new lines use…**
+
+- **Catalogue list price** — traditional staff order entry.
+- **Customer pricing (rules + account discount)** — auto-reprice when adding lines on order detail (if that order’s mode is set to customer pricing).
+
+Per-order override on **order detail** does not change this global default.
+
+### 16.4 Reports
 
 Operational / sales summaries — agree which report is **source of truth** vs finance system.
 
-### 16.4 Accounting
+### 16.5 Accounting
 
 Restricted permission on many installs — ledger views and exports. Staff without access should **not** be given the finance password; route requests to the controller.
 
@@ -477,6 +652,8 @@ Permissions map **areas of Admin** (orders, customers, catalogue, stock, uploads
 - [ ] Production URL on Supabase Auth allow-list.
 - [ ] Lamtek catalogue import smoke test (3 SKUs).
 - [ ] Tealbury import smoke test + customer verification on **Tealbury kitchens**.
+- [ ] For key **complete** Tealbury SKUs: **Complete unit make-up** defined (carcass, door/drawer, hinges, plates, legs, fittings).
+- [ ] Stock take smoke test on **Components only** at one depot.
 - [ ] One **delivery** and one **collection** test order.
 - [ ] Downloads folder has current PDFs.
 
@@ -509,6 +686,11 @@ Permissions map **areas of Admin** (orders, customers, catalogue, stock, uploads
 | Wrong Tealbury price | Hub-only file | Ensure **per-range** sheets exist and saved. |
 | Image not mapping | SKU typo | Copy SKU from **Browse** tab. |
 | Duplicate SKUs after import | File changed SKU column | Align file with portal; delete duplicate rows in Browse. |
+| Stock take empty for “Units” / “Doors” | Category filter vs imported slugs | Clear filters; products may be under **Lamtek — …** categories; try **All** categories. |
+| Customer price wrong on staff order only | Lines added at list price | Order detail → **Customer pricing** or **Apply customer pricing to all lines**. |
+| Account discount not applying | Set to 0 or blank | Customer profile → **Account discount (%)**; save; reprice order/cart. |
+| Cannot find pricing on customer | Looking under advanced only | **Pricing segment** is on main profile card; rules live under **Pricing & margin**. |
+| Wide catalogue table clipped | Horizontal scroll | Use **◀ ▶** next to column settings cog. |
 
 ---
 
@@ -551,6 +733,24 @@ A: Lines store **what was valid when you ordered** (name, SKU, unit price snapsh
 **Q: Can I email you my basket instead of using the portal?**  
 A: Business policy call — operationally, a **placed** or **quoted** order in the system reduces transcription errors; encourage portal submit then email the **reference**.
 
+**Q: What is the difference between a quote and an order in Admin?**  
+A: Same record type — **quotation** status is a quote. Staff use **Create quote** or convert a quotation to **placed** when the customer confirms.
+
+**Q: We gave the customer 5% account discount — why is one line still list price?**  
+A: Staff-added lines may have been entered with **catalogue list price** — use **Apply customer pricing to all lines** on order detail, or set **When adding catalogue lines** to **Customer pricing**.
+
+**Q: Where do I set trade type / pricing group?**  
+A: **Customers** → open account → **Pricing segment** on the profile (not only at user creation). Maintain dropdown options under **Pricing & margin → Segments**.
+
+**Q: Should we count complete Tealbury units or the parts in stock take?**  
+A: Count **components** (carcass, door, hinges, etc.) with **Stock count → Components only**. Complete package lines are for sales reference unless you expand **Show parts** to audit the BOM.
+
+**Q: Customer asks what is inside a complete unit price — where do I look?**  
+A: **Catalogue** product modal → **Complete unit make-up**, or the customer’s product detail **Complete unit make-up** section if configured.
+
+**Q: We imported Tealbury but stock take looks empty.**  
+A: Check **Stock count** is not stuck on **Complete packages only** with no BOMs defined; switch to **Components only** and clear category/product-group filters.
+
 ---
 
 ## 23. Deep dives (ordering modes, catalogue behaviour, training)
@@ -565,9 +765,23 @@ A: Business policy call — operationally, a **placed** or **quoted** order in t
 
 Customers can still change filters later; this screen is only the **starting lane**.
 
-### 23.2 Components vs bundled “complete” units
+### 23.2 Components vs complete units and BOM
 
-Some Lamtek flows talk about **complete units** (kitchen runs sold as a configured bundle) versus **components** (door, carcass, hinge line by line). In Admin you may maintain **assemblies** that bundle components. If a customer cannot find “one SKU for the whole base unit”, either **no assembly row** exists yet, or they must order **parts** — check **Browse** for an assembly-style product name or advise them to use **guided** mode if your team configured it there.
+| Concept | Who orders it | What you stock |
+|---------|---------------|----------------|
+| **Component** | Trade customer ordering parts, or implied inside a complete | Physical SKU on the shelf — **count in stock take** |
+| **Complete unit** | Customer adds **one line** (e.g. “600mm base — Hadfield”) | **No** single box — pick list is the **BOM** parts |
+
+**Tealbury complete** lines should have a **make-up** in Admin (§14.6): unit/carcass colour, door or drawer front, hinges + plates (brand), leg kit, fittings bag. **High line** vs **Drawer line** changes whether a **drawer** row appears in the BOM.
+
+**Lamtek ordering:** The **guided** flow may still use legacy **assembly** records (pre-defined bundles in the ordering wizard). Admin can link a sellable **product** to an assembly so the same BOM appears on the catalogue product — look for the **Complete unit** badge in **Browse**.
+
+**Support scripts:**
+
+- “You ordered the **complete** SKU — we pick carcass, door, hinges, legs, and fittings as separate stock lines.”
+- “If the website does not list what is included, we have not finished the **make-up** on that product — I will ask catalogue to link the parts.”
+
+**Do not** tell warehouse to increment stock on the **package** SKU when components are tracked — use **Components only** in stock take (§15.1).
 
 ### 23.3 Stock catalogue vs made-to-measure
 
@@ -617,9 +831,13 @@ If your build exposes it: prefer **SKU** for products and **reference** for orde
 
 | File | Contents |
 |------|-----------|
-| `docs/DEPLOY_VERCEL.md` | Live site, env vars. |
+| `docs/DEPLOY_GITHUB_PAGES.md` | GitHub Actions → Pages deploy; Supabase URL allow-list. |
+| `docs/DEPLOY_VERCEL.md` | Alternative live site (Vercel), env vars. |
 | `docs/DROPBOX_IMAGES_SETUP.md` | Image URLs. |
 | `scripts/clear-all-products.mjs` | **Destructive** — removes **all** products; staff must never run on production without written approval. |
+
+**Public demo (GitHub Pages):** https://lamteksystem.github.io/lamteksystem/  
+**Repository:** https://github.com/lamteksystem/lamteksystem
 
 ---
 
@@ -635,6 +853,8 @@ Use this section in tickets to developers — **not** for reading to trade custo
 | Order line frozen text | `order_lines.product_snapshot` JSON. |
 | Ticket types | `question`, `issue`, `returns` (note plural on returns). |
 | Staff access | `staff_profiles` + permission checks per Admin route family. |
+| Account discount % | `customer_profiles.account_discount_percent` (0–100, optional). |
+| Staff order line pricing default | `user_preferences` JSON key `admin_ui_prefs` → `adminOrderLinePricingDefault`. |
 | Row security | Supabase **RLS** on tables — service role bypasses (scripts only). |
 
 **Lamtek CSV/XLSX column keys** (standard export):  
@@ -642,4 +862,4 @@ Use this section in tickets to developers — **not** for reading to trade custo
 
 ---
 
-*Extended manual (§1–§25): customer nav, orders/baskets/cart, statuses, fulfilment, support, Admin modules, playbooks, deep dives, troubleshooting, scripts, and appendix. Update when product behaviour or navigation changes.*
+*Extended manual (§1–§25): customer nav, orders/baskets/cart, quotes, pricing segments & account discount, **complete-unit BOM & component stock take**, multi-category catalogue, fulfilment, support, Admin modules, catalogue/stock UX, playbooks, deep dives, troubleshooting, scripts, and appendix. **Revision:** May 2026 (BOM / stock-count update).*

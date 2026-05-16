@@ -2523,6 +2523,122 @@ a.ordering-wizard-card--link:hover {
   .cart-fab { display: none; }
 }
 
+/* Admin staff: floating quick actions (quote / order) */
+.admin-fab-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.2);
+  cursor: default;
+}
+.admin-fab-root {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1045;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.65rem;
+  pointer-events: none;
+}
+.admin-fab-root > * {
+  pointer-events: auto;
+}
+.admin-fab-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: min(280px, calc(100vw - 2.5rem));
+  padding: 0.35rem;
+  border-radius: 12px;
+  border: 1px solid var(--lamtek-border);
+  background: var(--lamtek-surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px) scale(0.96);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+}
+.admin-fab-root--open .admin-fab-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+.admin-fab-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--lamtek-text);
+  border: 1px solid transparent;
+}
+.admin-fab-menu-item:hover,
+.admin-fab-menu-item:focus-visible {
+  text-decoration: none;
+  background: var(--lamtek-bg);
+  border-color: var(--lamtek-border);
+}
+.admin-fab-menu-item strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.admin-fab-menu-item small {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.78rem;
+  color: var(--lamtek-text-muted, var(--lamtek-gray));
+  font-weight: 400;
+}
+.admin-fab-menu-item--quote svg {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+.admin-fab-menu-item--order svg {
+  color: var(--lamtek-gold);
+  flex-shrink: 0;
+}
+.admin-fab-trigger {
+  width: 3.25rem;
+  height: 3.25rem;
+  border: none;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--lamtek-white);
+  background: linear-gradient(145deg, var(--lamtek-gold-light), var(--lamtek-gold));
+  box-shadow: 0 6px 20px rgba(103, 39, 50, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.admin-fab-trigger:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(103, 39, 50, 0.42);
+}
+.admin-fab-root--open .admin-fab-trigger {
+  background: var(--admin-bar-bg, #141013);
+  color: var(--lamtek-on-dark, #f3f4f6);
+}
+.admin-orders-quick-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+@media (max-width: 768px) {
+  .admin-fab-root {
+    right: 0.85rem;
+    bottom: 0.85rem;
+  }
+}
+
 /* Keep bottom content visible above FAB on mobile */
 @media (max-width: 899px) {
   .ordering-page {
@@ -3125,6 +3241,68 @@ a.ordering-wizard-card--link:hover {
   border-radius: 6px;
   background: var(--lamtek-surface);
   color: var(--lamtek-text);
+}
+
+/* Complete-unit BOM (catalogue, product modal, stock take) */
+.product-assembly-breakdown-intro {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--lamtek-gray);
+}
+.product-assembly-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.product-assembly-breakdown-table th,
+.product-assembly-breakdown-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+  text-align: left;
+}
+.product-assembly-breakdown--compact .product-assembly-breakdown-table {
+  font-size: 0.85rem;
+}
+.product-assembly-editor-hint {
+  margin-bottom: 0.75rem;
+}
+.product-assembly-editor-add {
+  margin-top: 1rem;
+  padding: 1rem;
+}
+.product-assembly-editor-lines {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+.product-assembly-editor-lines li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+}
+.admin-badge--bom {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-radius: 4px;
+  background: var(--lamtek-accent-muted, #e8f4f8);
+  color: var(--lamtek-accent, #0d6b7c);
+  vertical-align: middle;
+}
+.admin-stock-bom-toggle {
+  display: block;
+  margin-top: 0.25rem;
+}
+.admin-stock-bom-row td {
+  background: var(--lamtek-surface-alt, #f8f9fa);
+  padding: 0.75rem 1rem;
 }
 
 /* Order cart */
@@ -4476,12 +4654,332 @@ a.ordering-wizard-card--link:hover {
   padding: 1.5rem;
   overflow-y: auto;
 }
+/* Portaled modals: above admin chrome; not clipped by .admin-page transform animation */
+.admin-modal-backdrop--portal {
+  z-index: 10050;
+}
 .admin-modal {
   position: relative;
   width: 100%;
   max-width: 480px;
   padding: 1.5rem;
   margin: auto;
+  flex-shrink: 0;
+}
+.admin-modal.card.admin-modal--product {
+  max-width: min(920px, 100%);
+  max-height: min(90vh, 900px);
+  margin-bottom: 0;
+  padding: 1.75rem 2rem 1.5rem;
+  padding-right: 2.75rem;
+  overflow-y: auto;
+  background: var(--lamtek-surface, #fff);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+}
+
+.admin-product-modal-detail {
+  padding-right: 0.25rem;
+}
+
+/* Categories modal (portaled to body — not under .admin-app) */
+.admin-modal-backdrop--stacked {
+  z-index: 10100;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.admin-modal-backdrop--stacked > .admin-modal--categories {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(600px, calc(100vw - 2.5rem));
+  max-width: min(600px, calc(100vw - 2.5rem));
+  max-height: min(88vh, 720px);
+  margin: 0;
+  padding: 1.75rem 2rem 1.5rem;
+  padding-right: 2.75rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--lamtek-surface, #fff);
+  border-radius: var(--lamtek-radius-lg, 12px);
+  border: 1px solid var(--lamtek-border, var(--lamtek-gray-light));
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+}
+
+.admin-modal--categories .admin-categories-modal-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  max-height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.admin-modal--categories .admin-modal-title {
+  margin: 0 0 0.65rem;
+  padding-right: 2rem;
+  font-size: 1.25rem;
+}
+
+.admin-categories-modal-context {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--lamtek-text-muted, var(--lamtek-gray));
+}
+
+.admin-categories-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.admin-modal--categories .admin-modal-form {
+  padding-right: 0;
+}
+
+.admin-categories-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+}
+
+.admin-categories-add-form .admin-modal-form-section-title {
+  margin: 0 0 0.75rem;
+}
+
+.admin-categories-add-form label {
+  display: block;
+  margin-top: 0.85rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.admin-categories-add-form label:first-of-type {
+  margin-top: 0;
+}
+
+.admin-categories-add-form input:not([type='checkbox']) {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.admin-categories-add-form .admin-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  cursor: pointer;
+}
+
+.admin-categories-add-form .admin-checkbox-label input {
+  width: auto;
+  margin-top: 0;
+}
+
+.admin-categories-add-form .btn {
+  margin-top: 1.15rem;
+  align-self: flex-start;
+}
+
+.admin-categories-slug-preview {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.admin-categories-list-section {
+  margin-bottom: 0;
+}
+
+.admin-categories-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.admin-categories-list-toolbar .admin-modal-form-section-title {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 8rem;
+}
+
+.admin-categories-search {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+  max-width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.admin-categories-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(16rem, 40vh);
+  overflow-y: auto;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--lamtek-surface, #fff) 96%, var(--lamtek-gray-light) 4%);
+}
+
+.admin-categories-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 0.15rem 0.75rem;
+  align-items: start;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+  font-size: 0.9rem;
+}
+
+.admin-categories-list-item:last-child {
+  border-bottom: none;
+}
+
+.admin-categories-list-name {
+  grid-column: 1;
+  grid-row: 1;
+  font-weight: 500;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.admin-categories-list-slug {
+  grid-column: 1;
+  grid-row: 2;
+  font-size: 0.78rem;
+  color: var(--lamtek-text-muted, var(--lamtek-gray));
+  word-break: break-all;
+}
+
+.admin-categories-list-count {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: 0.78rem;
+  color: var(--lamtek-text-muted, var(--lamtek-gray));
+  white-space: nowrap;
+  text-align: right;
+}
+
+.admin-modal--categories .admin-modal-actions {
+  flex-shrink: 0;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--lamtek-gray-light);
+}
+
+.admin-modal--categories .admin-modal-close {
+  top: 1rem;
+  right: 1rem;
+}
+
+.admin-modal--categories .admin-message-ok,
+.admin-modal--categories .admin-error {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* Product modal category controls (also portaled) */
+.admin-category-section-header {
+  margin: 0.75rem 0 0;
+}
+
+.admin-category-section-title-btn {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  padding: 0.35rem 0;
+  margin: 0.25rem 0 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.admin-category-section-title-btn:hover .admin-category-section-manage {
+  text-decoration: underline;
+  color: var(--lamtek-burgundy, #672739);
+}
+
+.admin-category-section-title {
+  margin: 0;
+}
+
+.admin-category-section-manage {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--lamtek-text-muted, var(--lamtek-gray));
+}
+
+.admin-category-section-hint {
+  font-size: 0.8rem;
+  margin: 0.35rem 0 0.65rem;
+  line-height: 1.45;
+  color: var(--lamtek-text-muted, var(--lamtek-gray));
+}
+
+.admin-category-dt-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.admin-product-modal-meta dt.admin-product-meta-categories-dt,
+.admin-product-modal-meta dd.admin-product-meta-categories {
+  align-self: start;
+}
+
+.admin-product-modal-meta dd.admin-product-meta-categories {
+  display: block;
+  padding-bottom: 0.25rem;
+}
+
+.admin-product-meta-categories-value {
+  display: block;
+  margin: 0 0 0.85rem;
+  line-height: 1.45;
+}
+
+.admin-product-meta-categories-actions {
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.admin-product-meta-categories-actions .btn {
+  display: inline-flex;
+  margin: 0;
 }
 .admin-modal-close {
   position: absolute;
@@ -4504,6 +5002,46 @@ a.ordering-wizard-card--link:hover {
 .admin-product-modal-image { margin-bottom: 1rem; }
 .admin-product-modal-image img { max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; background: var(--lamtek-gray-light); }
 .admin-product-modal-detail p { margin: 0.35rem 0; }
+.admin-product-modal-meta {
+  display: grid;
+  grid-template-columns: minmax(7rem, 10rem) 1fr;
+  gap: 0.4rem 1rem;
+  font-size: 0.9rem;
+  align-items: baseline;
+  margin: 0;
+}
+.admin-product-modal-meta dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--lamtek-gray);
+}
+.admin-product-modal-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.admin-product-modal-meta code {
+  font-size: 0.8em;
+  word-break: break-all;
+}
+.admin-product-modal-description {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.admin-product-modal-options-pre {
+  margin: 0;
+  padding: 0.75rem;
+  max-height: 240px;
+  overflow: auto;
+  background: var(--lamtek-bg);
+  border: 1px solid var(--lamtek-border);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .admin-product-modal-form label { display: block; margin-top: 0.75rem; font-weight: 500; }
 .admin-product-modal-form input:not([type="checkbox"]), .admin-product-modal-form textarea, .admin-product-modal-form select {
   width: 100%; padding: 0.5rem 0.75rem; margin-top: 0.25rem; border: 1px solid var(--lamtek-gray-light); border-radius: 6px;
@@ -4530,6 +5068,26 @@ a.ordering-wizard-card--link:hover {
 .admin-card-header h3 { margin: 0; }
 .admin-card-heading-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; }
 .admin-card-heading-row h2 { margin: 0; }
+.admin-catalogue-heading-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.admin-catalogue-scroll-arrows {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.admin-scroll-arrow--toolbar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  box-shadow: none;
+}
+.admin-scroll-arrow--toolbar:hover:not(:disabled) {
+  box-shadow: none;
+}
 .admin-table-cell-image { width: 56px; padding: 0.25rem; }
 .admin-table-cell-image img { width: 48px; height: 48px; object-fit: contain; border-radius: 4px; background: var(--lamtek-gray-light); }
 .admin-catalogue-card-cost { font-size: 0.85rem; color: var(--lamtek-gray); }
@@ -4655,6 +5213,19 @@ a.ordering-wizard-card--link:hover {
 /* Inline edit (catalogue table) */
 .admin-table-cell-editable { cursor: text; }
 .admin-table-cell-editable:hover { background: var(--lamtek-bg); }
+/* Catalogue table: long SKUs (e.g. Tealbury "CODE · Range") must wrap inside fixed column widths */
+.admin-table.admin-table--resizable td.admin-table-cell-sku {
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+.admin-table.admin-table--resizable td.admin-table-cell-sku .admin-table-cell-sku-code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
 .admin-inline-edit-input {
   width: 100%; min-width: 60px; max-width: 100%; padding: 0.25rem 0.4rem;
   font: inherit; border: 1px solid var(--lamtek-gold); border-radius: 4px; background: var(--lamtek-surface);
@@ -4725,6 +5296,75 @@ a.ordering-wizard-card--link:hover {
   -webkit-overflow-scrolling: touch;
 }
 .admin-horizontal-scroll-content { min-width: min-content; display: inline-block; }
+/* Catalogue grid/list/compact: fill card width instead of shrink-wrapping (avoids huge empty gutter). */
+.admin-horizontal-scroll-wrap.admin-horizontal-scroll-wrap--catalogue-fluid .admin-horizontal-scroll-content {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+/* Catalogue product table: horizontal scrollbar on the scroll strip (below the card) */
+.admin-horizontal-scroll-wrap--catalogue-table {
+  width: 100%;
+  max-width: 100%;
+}
+.admin-horizontal-scroll-wrap--catalogue-table .admin-catalogue-table-scroll,
+.admin-horizontal-scroll-wrap--catalogue-table .admin-horizontal-scroll-inner.admin-catalogue-table-scroll {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  /* Viewport-sized pane: vertical scroll inside the card so the horizontal bar stays on screen */
+  max-height: min(68vh, calc(100dvh - 14rem));
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--lamtek-gray) 70%, transparent) var(--lamtek-gray-light);
+  -webkit-overflow-scrolling: touch;
+}
+.admin-horizontal-scroll-wrap--catalogue-table .admin-catalogue-table-scroll::-webkit-scrollbar,
+.admin-horizontal-scroll-wrap--catalogue-table .admin-horizontal-scroll-inner.admin-catalogue-table-scroll::-webkit-scrollbar {
+  height: 14px;
+}
+.admin-horizontal-scroll-wrap--catalogue-table .admin-catalogue-table-scroll::-webkit-scrollbar-track,
+.admin-horizontal-scroll-wrap--catalogue-table .admin-horizontal-scroll-inner.admin-catalogue-table-scroll::-webkit-scrollbar-track {
+  background: var(--lamtek-gray-light);
+  border-radius: 7px;
+}
+.admin-horizontal-scroll-wrap--catalogue-table .admin-catalogue-table-scroll::-webkit-scrollbar-thumb,
+.admin-horizontal-scroll-wrap--catalogue-table .admin-horizontal-scroll-inner.admin-catalogue-table-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--lamtek-gray) 75%, var(--lamtek-black) 25%);
+  border-radius: 7px;
+  border: 2px solid var(--lamtek-gray-light);
+  min-height: 14px;
+}
+.admin-horizontal-scroll-wrap--catalogue-table .admin-horizontal-scroll-content {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+.admin-app .admin-catalogue-table-wrap.table-wrap,
+.admin-app .admin-catalogue-table-wrap.admin-table-wrap {
+  overflow: visible;
+  max-width: none;
+}
+.admin-catalogue-table-wrap .admin-catalogue-table.admin-table--resizable {
+  table-layout: fixed;
+}
+/* Narrow price/stock headers: wrap title text so columns can stay slim */
+.admin-table--resizable .admin-th.admin-th--header-wrap {
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+  vertical-align: middle;
+  hyphens: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
 /* Arrows - base circular button style */
 .admin-scroll-arrow {
   display: inline-flex;
@@ -4788,26 +5428,53 @@ a.ordering-wizard-card--link:hover {
 }
 .admin-catalogue-view-toggle button:hover { color: var(--lamtek-text); background: var(--lamtek-gray-light); }
 .admin-catalogue-view-toggle button.active { background: var(--lamtek-black); color: var(--lamtek-white); }
-.admin-catalogue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
-.admin-catalogue-grid.admin-catalogue-view--list { grid-template-columns: 1fr; max-width: 700px; }
-.admin-catalogue-grid.admin-catalogue-view--compact { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem; }
+.admin-catalogue-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  gap: 1rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.admin-catalogue-grid.admin-catalogue-view--list {
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  max-width: none;
+}
+.admin-catalogue-grid.admin-catalogue-view--compact {
+  grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
+  gap: 0.75rem;
+}
 .admin-catalogue-card {
   border: 1px solid var(--lamtek-gray-light);
   border-radius: 10px;
   padding: 1rem;
   cursor: pointer;
   transition: border-color 0.2s, box-shadow 0.2s;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
+.admin-catalogue-card-body { min-width: 0; }
 .admin-catalogue-card:hover { border-color: var(--lamtek-gold); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 .admin-catalogue-card--list { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; }
+.admin-catalogue-card--list .admin-catalogue-card-body { flex: 1; min-width: 0; }
 .admin-catalogue-card--list .admin-catalogue-card-image { width: 48px; min-width: 48px; height: 48px; }
 .admin-catalogue-card-image { aspect-ratio: 1; border-radius: 6px; background: var(--lamtek-gray-light); overflow: hidden; margin-bottom: 0.5rem; }
 .admin-catalogue-card-image img { width: 100%; height: 100%; object-fit: cover; }
 .admin-catalogue-card--list .admin-catalogue-card-image { margin-bottom: 0; }
 .admin-catalogue-card-name { font-weight: 600; margin: 0 0 0.25rem; }
-.admin-catalogue-card-sku { font-size: 0.85rem; color: var(--lamtek-gray); }
+.admin-catalogue-card-sku {
+  font-size: 0.85rem;
+  color: var(--lamtek-gray);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .admin-catalogue-card-price { font-weight: 600; margin-top: 0.35rem; }
 .admin-catalogue-card-stock { margin-top: 0.35rem; }
+.admin-catalogue-card-qty { font-size: 0.8rem; margin-top: 0.25rem; }
+.admin-catalogue-stock-qty { margin-top: 0.35rem; font-size: 0.8rem; }
+.admin-catalogue-stock-qty-value { font-weight: 600; color: var(--lamtek-text); }
 .admin-catalogue-card-stock .admin-stock-is-stock-btn { font-size: 0.75rem; padding: 0.2rem 0.4rem; min-width: auto; }
 .admin-catalogue-table-row { cursor: pointer; transition: background 0.15s; }
 .admin-catalogue-table-row:hover { background: var(--lamtek-gray-light); }
@@ -4833,6 +5500,12 @@ a.ordering-wizard-card--link:hover {
   margin: 0;
   font-size: 0.95rem;
   color: var(--lamtek-text-muted, var(--lamtek-gray));
+}
+.admin-dashboard-hero-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }
 .admin-dashboard-hero--skeleton .admin-dashboard-hero-title-skeleton,
 .admin-dashboard-hero--skeleton .admin-dashboard-hero-meta-skeleton {
@@ -5429,6 +6102,15 @@ a.ordering-wizard-card--link:hover {
 .admin-event-badge--shipment_created { background: rgba(5,150,105,0.10); border-color: rgba(5,150,105,0.20); color: var(--lamtek-text); }
 .admin-no-access { padding: 2rem; }
 .admin-no-access .admin-card { max-width: 28rem; }
+.admin-quote-workflow-card {
+  margin-bottom: 1rem;
+  border-color: color-mix(in srgb, #3b82f6 35%, var(--lamtek-border) 65%);
+  background: color-mix(in srgb, #3b82f6 6%, var(--lamtek-surface) 94%);
+}
+.admin-quote-workflow-card h2 { margin: 0 0 0.5rem; font-size: 1.05rem; }
+.admin-create-quote-linked {
+  border-color: color-mix(in srgb, #3b82f6 40%, var(--lamtek-gold) 60%);
+}
 .admin-order-actions-card { margin-bottom: 1rem; }
 .admin-order-actions-card h2 { margin: 0 0 0.75rem; }
 .admin-order-current-status { margin: 0 0 0.75rem; }

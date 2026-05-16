@@ -14,7 +14,7 @@ function parseLinkReason(raw: string | null): OrderLinkReason | null {
   return ORDER_LINK_REASONS.includes(raw as OrderLinkReason) ? (raw as OrderLinkReason) : null
 }
 
-export default function AdminCreateOrder() {
+export default function AdminCreateQuote() {
   const [searchParams] = useSearchParams()
   const preselectedCustomer = searchParams.get('customer') ?? ''
   const parentOrderParam = searchParams.get('parentOrder') ?? ''
@@ -23,6 +23,7 @@ export default function AdminCreateOrder() {
   const { staffProfile } = useStaff()
   const [customers, setCustomers] = useState<(CustomerProfileRow & { email?: string })[]>([])
   const [selectedUserId, setSelectedUserId] = useState(preselectedCustomer)
+  const [quoteReference, setQuoteReference] = useState('')
   const [parentOrder, setParentOrder] = useState<OrderRow | null>(null)
   const [parentLoadError, setParentLoadError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -68,7 +69,7 @@ export default function AdminCreateOrder() {
     }
   }, [parentOrderId, preselectedCustomer])
 
-  async function createOrder() {
+  async function createQuote() {
     if (!selectedUserId || !staffProfile) {
       setError('Select a customer and ensure you are logged in as staff.')
       return
@@ -87,7 +88,8 @@ export default function AdminCreateOrder() {
     const { data: order, error: err } = await insertStaffOrder({
       userId: selectedUserId,
       staffProfileId: staffProfile.id,
-      status: 'draft',
+      status: 'quotation',
+      reference: quoteReference.trim() || null,
       parentOrderId: parentOrderId || undefined,
       parentOrder: parentOrderId && parentOrder ? parentOrder : null,
       linkReason: linkReasonParam,
@@ -102,22 +104,22 @@ export default function AdminCreateOrder() {
   }
 
   return (
-    <div className="admin-page">
+    <div className="admin-page admin-create-quote-page">
       <div className="admin-page-header">
-        <span className="admin-breadcrumb">Create order</span>
+        <span className="admin-breadcrumb">Create quote</span>
       </div>
       <p className="page-intro">
-        One step: pick the account that will own the order. You'll go straight to order detail to add lines, pricing, delivery or collection, then save or progress status.
+        Build a quotation for a customer: add lines and pricing on the next screen, print or send the quote, then convert to a placed order when they confirm.
       </p>
 
       {parentOrderId && parentOrder && !parentLoadError && (
-        <div className="card admin-card" style={{ marginBottom: '1rem', borderColor: 'var(--lamtek-gold, #b8860b)' }}>
+        <div className="card admin-card admin-create-quote-linked" style={{ marginBottom: '1rem' }}>
           <p style={{ margin: 0 }}>
-            <strong>Follow-up order</strong> — linked to parent{' '}
+            <strong>Linked quote</strong> — related to{' '}
             <Link to={`/admin/orders/${parentOrderId}`}>
               {parentOrder.reference?.trim() || parentOrderId.slice(0, 8)}
             </Link>
-            {linkReasonParam ? ` · reason: ${linkReasonParam}` : ''}. Delivery details are copied from the parent; clear or adjust on the order page if needed.
+            {linkReasonParam ? ` · ${linkReasonParam}` : ''}. Delivery details are copied from the parent where applicable.
           </p>
         </div>
       )}
@@ -128,9 +130,9 @@ export default function AdminCreateOrder() {
       )}
 
       <div className="card admin-card admin-create-order-card">
-        <h2 style={{ marginTop: 0 }}>Who is this order for?</h2>
+        <h2 style={{ marginTop: 0 }}>Quote for which customer?</h2>
         <label className="admin-create-order-label">
-          <span className="admin-settings-label">Select customer</span>
+          <span className="admin-settings-label">Customer account</span>
           <select
             value={selectedUserId}
             onChange={(e) => setSelectedUserId(e.target.value)}
@@ -144,24 +146,41 @@ export default function AdminCreateOrder() {
             ))}
           </select>
         </label>
+        <label className="admin-create-order-label" style={{ marginTop: '1rem' }}>
+          <span className="admin-settings-label">Quote reference (optional)</span>
+          <input
+            type="text"
+            className="admin-filter-input"
+            value={quoteReference}
+            onChange={(e) => setQuoteReference(e.target.value)}
+            placeholder="e.g. Kitchen ref ABC-12, March 2026"
+            maxLength={120}
+          />
+          <p className="admin-muted" style={{ margin: '0.35rem 0 0', fontSize: '0.85rem' }}>
+            Shown on the quote printout and order list. Leave blank to use the system reference.
+          </p>
+        </label>
         {customers.length === 0 && (
-          <p className="admin-muted">No customer profiles found. Create profiles in the Customers section or ensure customers have signed up and have a profile.</p>
+          <p className="admin-muted">No customer profiles found. Add customers before creating quotes.</p>
         )}
         {error && <p className="admin-error">{error}</p>}
-        <div style={{ marginTop: '1.25rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+        <div className="admin-create-quote-actions" style={{ marginTop: '1.25rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
           <button
             type="button"
             className="btn"
-            onClick={createOrder}
+            onClick={createQuote}
             disabled={!selectedUserId || creating || (!!parentOrderId && !!parentLoadError)}
           >
-            {creating ? 'Creating…' : 'Create draft order'}
+            {creating ? 'Creating…' : 'Create quote'}
           </button>
-          <Link to="/admin/create-quote" className="btn btn-outline">
-            Create quote instead
+          <Link to="/admin/create-order" className="btn btn-outline">
+            Create order instead
           </Link>
         </div>
-        <p className="admin-muted" style={{ marginTop: '1rem' }}>After creating, you'll be taken to the order to add lines, set delivery details, and process it.</p>
+        <p className="admin-muted" style={{ marginTop: '1rem' }}>
+          After creating, add products on the quote detail page. Use <strong>Print quote</strong> for the customer.
+          When they accept, use <strong>Convert to order</strong> to move the quote to a placed order.
+        </p>
       </div>
     </div>
   )

@@ -35,10 +35,11 @@ type RecentOrder = {
 
 const WORKFLOW_ACTIONS: { heading: string; items: { to: string; label: string; Icon: LucideIcon }[] }[] = [
   {
-    heading: 'Orders',
+    heading: 'Orders & quotes',
     items: [
       { to: '/admin/orders/processing', label: 'Process orders', Icon: Zap },
-      { to: '/admin/orders', label: 'All orders', Icon: ClipboardList },
+      { to: '/admin/orders', label: 'All orders & quotes', Icon: ClipboardList },
+      { to: '/admin/create-quote', label: 'Create quote', Icon: PlusCircle },
       { to: '/admin/create-order', label: 'Create order', Icon: PlusCircle },
       { to: '/admin/pick-lists', label: 'Pick lists', Icon: ScanBarcode },
       { to: '/admin/orders/reminders', label: 'Reminders', Icon: Bell },
@@ -176,6 +177,14 @@ export default function AdminDashboard() {
           <p className="admin-dashboard-hero-lead">
             Use this as your daily workspace: process orders first, then follow up customers, then maintain stock and catalogue.
           </p>
+          <div className="admin-dashboard-hero-quick">
+            <Link to="/admin/create-quote" className="btn btn-small">
+              Quick quote
+            </Link>
+            <Link to="/admin/create-order" className="btn btn-outline btn-small">
+              Quick order
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -286,7 +295,8 @@ export default function AdminDashboard() {
           ) : (
             <div className="admin-dashboard-empty">
               <p>No orders yet.</p>
-              <Link to="/admin/create-order" className="btn">Create order for customer</Link>
+              <Link to="/admin/create-quote" className="btn">Create quote</Link>
+              <Link to="/admin/create-order" className="btn btn-outline">Create order</Link>
             </div>
           )}
         </section>

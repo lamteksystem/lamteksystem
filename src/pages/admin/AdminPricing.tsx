@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import type {
   CustomerGroupRow,
@@ -13,7 +14,7 @@ import type {
   ProductRow,
   SupplierRow,
 } from '@/types/database'
-import { resolveCustomerPrice, resolveCostPrice } from '@/lib/pricing'
+import { resolveCustomerPrice, resolveCostPrice, normalizeAccountDiscountPercent } from '@/lib/pricing'
 
 type TabId = 'segments' | 'customer-rules' | 'cost-rules' | 'collections' | 'preview'
 
@@ -78,16 +79,59 @@ export default function AdminPricing() {
     loadAll()
   }, [])
 
-  const tabs: { id: TabId; label: string }[] = [
-    { id: 'segments', label: 'Segments (groups, locations, trade & company types)' },
-    { id: 'customer-rules', label: 'Customer price rules & promotions' },
-    { id: 'cost-rules', label: 'Cost price rules' },
-    { id: 'collections', label: 'Collections (for range promotions)' },
-    { id: 'preview', label: 'Pricing preview / simulator' },
+  const tabs: { id: TabId; label: string; title: string }[] = [
+    {
+      id: 'segments',
+      label: 'Segments',
+      title: 'Maintain the lists used on each customer record (group, region, trade type, legal structure).',
+
+    },
+    {
+      id: 'customer-rules',
+      label: 'Sell price rules',
+      title:
+        'Discounts, mark-ups and fixed sell overrides. Rules match customers when every segment field you set on the rule equals that customer’s profile (blank on the rule means “any”).',
+
+    },
+    {
+      id: 'cost-rules',
+      label: 'Cost rules',
+      title:
+        'How landed cost is derived for margin (fixed cost, % of sell, or markup on catalogue cost). Does not change what the customer pays unless you also use sell rules.',
+
+    },
+    {
+      id: 'collections',
+      label: 'Collections',
+      title: 'Product ranges for promotions—reference collection IDs in sell rules or the preview simulator.',
+
+    },
+    {
+      id: 'preview',
+      label: 'Preview',
+      title:
+        'Dry-run sell price, resolved cost and unit margin for one customer and SKU using current catalogue prices and active rules.',
+
+    },
   ]
 
   return (
     <div className="admin-page">
+      <p className="page-intro">
+        Use these tabs to maintain <strong>segment lookups</strong>, <strong>sell-side discounts and promotions</strong>,{' '}
+        <strong>cost assumptions for margin</strong>, and to <strong>preview</strong> effective prices.
+        Most discounts come from <strong>sell price rules</strong> when a customer’s segment matches.
+        You can also set an extra <strong>account discount %</strong> on each customer profile (applied after those rules).
+        On <strong>Order detail</strong> you can override per order, auto-apply when adding lines, or use <strong>Apply customer pricing to all lines</strong> (see Settings → Advanced for your default).
+      </p>
+      <p className="admin-muted" style={{ marginTop: '-0.75rem', marginBottom: '1rem' }}>
+        <strong>Where to assign a customer:</strong>{' '}
+        <Link to="/admin/customers">Customers</Link> → open the account → under <strong>Profile</strong>, set{' '}
+        <em>Pricing segment</em> (group, location, trade type, company type), optional <strong>account discount %</strong>, and{' '}
+        <strong>Payment terms</strong> (shown on quotes/invoices).
+        Manage the lists of groups/regions/types here under <strong>Segments</strong>; manage percentages and promos under{' '}
+        <strong>Sell price rules</strong>.
+      </p>
       <div className="admin-pricing-tabs">
         {tabs.map((t) => (
           <button
@@ -95,6 +139,7 @@ export default function AdminPricing() {
             type="button"
             className={`admin-pricing-tab ${tab === t.id ? 'active' : ''}`}
             onClick={() => setTab(t.id)}
+            title={t.title}
           >
             {t.label}
           </button>
@@ -185,16 +230,53 @@ function SegmentsSection({
 }) {
   return (
     <div className="admin-pricing-segments">
-      <SegmentTable title="Customer groups" rows={groups} slugKey="slug" onUpdate={onReload} onMessage={onMessage} table="customer_groups" />
-      <SegmentTable title="Customer locations" rows={locations} slugKey="slug" onUpdate={onReload} onMessage={onMessage} table="customer_locations" />
-      <SegmentTable title="Trade types (e.g. Kitchen Fitter, Retailer)" rows={tradeTypes} slugKey="slug" onUpdate={onReload} onMessage={onMessage} table="trade_types" />
-      <SegmentTable title="Company types (e.g. Ltd, Sole Trader)" rows={companyTypes} slugKey="slug" onUpdate={onReload} onMessage={onMessage} table="company_types" />
+      <p className="admin-muted" style={{ gridColumn: '1 / -1', marginBottom: '0.25rem' }}>
+        Each row is a choice you can assign on a customer profile. Rules in <strong>Sell price rules</strong> reference these values;
+        leave a segment blank on the rule to mean “match any customer regardless of that field”.
+      </p>
+      <SegmentTable
+        title="Customer groups"
+        subtitle="Pricing tier or channel (e.g. Gold trade, National account). One group per customer."
+        rows={groups}
+        slugKey="slug"
+        onUpdate={onReload}
+        onMessage={onMessage}
+        table="customer_groups"
+      />
+      <SegmentTable
+        title="Customer locations"
+        subtitle="Commercial region or branch label used for regional pricing (not the same as depot stock locations)."
+        rows={locations}
+        slugKey="slug"
+        onUpdate={onReload}
+        onMessage={onMessage}
+        table="customer_locations"
+      />
+      <SegmentTable
+        title="Trade types"
+        subtitle="What they do (e.g. Kitchen fitter, Retailer). Helps target trade-specific discounts."
+        rows={tradeTypes}
+        slugKey="slug"
+        onUpdate={onReload}
+        onMessage={onMessage}
+        table="trade_types"
+      />
+      <SegmentTable
+        title="Company types"
+        subtitle="Legal shape (e.g. Ltd, Sole trader). Optional filter for differentiated pricing."
+        rows={companyTypes}
+        slugKey="slug"
+        onUpdate={onReload}
+        onMessage={onMessage}
+        table="company_types"
+      />
     </div>
   )
 }
 
 function SegmentTable({
   title,
+  subtitle,
   rows,
   slugKey,
   onUpdate,
@@ -202,6 +284,7 @@ function SegmentTable({
   table,
 }: {
   title: string
+  subtitle?: string
   rows: { id: string; name: string; slug?: string; code?: string | null; description?: string | null; sort_order: number }[]
   slugKey: string
   onUpdate: () => void
@@ -236,7 +319,8 @@ function SegmentTable({
 
   return (
     <div className="card admin-card admin-segment-card">
-      <h3>{title}</h3>
+      <h3 title={subtitle}>{title}</h3>
+      {subtitle ? <p className="admin-muted" style={{ marginTop: '-0.35rem', marginBottom: '0.65rem', fontSize: '0.875rem' }}>{subtitle}</p> : null}
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -420,10 +504,15 @@ function CustomerRulesSection({
   return (
     <div className="card admin-card">
       <div className="admin-card-header">
-        <h3>Customer price rules & promotions</h3>
+        <h3>Customer price rules &amp; promotions</h3>
         <button type="button" className="btn btn-small" onClick={openAdd}>Add rule</button>
       </div>
-      <p className="admin-muted">Rules apply by customer segment (group, location, trade type, company type). Use scope to target all products, a category, a product, or a collection. Set valid dates and min order for promotions (e.g. &quot;Extra 10% off XYZ range in March, orders over £1500&quot;).</p>
+      <p className="admin-muted">
+        These rules drive <strong>sell price</strong> (discount %, markup %, or fixed £ override) after catalogue list prices.
+        A rule applies only if each segment you fill in matches the customer’s profile—for example group <em>and</em> trade type must both match when both are set.
+        Use <strong>Scope</strong> to limit the rule to all products, one category, one SKU, or a collection. Use dates and minimum order value for time-bound promos.
+        An optional <strong>account discount %</strong> on the customer profile (Customers → profile) is applied <em>after</em> every matching rule here.
+      </p>
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -477,21 +566,46 @@ function CustomerRulesSection({
                 <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="e.g. March XYZ range promo" />
               </div>
               <div className="admin-modal-form-section">
-                <h4 className="admin-modal-form-section-title">Segment (leave empty = any)</h4>
+                <h4
+                  className="admin-modal-form-section-title"
+                  title="Blank dropdowns mean ‘don’t filter on this field’. To target one customer cohort, set only the segments that matter and leave the rest blank."
+                >
+                  Segment (leave empty = match any)
+                </h4>
+                <p className="admin-muted" style={{ margin: '0 0 0.5rem', fontSize: '0.8rem' }}>
+                  Must match the customer’s profile fields on{' '}
+                  <Link to="/admin/customers">Customers</Link> for each dropdown you set. Narrower combinations reach fewer accounts.
+                </p>
                 <div className="admin-modal-form-row admin-form-row--multi">
-                  <select value={form.customer_group_id} onChange={(e) => setForm((f) => ({ ...f, customer_group_id: e.target.value }))}>
+                  <select
+                    title="Customer group from their profile. Blank = any group."
+                    value={form.customer_group_id}
+                    onChange={(e) => setForm((f) => ({ ...f, customer_group_id: e.target.value }))}
+                  >
                     <option value="">Any group</option>
                     {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
-                  <select value={form.customer_location_id} onChange={(e) => setForm((f) => ({ ...f, customer_location_id: e.target.value }))}>
+                  <select
+                    title="Customer location / region segment from their profile. Blank = any."
+                    value={form.customer_location_id}
+                    onChange={(e) => setForm((f) => ({ ...f, customer_location_id: e.target.value }))}
+                  >
                     <option value="">Any location</option>
                     {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
-                  <select value={form.trade_type_id} onChange={(e) => setForm((f) => ({ ...f, trade_type_id: e.target.value }))}>
+                  <select
+                    title="Trade type from their profile. Blank = any."
+                    value={form.trade_type_id}
+                    onChange={(e) => setForm((f) => ({ ...f, trade_type_id: e.target.value }))}
+                  >
                     <option value="">Any trade</option>
                     {tradeTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
-                  <select value={form.company_type_id} onChange={(e) => setForm((f) => ({ ...f, company_type_id: e.target.value }))}>
+                  <select
+                    title="Company type from their profile. Blank = any."
+                    value={form.company_type_id}
+                    onChange={(e) => setForm((f) => ({ ...f, company_type_id: e.target.value }))}
+                  >
                     <option value="">Any company type</option>
                     {companyTypes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
@@ -527,14 +641,26 @@ function CustomerRulesSection({
               </div>
               <div className="admin-modal-form-section">
                 <h4 className="admin-modal-form-section-title">Rule effect</h4>
-                <label>Rule type</label>
-                <select value={form.rule_type} onChange={(e) => setForm((f) => ({ ...f, rule_type: e.target.value as typeof form.rule_type }))}>
+                <label title="How this rule adjusts the catalogue unit price when segment and scope match.">Rule type</label>
+                <select
+                  title="Discount reduces sell price; markup increases it; fixed override replaces list price for matched lines."
+                  value={form.rule_type}
+                  onChange={(e) => setForm((f) => ({ ...f, rule_type: e.target.value as typeof form.rule_type }))}
+                >
                   <option value="percentage_discount">Percentage discount (%)</option>
                   <option value="percentage_markup">Percentage markup (%)</option>
                   <option value="fixed_price_override">Fixed price override (£)</option>
                 </select>
-                <label>Value ({form.rule_type === 'fixed_price_override' ? '£' : '%'})</label>
-                <input type="number" step={form.rule_type === 'fixed_price_override' ? '0.01' : '0.1'} value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))} required />
+                <label title={form.rule_type === 'fixed_price_override' ? 'New sell price ex VAT for matched lines.' : 'Percentage applied to list price (discount subtracts, markup adds).'}>
+                  Value ({form.rule_type === 'fixed_price_override' ? '£' : '%'})
+                </label>
+                <input
+                  type="number"
+                  step={form.rule_type === 'fixed_price_override' ? '0.01' : '0.1'}
+                  value={form.value}
+                  onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
+                  required
+                />
               </div>
               <div className="admin-modal-form-section">
                 <h4 className="admin-modal-form-section-title">Promotion constraints (optional)</h4>
@@ -547,7 +673,9 @@ function CustomerRulesSection({
               </div>
               <div className="admin-modal-form-section">
                 <h4 className="admin-modal-form-section-title">Priority &amp; status</h4>
-                <label>Priority (higher = applied first)</label>
+                <label title="When multiple rules match, higher numbers run first; later rules compound or override depending on engine behaviour—keep important promos higher.">
+                  Priority (higher = applied first)
+                </label>
                 <input type="number" value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))} />
                 <label className="admin-checkbox-label"><input type="checkbox" checked={form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} /> Active</label>
               </div>
@@ -680,7 +808,10 @@ function CostRulesSection({
         <h3>Cost price rules</h3>
         <button type="button" className="btn btn-small" onClick={openAdd}>Add rule</button>
       </div>
-      <p className="admin-muted">Override or compute cost by supplier, category or product. Rule types: fixed cost (£), percentage of sell price (%), markup on cost (%).</p>
+      <p className="admin-muted">
+        Used for <strong>margin reporting</strong> and preview: resolved cost per unit after these rules. Typical pattern is fixed supplier cost or markup on catalogue cost.
+        <strong> Percentage of sell</strong> ties cost to whatever sell price was resolved (including customer discounts).
+      </p>
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -753,13 +884,17 @@ function CostRulesSection({
               </div>
               <div className="admin-modal-form-section">
                 <h4 className="admin-modal-form-section-title">Rule effect</h4>
-                <label>Rule type</label>
-                <select value={form.rule_type} onChange={(e) => setForm((f) => ({ ...f, rule_type: e.target.value as typeof form.rule_type }))}>
+                <label title="Fixed £ cost, margin as % of resolved sell, or % markup starting from catalogue cost.">Rule type</label>
+                <select
+                  title="fixed_cost: absolute £; percentage_of_sell: margin tied to sell; markup_on_cost: adds % to base cost."
+                  value={form.rule_type}
+                  onChange={(e) => setForm((f) => ({ ...f, rule_type: e.target.value as typeof form.rule_type }))}
+                >
                   <option value="fixed_cost">Fixed cost (£)</option>
                   <option value="percentage_of_sell">% of sell price</option>
                   <option value="markup_on_cost">Markup on cost (%)</option>
                 </select>
-                <label>Value</label>
+                <label title="Numeric parameter for the rule type above (£ or % depending on type).">Value</label>
                 <input type="number" step="0.01" value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))} required />
               </div>
               <div className="admin-modal-form-section">
@@ -839,6 +974,7 @@ function PricingPreviewSection({
         },
         orderTotalExVat: Number(orderTotalExVat || 0),
         collectionIds: collectionIds.length > 0 ? collectionIds : undefined,
+        accountDiscountPercent: normalizeAccountDiscountPercent(customer.account_discount_percent),
       })
       const resolvedCost = await resolveCostPrice({
         productId: product.id,
@@ -864,10 +1000,10 @@ function PricingPreviewSection({
     <div className="card admin-card">
       <h3>Pricing preview / simulator</h3>
       <p className="admin-muted">
-        Select a customer and product to preview effective sell price, resolved cost, and margin using active pricing rules.
+        Uses the selected customer’s <strong>pricing segment</strong>, optional <strong>account discount %</strong>, and active rules to show list vs resolved sell, resolved cost, and unit margin.
       </p>
       <form onSubmit={runPreview} className="admin-inline-form--stack">
-        <label>
+        <label title="Customer profile supplies group, location, trade type and company type into the pricing engine.">
           Customer{' '}
           <select value={customerUserId} onChange={(e) => setCustomerUserId(e.target.value)}>
             <option value="">Select customer</option>
@@ -876,7 +1012,7 @@ function PricingPreviewSection({
             ))}
           </select>
         </label>
-        <label>
+        <label title="Catalogue list price and category drive base sell and which rules apply.">
           Product{' '}
           <select value={productId} onChange={(e) => setProductId(e.target.value)}>
             <option value="">Select product</option>
@@ -885,11 +1021,11 @@ function PricingPreviewSection({
             ))}
           </select>
         </label>
-        <label>
+        <label title="Some promotions require a minimum basket ex VAT—enter the hypothetical order total to test that gate.">
           Order total ex VAT{' '}
           <input type="number" step="0.01" value={orderTotalExVat} onChange={(e) => setOrderTotalExVat(e.target.value)} />
         </label>
-        <label>
+        <label title="If the product belongs to collections, pass those UUIDs so collection-scoped rules can match (see Collections tab for IDs).">
           Collection IDs (comma-separated){' '}
           <input type="text" value={collectionIdsText} onChange={(e) => setCollectionIdsText(e.target.value)} placeholder="Optional" />
         </label>
@@ -907,19 +1043,19 @@ function PricingPreviewSection({
       {result && (
         <ul className="admin-report-list" style={{ marginTop: '0.75rem' }}>
           <li className="admin-report-list-item">
-            <span className="admin-report-list-label">Base sell price</span>
+            <span className="admin-report-list-label" title="Unit list price from the product catalogue before customer rules.">Base sell price</span>
             <span className="admin-report-list-value">£{result.baseSell.toFixed(2)}</span>
           </li>
           <li className="admin-report-list-item">
-            <span className="admin-report-list-label">Resolved sell price</span>
+            <span className="admin-report-list-label" title="Sell price after applying matching customer price rules.">Resolved sell price</span>
             <span className="admin-report-list-value">£{result.resolvedSell.toFixed(2)}</span>
           </li>
           <li className="admin-report-list-item">
-            <span className="admin-report-list-label">Resolved cost</span>
+            <span className="admin-report-list-label" title="Unit cost from cost rules (may use catalogue cost as input).">Resolved cost</span>
             <span className="admin-report-list-value">{result.resolvedCost != null ? `£${result.resolvedCost.toFixed(2)}` : '—'}</span>
           </li>
           <li className="admin-report-list-item">
-            <span className="admin-report-list-label">Unit margin</span>
+            <span className="admin-report-list-label" title="Resolved sell minus resolved cost for one unit (ex VAT figures).">Unit margin</span>
             <span className="admin-report-list-value">{result.margin != null ? `£${result.margin.toFixed(2)}` : '—'}</span>
           </li>
         </ul>

@@ -198,6 +198,17 @@
     0 0 0 1px rgba(255, 255, 255, 0.72) inset;
   overflow: hidden;
 }
+/* Catalogue table: scroll lives on .admin-catalogue-table-scroll; do not clip wide table */
+.admin-app .admin-catalogue-table-wrap.table-wrap,
+.admin-app .admin-catalogue-table-wrap.admin-table-wrap {
+  overflow: visible;
+  max-width: none;
+}
+.admin-app .admin-catalogue-table-scroll {
+  overflow: auto;
+  max-width: 100%;
+  max-height: min(68vh, calc(100dvh - 14rem));
+}
 
 .admin-app .admin-table thead th {
   background: linear-gradient(
@@ -468,4 +479,116 @@
   .admin-app .admin-dashboard {
     animation: none;
   }
+}
+
+/* Staff support manual */
+.admin-app .admin-staff-manual-page .staff-manual {
+  max-width: 52rem;
+  padding: 1.25rem 1.5rem 2rem;
+  line-height: 1.55;
+}
+
+.admin-app .staff-manual-h1 {
+  font-size: 1.5rem;
+  margin: 0 0 0.75rem;
+}
+
+.admin-app .staff-manual-h2 {
+  font-size: 1.15rem;
+  margin: 1.5rem 0 0.5rem;
+  scroll-margin-top: 5rem;
+}
+
+.admin-app .staff-manual-h3 {
+  font-size: 1rem;
+  margin: 1rem 0 0.35rem;
+}
+
+.admin-app .staff-manual-p {
+  margin: 0.5rem 0;
+}
+
+.admin-app .staff-manual-list {
+  margin: 0.5rem 0 0.75rem 1.25rem;
+}
+
+.admin-app .staff-manual-hr {
+  margin: 1.25rem 0;
+  border: none;
+  border-top: 1px solid var(--lamtek-border);
+}
+
+.admin-app .staff-manual-pre {
+  overflow-x: auto;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--lamtek-bg) 92%, var(--lamtek-text) 8%);
+  font-size: 0.85rem;
+}
+
+.admin-app .staff-manual-table-wrap {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+
+.admin-app .staff-manual-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.admin-app .staff-manual-table th,
+.admin-app .staff-manual-table td {
+  border: 1px solid var(--lamtek-border);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-app .staff-manual-table th {
+  background: color-mix(in srgb, var(--lamtek-surface) 88%, var(--lamtek-gold) 12%);
+}
+
+/* Product multi-category editor */
+.admin-app .product-category-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 12rem;
+}
+
+.admin-app .product-category-multi--compact .product-category-multi-checks {
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.admin-app .product-category-multi-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.admin-app .product-category-multi-primary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.admin-app .product-category-multi-primary-label {
+  color: var(--lamtek-text-muted);
+}
+
+.admin-app .admin-table-cell-categories {
+  min-width: 11rem;
+  vertical-align: top;
+}
+
+.admin-app .product-category-inline-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
 }

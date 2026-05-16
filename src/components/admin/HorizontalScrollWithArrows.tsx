@@ -1,150 +1,256 @@
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { forwardRef, useRef, useState, useEffect, useCallback, useImperativeHandle } from 'react'
 
 const ARROW_SCROLL_AMOUNT = 280
 const AUTOSCROLL_SPEED_PX_PER_MS = 0.2
 
 type ScrollDirection = 'left' | 'right' | null
 
+export type HorizontalScrollState = {
+  canScrollLeft: boolean
+  canScrollRight: boolean
+}
+
+export type HorizontalScrollHandle = {
+  scrollLeft: () => void
+  scrollRight: () => void
+  getScrollState: () => HorizontalScrollState
+}
+
 interface HorizontalScrollWithArrowsProps {
   children: React.ReactNode
   className?: string
+  /** Extra classes on the element that actually scrolls horizontally */
+  innerClassName?: string
+  /** Applied to the content wrapper (e.g. minWidth matching table column sum) */
+  contentStyle?: React.CSSProperties
+  /** Fixed viewport arrows (default true). Set false when using toolbar arrows. */
+  fixedArrows?: boolean
+  /** Called when horizontal scroll limits change (for toolbar buttons). */
+  onScrollStateChange?: (state: HorizontalScrollState) => void
 }
 
-export function HorizontalScrollWithArrows({ children, className = '' }: HorizontalScrollWithArrowsProps) {
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [scrollDirection, setScrollDirection] = useState<ScrollDirection>(null)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(false)
-  const [arrowsVisible, setArrowsVisible] = useState(false)
-  const rafRef = useRef<number | null>(null)
-  const lastTickRef = useRef<number>(0)
+export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, HorizontalScrollWithArrowsProps>(
+  function HorizontalScrollWithArrows(
+    {
+      children,
+      className = '',
+      innerClassName = '',
+      contentStyle,
+      fixedArrows = true,
+      onScrollStateChange,
+    },
+    ref
+  ) {
+    const wrapRef = useRef<HTMLDivElement>(null)
+    const scrollRef = useRef<HTMLDivElement>(null)
+    const [scrollDirection, setScrollDirection] = useState<ScrollDirection>(null)
+    const [canScrollLeft, setCanScrollLeft] = useState(false)
+    const [canScrollRight, setCanScrollRight] = useState(false)
+    const [arrowsVisible, setArrowsVisible] = useState(false)
+    const rafRef = useRef<number | null>(null)
+    const lastTickRef = useRef<number>(0)
 
-  const updateScrollState = useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const { scrollLeft, scrollWidth, clientWidth } = el
-    setCanScrollLeft(scrollLeft > 2)
-    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 2)
-  }, [])
+    const updateScrollState = useCallback(() => {
+      const el = scrollRef.current
+      if (!el) return
+      const { scrollLeft, scrollWidth, clientWidth } = el
+      const left = scrollLeft > 2
+      const right = scrollLeft < scrollWidth - clientWidth - 2
+      setCanScrollLeft(left)
+      setCanScrollRight(right)
+      onScrollStateChange?.({ canScrollLeft: left, canScrollRight: right })
+    }, [onScrollStateChange])
 
-  const updateArrowsVisible = useCallback(() => {
-    const wrap = wrapRef.current
-    if (!wrap) return
-    const rect = wrap.getBoundingClientRect()
-    const vh = window.innerHeight
-    setArrowsVisible(rect.top < vh && rect.bottom > 0 && rect.width > 0 && rect.height > 0)
-  }, [])
+    const updateArrowsVisible = useCallback(() => {
+      const wrap = wrapRef.current
+      if (!wrap) return
+      const rect = wrap.getBoundingClientRect()
+      const vh = window.innerHeight
+      setArrowsVisible(rect.top < vh && rect.bottom > 0 && rect.width > 0 && rect.height > 0)
+    }, [])
 
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    updateScrollState()
-    const obs = new ResizeObserver(updateScrollState)
-    obs.observe(el)
-    el.addEventListener('scroll', updateScrollState)
-    return () => {
-      obs.disconnect()
-      el.removeEventListener('scroll', updateScrollState)
-    }
-  }, [updateScrollState, children])
+    const scrollLeftFn = useCallback(() => {
+      const el = scrollRef.current
+      if (el) {
+        el.scrollLeft = Math.max(0, el.scrollLeft - ARROW_SCROLL_AMOUNT)
+        updateScrollState()
+      }
+    }, [updateScrollState])
 
-  useEffect(() => {
-    updateArrowsVisible()
-    const wrap = wrapRef.current
-    if (!wrap) return
-    const obs = new ResizeObserver(updateArrowsVisible)
-    obs.observe(wrap)
-    window.addEventListener('scroll', updateArrowsVisible, true)
-    window.addEventListener('resize', updateArrowsVisible)
-    const interval = setInterval(updateArrowsVisible, 150)
-    return () => {
-      obs.disconnect()
-      window.removeEventListener('scroll', updateArrowsVisible, true)
-      window.removeEventListener('resize', updateArrowsVisible)
-      clearInterval(interval)
-    }
-  }, [updateArrowsVisible])
+    const scrollRightFn = useCallback(() => {
+      const el = scrollRef.current
+      if (el) {
+        const max = el.scrollWidth - el.clientWidth
+        el.scrollLeft = Math.min(max, el.scrollLeft + ARROW_SCROLL_AMOUNT)
+        updateScrollState()
+      }
+    }, [updateScrollState])
 
-  useEffect(() => {
-    if (scrollDirection === null) return
-    const el = scrollRef.current
-    if (!el) return
+    useImperativeHandle(
+      ref,
+      () => ({
+        scrollLeft: scrollLeftFn,
+        scrollRight: scrollRightFn,
+        getScrollState: () => ({ canScrollLeft, canScrollRight }),
+      }),
+      [scrollLeftFn, scrollRightFn, canScrollLeft, canScrollRight]
+    )
 
-    lastTickRef.current = performance.now()
+    useEffect(() => {
+      const el = scrollRef.current
+      if (!el) return
+      updateScrollState()
+      const obs = new ResizeObserver(updateScrollState)
+      obs.observe(el)
+      el.addEventListener('scroll', updateScrollState)
+      return () => {
+        obs.disconnect()
+        el.removeEventListener('scroll', updateScrollState)
+      }
+    }, [updateScrollState, children])
 
-    function tick(now: number) {
-      const scrollEl = scrollRef.current
-      if (!scrollEl || scrollEl !== el) return
-      const dt = Math.min(now - lastTickRef.current, 50)
-      lastTickRef.current = now
+    useEffect(() => {
+      if (!fixedArrows) return
+      updateArrowsVisible()
+      const wrap = wrapRef.current
+      if (!wrap) return
+      const obs = new ResizeObserver(updateArrowsVisible)
+      obs.observe(wrap)
+      window.addEventListener('scroll', updateArrowsVisible, true)
+      window.addEventListener('resize', updateArrowsVisible)
+      const interval = setInterval(updateArrowsVisible, 150)
+      return () => {
+        obs.disconnect()
+        window.removeEventListener('scroll', updateArrowsVisible, true)
+        window.removeEventListener('resize', updateArrowsVisible)
+        clearInterval(interval)
+      }
+    }, [updateArrowsVisible, fixedArrows])
 
-      const max = el.scrollWidth - el.clientWidth
-      if (scrollDirection === 'left') {
-        const move = -AUTOSCROLL_SPEED_PX_PER_MS * dt
-        el.scrollLeft = Math.max(0, el.scrollLeft + move)
-        if (el.scrollLeft <= 0) setScrollDirection(null)
-      } else if (scrollDirection === 'right') {
-        const move = AUTOSCROLL_SPEED_PX_PER_MS * dt
-        el.scrollLeft = Math.min(max, el.scrollLeft + move)
-        if (el.scrollLeft >= max - 1) setScrollDirection(null)
+    useEffect(() => {
+      if (scrollDirection === null) return
+      const el = scrollRef.current
+      if (!el) return
+
+      lastTickRef.current = performance.now()
+
+      function tick(now: number) {
+        const scrollEl = scrollRef.current
+        if (!scrollEl || scrollEl !== el) return
+        const dt = Math.min(now - lastTickRef.current, 50)
+        lastTickRef.current = now
+
+        const max = el.scrollWidth - el.clientWidth
+        if (scrollDirection === 'left') {
+          const move = -AUTOSCROLL_SPEED_PX_PER_MS * dt
+          el.scrollLeft = Math.max(0, el.scrollLeft + move)
+          if (el.scrollLeft <= 0) setScrollDirection(null)
+        } else if (scrollDirection === 'right') {
+          const move = AUTOSCROLL_SPEED_PX_PER_MS * dt
+          el.scrollLeft = Math.min(max, el.scrollLeft + move)
+          if (el.scrollLeft >= max - 1) setScrollDirection(null)
+        }
+        updateScrollState()
+        rafRef.current = requestAnimationFrame(tick)
       }
       rafRef.current = requestAnimationFrame(tick)
-    }
-    rafRef.current = requestAnimationFrame(tick)
-    return () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
-    }
-  }, [scrollDirection])
+      return () => {
+        if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+      }
+    }, [scrollDirection, updateScrollState])
 
-  const scrollLeftFn = useCallback(() => {
-    const el = scrollRef.current
-    if (el) {
-      el.scrollLeft = Math.max(0, el.scrollLeft - ARROW_SCROLL_AMOUNT)
-      updateScrollState()
-    }
-  }, [updateScrollState])
-
-  const scrollRightFn = useCallback(() => {
-    const el = scrollRef.current
-    if (el) {
-      const max = el.scrollWidth - el.clientWidth
-      el.scrollLeft = Math.min(max, el.scrollLeft + ARROW_SCROLL_AMOUNT)
-      updateScrollState()
-    }
-  }, [updateScrollState])
-
-  return (
-    <div ref={wrapRef} className={`admin-horizontal-scroll-wrap ${className}`}>
-      <div ref={scrollRef} className="admin-horizontal-scroll-inner">
-        <div className="admin-horizontal-scroll-content">
-          {children}
+    return (
+      <div className={`admin-horizontal-scroll-wrap ${className}`} ref={wrapRef}>
+        <div
+          ref={scrollRef}
+          className={`admin-horizontal-scroll-inner${innerClassName ? ` ${innerClassName}` : ''}`}
+        >
+          <div className="admin-horizontal-scroll-content" style={contentStyle}>
+            {children}
+          </div>
         </div>
+        {fixedArrows ? (
+          <>
+            <button
+              type="button"
+              className="admin-scroll-arrow admin-scroll-arrow--left admin-scroll-arrow--fixed"
+              style={{ visibility: arrowsVisible ? 'visible' : 'hidden' }}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                scrollLeftFn()
+              }}
+              onMouseEnter={() => setScrollDirection('left')}
+              onMouseLeave={() => setScrollDirection(null)}
+              disabled={!canScrollLeft}
+              title="Scroll left (or hover to auto-scroll)"
+              aria-label="Scroll left"
+            >
+              <ChevronLeftIcon />
+            </button>
+            <button
+              type="button"
+              className="admin-scroll-arrow admin-scroll-arrow--right admin-scroll-arrow--fixed"
+              style={{ visibility: arrowsVisible ? 'visible' : 'hidden' }}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                scrollRightFn()
+              }}
+              onMouseEnter={() => setScrollDirection('right')}
+              onMouseLeave={() => setScrollDirection(null)}
+              disabled={!canScrollRight}
+              title="Scroll right (or hover to auto-scroll)"
+              aria-label="Scroll right"
+            >
+              <ChevronRightIcon />
+            </button>
+          </>
+        ) : null}
       </div>
-      {/* Fixed to viewport (always same position on screen); visible only when table is in view */}
+    )
+  }
+)
+
+/** Toolbar left/right buttons matching catalogue column-settings styling. */
+export function HorizontalScrollToolbarArrows({
+  canScrollLeft,
+  canScrollRight,
+  onScrollLeft,
+  onScrollRight,
+  className = '',
+}: {
+  canScrollLeft: boolean
+  canScrollRight: boolean
+  onScrollLeft: () => void
+  onScrollRight: () => void
+  className?: string
+}) {
+  return (
+    <div className={`admin-catalogue-scroll-arrows ${className}`.trim()} role="group" aria-label="Scroll table horizontally">
       <button
         type="button"
-        className="admin-scroll-arrow admin-scroll-arrow--left admin-scroll-arrow--fixed"
-        style={{ visibility: arrowsVisible ? 'visible' : 'hidden' }}
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); scrollLeftFn(); }}
-        onMouseEnter={() => setScrollDirection('left')}
-        onMouseLeave={() => setScrollDirection(null)}
+        className="admin-scroll-arrow admin-scroll-arrow--toolbar"
+        onClick={(e) => {
+          e.preventDefault()
+          onScrollLeft()
+        }}
         disabled={!canScrollLeft}
-        title="Scroll left (or hover to auto-scroll)"
-        aria-label="Scroll left"
+        title="Scroll table left"
+        aria-label="Scroll table left"
       >
         <ChevronLeftIcon />
       </button>
       <button
         type="button"
-        className="admin-scroll-arrow admin-scroll-arrow--right admin-scroll-arrow--fixed"
-        style={{ visibility: arrowsVisible ? 'visible' : 'hidden' }}
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); scrollRightFn(); }}
-        onMouseEnter={() => setScrollDirection('right')}
-        onMouseLeave={() => setScrollDirection(null)}
+        className="admin-scroll-arrow admin-scroll-arrow--toolbar"
+        onClick={(e) => {
+          e.preventDefault()
+          onScrollRight()
+        }}
         disabled={!canScrollRight}
-        title="Scroll right (or hover to auto-scroll)"
-        aria-label="Scroll right"
+        title="Scroll table right"
+        aria-label="Scroll table right"
       >
         <ChevronRightIcon />
       </button>

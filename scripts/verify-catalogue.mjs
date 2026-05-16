@@ -53,12 +53,30 @@ async function sampleVisibilityAsAnon() {
   return count
 }
 
+/** Product counts per Lamtek category name (joined from categories). */
+async function lamtekCountsByCategoryName() {
+  const { data: products, error } = await supabase.from('products').select('category_id').eq('catalog_program', 'lamtek')
+  if (error) throw error
+  const ids = [...new Set((products || []).map((p) => p.category_id).filter(Boolean))]
+  if (!ids.length) return new Map()
+  const { data: cats, error: cErr } = await supabase.from('categories').select('id, name').in('id', ids)
+  if (cErr) throw cErr
+  const byId = new Map((cats || []).map((c) => [c.id, c.name]))
+  const counts = new Map()
+  for (const p of products || []) {
+    const n = byId.get(p.category_id) || '?'
+    counts.set(n, (counts.get(n) || 0) + 1)
+  }
+  return counts
+}
+
 const lamtekCount = await countByProgram('lamtek')
 const tealburyCount = await countByProgram('tealbury')
 const lamtekCats = await categoriesFor('lamtek-')
 const tealburyCats = await categoriesFor('tealbury-')
 const ranges = await doorRangesForTealbury()
 const anonVisible = await sampleVisibilityAsAnon()
+const lamtekByCat = await lamtekCountsByCategoryName()
 
 console.log('--- Catalogue summary ---')
 console.log('Lamtek products:   ', lamtekCount)
@@ -66,6 +84,12 @@ console.log('Tealbury products: ', tealburyCount)
 console.log('Total active rows visible to anon (RLS allowing): ', anonVisible)
 console.log('\nLamtek categories:', lamtekCats.length)
 lamtekCats.slice(0, 12).forEach((c) => console.log('  -', c.name, `[${c.slug}]`))
+if (lamtekCats.length > 12) console.log(`  … and ${lamtekCats.length - 12} more`)
+
+console.log('\nLamtek products by category (top 20 by count):')
+const lamtekSorted = [...lamtekByCat.entries()].sort((a, b) => b[1] - a[1])
+lamtekSorted.slice(0, 20).forEach(([name, n]) => console.log(`  ${String(n).padStart(4)}  ${name}`))
+if (lamtekSorted.length > 20) console.log(`  … and ${lamtekSorted.length - 20} more category rows`)
 console.log('\nTealbury categories:', tealburyCats.length)
 tealburyCats.slice(0, 12).forEach((c) => console.log('  -', c.name, `[${c.slug}]`))
 console.log('\nTealbury door ranges (from options.tealbury_door_range):')

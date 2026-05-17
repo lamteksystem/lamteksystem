@@ -455,6 +455,8 @@ export default function Ordering() {
         cartHref="/ordering/cart"
         initialCategoryId={selectedCategory}
         commitLabel="Add to order"
+        linePersistence="immediate"
+        addButtonLabel="Add to order"
         onCommit={commitCatalogPicker}
       />
     </div>

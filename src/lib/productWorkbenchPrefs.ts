@@ -64,3 +64,33 @@ export async function loadFilterPresets(scope: string): Promise<SavedFilterPrese
 export async function saveFilterPresets(scope: string, presets: SavedFilterPreset[]): Promise<void> {
   await setUserPreference(presetsKey(scope), JSON.stringify(presets))
 }
+
+const LAYOUT_KEY = 'catalog_workbench_layout_v1'
+
+export interface WorkbenchLayoutPrefs {
+  leftCollapsed: boolean
+  rightDetailVisible: boolean
+}
+
+const DEFAULT_LAYOUT: WorkbenchLayoutPrefs = {
+  leftCollapsed: false,
+  rightDetailVisible: true,
+}
+
+export async function loadWorkbenchLayout(): Promise<WorkbenchLayoutPrefs> {
+  const raw = await getUserPreference(LAYOUT_KEY)
+  if (!raw) return { ...DEFAULT_LAYOUT }
+  try {
+    const parsed = JSON.parse(raw) as Partial<WorkbenchLayoutPrefs>
+    return {
+      leftCollapsed: Boolean(parsed.leftCollapsed),
+      rightDetailVisible: parsed.rightDetailVisible !== false,
+    }
+  } catch {
+    return { ...DEFAULT_LAYOUT }
+  }
+}
+
+export async function saveWorkbenchLayout(prefs: WorkbenchLayoutPrefs): Promise<void> {
+  await setUserPreference(LAYOUT_KEY, JSON.stringify(prefs))
+}

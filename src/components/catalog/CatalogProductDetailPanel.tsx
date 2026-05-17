@@ -21,6 +21,8 @@ interface CatalogProductDetailPanelProps {
   onToggleFavourite: () => void
   onClose: () => void
   onAddToBasket: (product: ProductRow, quantity: number) => void
+  addButtonLabel?: string
+  adding?: boolean
 }
 
 export default function CatalogProductDetailPanel({
@@ -31,6 +33,8 @@ export default function CatalogProductDetailPanel({
   onToggleFavourite,
   onClose,
   onAddToBasket,
+  addButtonLabel = 'Add to order',
+  adding = false,
 }: CatalogProductDetailPanelProps) {
   const [quantity, setQuantity] = useState(1)
   const [pricing, setPricing] = useState<ProductPriceBreakdown | null>(null)
@@ -167,8 +171,13 @@ export default function CatalogProductDetailPanel({
                 ))}
               </select>
             </label>
-            <button type="button" className="btn btn-small" onClick={() => onAddToBasket(product, quantity)}>
-              Add to basket
+            <button
+              type="button"
+              className="btn btn-small"
+              disabled={adding}
+              onClick={() => onAddToBasket(product, quantity)}
+            >
+              {adding ? 'Adding…' : addButtonLabel}
             </button>
           </div>
         </div>

@@ -18,9 +18,11 @@ import {
   loadFavouriteProductIds,
   loadFilterPresets,
   loadWorkbenchFilters,
+  loadWorkbenchLayout,
   saveFavouriteProductIds,
   saveFilterPresets,
   saveWorkbenchFilters,
+  saveWorkbenchLayout,
   type SavedFilterPreset,
 } from '@/lib/productWorkbenchPrefs'
 import { resolveProductPriceBreakdown } from '@/lib/productWorkbenchPricing'
@@ -31,6 +33,7 @@ import CatalogProductStagingBasket, {
 import type { CatalogPickerCommitPayload } from '@/components/catalog/CatalogProductPickerModal'
 
 type MainTab = 'products' | 'assemblies'
+export type CatalogLinePersistence = 'staged' | 'immediate'
 
 interface CatalogProductWorkbenchProps {
   products: ProductRow[]
@@ -42,6 +45,8 @@ interface CatalogProductWorkbenchProps {
   cartLineCount?: number
   cartHref?: string
   commitLabel?: string
+  addButtonLabel?: string
+  linePersistence?: CatalogLinePersistence
   showCatalogueSwitcher?: boolean
   embedded?: boolean
   initialCategoryId?: string | null
@@ -58,6 +63,8 @@ export default function CatalogProductWorkbench({
   cartLineCount = 0,
   cartHref = '/ordering/cart',
   commitLabel = 'Add to order',
+  addButtonLabel = 'Add to order',
+  linePersistence = 'staged',
   showCatalogueSwitcher = false,
   embedded = false,
   initialCategoryId = null,
@@ -78,6 +85,9 @@ export default function CatalogProductWorkbench({
   const [filterPresets, setFilterPresets] = useState<SavedFilterPreset[]>([])
   const [sellPriceByProductId, setSellPriceByProductId] = useState<Record<string, number>>({})
   const [prefsReady, setPrefsReady] = useState(false)
+  const [leftCollapsed, setLeftCollapsed] = useState(false)
+  const [rightDetailVisible, setRightDetailVisible] = useState(true)
+  const [layoutReady, setLayoutReady] = useState(false)
 
   const favouriteSet = useMemo(() => new Set(favouriteIds), [favouriteIds])
 
@@ -113,6 +123,24 @@ export default function CatalogProductWorkbench({
   const clearFilters = useCallback(() => {
     setFilters({ ...EMPTY_WORKBENCH_FILTERS, categoryId: initialCategoryId })
   }, [initialCategoryId])
+
+  useEffect(() => {
+    let cancelled = false
+    void loadWorkbenchLayout().then((layout) => {
+      if (cancelled) return
+      setLeftCollapsed(layout.leftCollapsed)
+      setRightDetailVisible(layout.rightDetailVisible)
+      setLayoutReady(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!layoutReady) return
+    void saveWorkbenchLayout({ leftCollapsed, rightDetailVisible })
+  }, [layoutReady, leftCollapsed, rightDetailVisible])
 
   useEffect(() => {
     let cancelled = false
@@ -189,8 +217,31 @@ export default function CatalogProductWorkbench({
     [sellPriceByProductId],
   )
 
+  const persistPayload = useCallback(
+    async (payload: CatalogPickerCommitPayload, successMessage: string) => {
+      setCommitting(true)
+      try {
+        await onCommit(payload)
+        setStatusMessage(successMessage)
+      } catch (e) {
+        console.error(e)
+        setStatusMessage('Could not add line — please try again')
+      } finally {
+        setCommitting(false)
+      }
+    },
+    [onCommit],
+  )
+
   const addProductToBasket = useCallback(
     (product: ProductRow, quantity: number) => {
+      if (linePersistence === 'immediate') {
+        void persistPayload(
+          { products: [{ product, quantity }], assemblies: [] },
+          `Added ${quantity} × ${product.name} to order`,
+        )
+        return
+      }
       const unitPrice = productUnitPrice(product)
       setStaged((prev) => {
         const existing = prev.find((l) => l.kind === 'product' && l.product.id === product.id)
@@ -204,30 +255,40 @@ export default function CatalogProductWorkbench({
           { kind: 'product', id: `p-${product.id}`, product, quantity, unitPrice },
         ]
       })
-      setStatusMessage(`Added ${quantity} × ${product.name} to basket`)
+      setStatusMessage(`Added ${quantity} × ${product.name} to selection — confirm below`)
     },
-    [productUnitPrice],
+    [linePersistence, persistPayload, productUnitPrice],
   )
 
-  const addAssemblyToBasket = useCallback((assembly: AssemblyWithLines, quantity: number) => {
-    const unitPrice = (assembly.assembly_lines ?? []).reduce((sum, line) => {
-      const product = line.product as ProductRow | undefined
-      return sum + (product ? line.quantity * Number(product.unit_price) : 0)
-    }, 0)
-    setStaged((prev) => {
-      const existing = prev.find((l) => l.kind === 'assembly' && l.assembly.id === assembly.id)
-      if (existing && existing.kind === 'assembly') {
-        return prev.map((l) =>
-          l.id === existing.id ? { ...l, quantity: Math.min(99, l.quantity + quantity) } : l,
+  const addAssemblyToBasket = useCallback(
+    (assembly: AssemblyWithLines, quantity: number) => {
+      if (linePersistence === 'immediate') {
+        void persistPayload(
+          { products: [], assemblies: [{ assembly, quantity }] },
+          `Added ${quantity} × ${assembly.name} to order`,
         )
+        return
       }
-      return [
-        ...prev,
-        { kind: 'assembly', id: `a-${assembly.id}`, assembly, quantity, unitPrice },
-      ]
-    })
-    setStatusMessage(`Added ${quantity} × ${assembly.name} to basket`)
-  }, [])
+      const unitPrice = (assembly.assembly_lines ?? []).reduce((sum, line) => {
+        const product = line.product as ProductRow | undefined
+        return sum + (product ? line.quantity * Number(product.unit_price) : 0)
+      }, 0)
+      setStaged((prev) => {
+        const existing = prev.find((l) => l.kind === 'assembly' && l.assembly.id === assembly.id)
+        if (existing && existing.kind === 'assembly') {
+          return prev.map((l) =>
+            l.id === existing.id ? { ...l, quantity: Math.min(99, l.quantity + quantity) } : l,
+          )
+        }
+        return [
+          ...prev,
+          { kind: 'assembly', id: `a-${assembly.id}`, assembly, quantity, unitPrice },
+        ]
+      })
+      setStatusMessage(`Added ${quantity} × ${assembly.name} to selection — confirm below`)
+    },
+    [linePersistence, persistPayload],
+  )
 
   const commitBasket = useCallback(async () => {
     if (staged.length === 0) return
@@ -276,8 +337,17 @@ export default function CatalogProductWorkbench({
     void saveFilterPresets(preferencesScope, next)
   }
 
+  const workbenchClass = [
+    'tb-workbench',
+    embedded ? 'tb-workbench--embedded' : '',
+    leftCollapsed ? 'tb-workbench--filters-collapsed' : '',
+    !rightDetailVisible ? 'tb-workbench--detail-hidden' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <article className={`tb-workbench${embedded ? ' tb-workbench--embedded' : ''}`}>
+    <article className={workbenchClass}>
       {statusMessage && (
         <p className="ordering-toast tb-workbench-toast" role="status">
           {statusMessage}
@@ -285,7 +355,21 @@ export default function CatalogProductWorkbench({
       )}
 
       <aside className="tb-workbench-filters" aria-label="Product filters">
-        <h2 className="tb-filters-title">Product search</h2>
+        <div className="tb-pane-toolbar tb-pane-toolbar--filters">
+          <h2 className="tb-filters-title">Product search</h2>
+          <button
+            type="button"
+            className="tb-pane-toggle"
+            onClick={() => setLeftCollapsed((v) => !v)}
+            aria-expanded={!leftCollapsed}
+            aria-label={leftCollapsed ? 'Expand filters' : 'Collapse filters'}
+            title={leftCollapsed ? 'Expand filters' : 'Collapse filters'}
+          >
+            {leftCollapsed ? '»' : '«'}
+          </button>
+        </div>
+        {!leftCollapsed && (
+        <>
 
         <label className="tb-filter-field">
           <span>Product code</span>
@@ -424,6 +508,8 @@ export default function CatalogProductWorkbench({
         <button type="button" className="btn btn-outline btn-small tb-filter-clear" onClick={clearFilters}>
           Clear filters
         </button>
+        </>
+        )}
       </aside>
 
       <section className="tb-workbench-main" aria-label="Product results">
@@ -454,6 +540,15 @@ export default function CatalogProductWorkbench({
               </button>
             )}
           </form>
+          <button
+            type="button"
+            className="tb-pane-toggle tb-pane-toggle--detail"
+            onClick={() => setRightDetailVisible((v) => !v)}
+            aria-pressed={rightDetailVisible}
+            title={rightDetailVisible ? 'Hide product details' : 'Show product details'}
+          >
+            {rightDetailVisible ? 'Hide details' : 'Show details'}
+          </button>
           <p className="tb-result-meta">
             <strong>{mainTab === 'products' ? filtered.length : filteredAssemblies.length}</strong>{' '}
             {mainTab === 'products' ? 'product' : 'unit'}
@@ -461,7 +556,7 @@ export default function CatalogProductWorkbench({
             {cartLineCount > 0 && cartHref && (
               <>
                 {' '}
-                · <Link to={cartHref}>Order ({cartLineCount})</Link>
+                · <Link to={cartHref}>View order ({cartLineCount})</Link>
               </>
             )}
           </p>
@@ -737,24 +832,31 @@ export default function CatalogProductWorkbench({
       </section>
 
       <aside className="tb-workbench-right" aria-label="Details and basket">
-        {selectedProduct && mainTab === 'products' ? (
-          <CatalogProductDetailPanel
-            product={selectedProduct}
-            categories={categories}
-            customerUserId={customerUserId}
-            isFavourite={favouriteSet.has(selectedProduct.id)}
-            onToggleFavourite={() => toggleFavourite(selectedProduct.id)}
-            onClose={() => setSelectedProductId(null)}
-            onAddToBasket={addProductToBasket}
-          />
-        ) : (
-          <section className="tb-detail tb-detail--placeholder">
-            <p>Select a product row to view specification, properties and customer pricing.</p>
-          </section>
+        {rightDetailVisible && (
+          selectedProduct && mainTab === 'products' ? (
+            <CatalogProductDetailPanel
+              product={selectedProduct}
+              categories={categories}
+              customerUserId={customerUserId}
+              isFavourite={favouriteSet.has(selectedProduct.id)}
+              onToggleFavourite={() => toggleFavourite(selectedProduct.id)}
+              onClose={() => setSelectedProductId(null)}
+              onAddToBasket={addProductToBasket}
+              addButtonLabel={addButtonLabel}
+              adding={committing}
+            />
+          ) : (
+            <section className="tb-detail tb-detail--placeholder">
+              <p>Select a product row to view specification, properties and customer pricing.</p>
+            </section>
+          )
         )}
 
         <CatalogProductStagingBasket
           lines={staged}
+          linePersistence={linePersistence}
+          cartLineCount={cartLineCount}
+          cartHref={cartHref}
           commitLabel={commitLabel}
           onQuantityChange={(lineId, quantity) => {
             setStaged((prev) => prev.map((l) => (l.id === lineId ? { ...l, quantity } : l)))

@@ -944,7 +944,6 @@ export default function AdminOrderDetail() {
         note: noteParts.slice(0, 3).join('; ') + (noteParts.length > 3 ? '…' : ''),
       }).catch(() => {})
       await reloadOrderLinesFromDb()
-      setCatalogPickerOpen(false)
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Could not add lines from product search.')
     } finally {
@@ -2656,6 +2655,8 @@ export default function AdminOrderDetail() {
         customerUserId={order?.user_id ?? null}
         preferencesScope={orderId ? `admin_order_${orderId}` : 'admin_order'}
         commitLabel="Add to order"
+        cartLineCount={lines.length}
+        linePersistence="immediate"
         onClose={() => setCatalogPickerOpen(false)}
         onCommit={commitCatalogFromPicker}
       />

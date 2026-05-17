@@ -111,6 +111,8 @@ export default function TealburyOrdering() {
         cartLineCount={lineCount}
         cartHref="/ordering/cart"
         commitLabel="Add to order"
+        linePersistence="immediate"
+        addButtonLabel="Add to order"
         onCommit={commitPicker}
       />
     </div>

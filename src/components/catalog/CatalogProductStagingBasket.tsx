@@ -1,5 +1,7 @@
+import { Link } from 'react-router-dom'
 import type { AssemblyWithLines, ProductRow } from '@/types/database'
 import { displayProductCode } from '@/lib/catalogProductDisplay'
+import type { CatalogLinePersistence } from '@/components/catalog/CatalogProductWorkbench'
 
 export type StagedCatalogLine =
   | { kind: 'product'; id: string; product: ProductRow; quantity: number; unitPrice: number }
@@ -7,6 +9,9 @@ export type StagedCatalogLine =
 
 interface CatalogProductStagingBasketProps {
   lines: StagedCatalogLine[]
+  linePersistence?: CatalogLinePersistence
+  cartLineCount?: number
+  cartHref?: string
   commitLabel?: string
   onQuantityChange: (lineId: string, quantity: number) => void
   onRemove: (lineId: string) => void
@@ -27,6 +32,9 @@ function lineCode(line: StagedCatalogLine): string {
 
 export default function CatalogProductStagingBasket({
   lines,
+  linePersistence = 'staged',
+  cartLineCount = 0,
+  cartHref = '',
   commitLabel = 'Add to order',
   onQuantityChange,
   onRemove,
@@ -35,17 +43,34 @@ export default function CatalogProductStagingBasket({
   committing,
 }: CatalogProductStagingBasketProps) {
   const totalExVat = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0)
+  const immediate = linePersistence === 'immediate'
 
   return (
     <section className="tb-basket" aria-label="Selection basket">
       <header className="tb-basket-header">
-        <h3>Basket</h3>
-        <span className="tb-basket-count">{lines.length} line{lines.length === 1 ? '' : 's'}</span>
+        <h3>{immediate ? 'On order' : 'Selection'}</h3>
+        <span className="tb-basket-count">
+          {immediate ? cartLineCount : lines.length} line
+          {(immediate ? cartLineCount : lines.length) === 1 ? '' : 's'}
+        </span>
       </header>
 
-      {lines.length === 0 ? (
+      {immediate ? (
+        <div className="tb-basket-immediate">
+          <p className="tb-basket-empty">
+            Lines save to your order as you add them from the table or detail panel.
+          </p>
+          {cartLineCount > 0 && cartHref ? (
+            <Link to={cartHref} className="btn btn-small">
+              View order ({cartLineCount}) →
+            </Link>
+          ) : (
+            <p className="tb-basket-vat-note">No lines on this order yet.</p>
+          )}
+        </div>
+      ) : lines.length === 0 ? (
         <p className="tb-basket-empty">
-          Add products from the list or detail panel. Lines stay here until you confirm.
+          Add products from the list or detail panel, then confirm below to save to your order.
         </p>
       ) : (
         <ul className="tb-basket-lines">
@@ -106,12 +131,13 @@ export default function CatalogProductStagingBasket({
         </ul>
       )}
 
+      {!immediate && (
       <footer className="tb-basket-footer">
         <div className="tb-basket-total">
-          <span>Total ex VAT</span>
+          <span>Selection total ex VAT</span>
           <strong>£{totalExVat.toFixed(2)}</strong>
         </div>
-        <p className="tb-basket-vat-note">All prices exclude VAT unless noted.</p>
+        <p className="tb-basket-vat-note">Confirm to save lines to your order. All prices exclude VAT unless noted.</p>
         <div className="tb-basket-actions">
           <button
             type="button"
@@ -131,6 +157,7 @@ export default function CatalogProductStagingBasket({
           </button>
         </div>
       </footer>
+      )}
     </section>
   )
 }

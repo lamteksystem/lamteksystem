@@ -1,0 +1,113 @@
+.catalog-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.catalog-picker-shell {
+  width: min(1600px, 100%);
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  background: var(--lamtek-bg);
+  border-radius: var(--lamtek-radius-lg);
+  box-shadow: var(--lamtek-shadow-lg);
+  overflow: hidden;
+}
+
+.catalog-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+  background: var(--lamtek-surface);
+}
+
+.catalog-picker-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.catalog-picker-close {
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--lamtek-text-muted);
+}
+
+.catalog-picker-shell .tb-workbench {
+  flex: 1;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.tb-workbench--embedded {
+  min-height: min(72vh, 900px);
+}
+
+.tb-workbench-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem 0;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+}
+
+.tb-workbench-tabs button {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--lamtek-surface);
+  color: var(--lamtek-text-muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tb-workbench-tabs button.active {
+  background: var(--lamtek-white);
+  color: var(--lamtek-text);
+  border-color: var(--lamtek-gray-light);
+  margin-bottom: -1px;
+}
+
+.tb-detail-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.tb-fav-btn {
+  border: none;
+  background: transparent;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--lamtek-gray);
+}
+
+.tb-fav-btn--on {
+  color: #ca8a04;
+}
+
+.tb-filter-checkbox {
+  margin-bottom: 0.5rem;
+}
+
+.tb-price-was {
+  display: block;
+  font-size: 0.75rem;
+}
+
+.ordering-page .tb-workbench {
+  margin-top: 0.5rem;
+}

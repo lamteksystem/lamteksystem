@@ -1,55 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PageNav } from '@/components/PageNav'
-import TealburyProductWorkbench from '@/components/tealbury/TealburyProductWorkbench'
-import { supabase } from '@/lib/supabase'
+import CatalogProductWorkbench from '@/components/catalog/CatalogProductWorkbench'
+import { useCatalogWorkbenchData } from '@/hooks/useCatalogWorkbenchData'
 import { useDraftOrder } from '@/hooks/useDraftOrder'
-import { repriceDraftOrderLinesForCustomer } from '@/lib/orderPricing'
 import { useEffectiveUserId } from '@/contexts/ImpersonationContext'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
-import type { CategoryRow, ProductRow } from '@/types/database'
+import { insertAssemblyOrderLines, insertProductOrderLines } from '@/lib/orderLineInsert'
+import { supabase } from '@/lib/supabase'
+import type { CatalogPickerCommitPayload } from '@/components/catalog/CatalogProductPickerModal'
 
 export default function TealburyOrdering() {
   const { draftOrder, ensureDraftOrder, refresh } = useDraftOrder()
   const effectiveUserId = useEffectiveUserId()
-  const [categories, setCategories] = useState<CategoryRow[]>([])
-  const [products, setProducts] = useState<ProductRow[]>([])
-  const [loading, setLoading] = useState(true)
+  const { products, categories, loading } = useCatalogWorkbenchData([CATALOG_PROGRAM.TEALBURY])
   const [lineCount, setLineCount] = useState(0)
-
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      const { data: prodData, error: pErr } = await supabase
-        .from('products')
-        .select('*')
-        .eq('active', true)
-        .eq('catalog_program', CATALOG_PROGRAM.TEALBURY)
-        .order('sort_order')
-        .order('name')
-      if (pErr) {
-        console.error(pErr)
-        if (!cancelled) setLoading(false)
-        return
-      }
-      const plist = (prodData ?? []) as ProductRow[]
-      const catIds = [...new Set(plist.map((p) => p.category_id).filter(Boolean))] as string[]
-      const { data: catData } =
-        catIds.length === 0
-          ? { data: [] as CategoryRow[] }
-          : await supabase.from('categories').select('*').in('id', catIds).order('sort_order').order('name')
-      if (!cancelled) {
-        setProducts(plist)
-        setCategories((catData ?? []) as CategoryRow[])
-        setLoading(false)
-      }
-    }
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -70,29 +35,21 @@ export default function TealburyOrdering() {
     }
   }, [draftOrder?.id])
 
-  const commitLines = useCallback(
-    async (lines: { product: ProductRow; quantity: number }[]) => {
-      if (lines.length === 0) return
+  const commitPicker = useCallback(
+    async (payload: CatalogPickerCommitPayload) => {
       const orderId = await ensureDraftOrder()
-      for (const { product, quantity } of lines) {
-        const productSnapshot = {
-          name: product.name,
-          description: product.description,
-          sku: product.sku,
-          image_url: product.image_url,
-        }
-        const { error } = await supabase.from('order_lines').insert({
-          order_id: orderId,
-          product_id: product.id,
-          product_snapshot: productSnapshot,
-          quantity,
-          unit_price: product.unit_price,
-          options: product.options ?? {},
+      await insertProductOrderLines({
+        orderId,
+        lines: payload.products,
+        customerUserId: effectiveUserId,
+      })
+      for (const line of payload.assemblies) {
+        await insertAssemblyOrderLines({
+          orderId,
+          assembly: line.assembly,
+          quantity: line.quantity,
+          customerUserId: effectiveUserId,
         })
-        if (error) throw error
-      }
-      if (effectiveUserId) {
-        await repriceDraftOrderLinesForCustomer({ orderId, customerUserId: effectiveUserId })
       }
       await refresh()
       const { count } = await supabase
@@ -124,13 +81,12 @@ export default function TealburyOrdering() {
   return (
     <div className="page ordering-page tealbury-ordering-page tealbury-ordering-page--workbench">
       <PageNav backTo="/ordering/start" backLabel="Ordering" />
-
       <header className="page-header ordering-page-header tb-page-header">
         <div>
           <h1>Tealbury product search</h1>
           <p className="page-lead">
-            Search the Tealbury catalogue, review specifications and build your order in a staging basket — similar to
-            industry quoting tools. Component ordering remains under <Link to="/ordering">Create order</Link>.
+            Industry-style catalogue search for Tealbury packaged kitchens. Component ordering is under{' '}
+            <Link to="/ordering">Lamtek create order</Link>.
           </p>
         </div>
         <div className="ordering-header-actions">
@@ -146,13 +102,17 @@ export default function TealburyOrdering() {
         </Link>
       )}
 
-      <TealburyProductWorkbench
+      <CatalogProductWorkbench
         products={products}
         categories={categories}
+        allowedCatalogPrograms={[CATALOG_PROGRAM.TEALBURY]}
+        customerUserId={effectiveUserId}
+        preferencesScope="ordering_tealbury"
         cartLineCount={lineCount}
-        onCommitLines={commitLines}
+        cartHref="/ordering/cart"
+        commitLabel="Add to order"
+        onCommit={commitPicker}
       />
     </div>
   )
 }
-

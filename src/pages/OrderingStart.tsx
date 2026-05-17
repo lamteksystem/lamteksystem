@@ -17,19 +17,18 @@ export default function OrderingStart() {
           <span className="ordering-wizard-card-icon ordering-wizard-card-icon--lucide" aria-hidden>
             <LayoutGrid size={30} strokeWidth={1.85} />
           </span>
-          <h2 className="ordering-wizard-card-title">Tealbury kitchens</h2>
+          <h2 className="ordering-wizard-card-title">Tealbury product search</h2>
           <p className="ordering-wizard-card-desc">
-            Curated Tealbury packaged kitchen lines (separate pricelist). Use this when ordering complete configured kitchens rather
-            than individual Lamtek components.
+            Same industry-style search for Tealbury packaged kitchen lines (separate pricelist). Filter by door range, stage lines, then add to your order.
           </p>
         </Link>
         <Link to="/ordering" className="ordering-wizard-card ordering-wizard-card--link">
           <span className="ordering-wizard-card-icon ordering-wizard-card-icon--lucide" aria-hidden>
             <Compass size={30} strokeWidth={1.85} />
           </span>
-          <h2 className="ordering-wizard-card-title">Manual order</h2>
+          <h2 className="ordering-wizard-card-title">Lamtek product search</h2>
           <p className="ordering-wizard-card-desc">
-            Browse the full catalogue: pick component or complete units, filters, and search — no step-by-step questionnaire first.
+            Professional catalogue search with filters, product details, customer pricing and a staging basket — the standard way to build Lamtek orders.
           </p>
         </Link>
         <Link to="/ordering?flow=guided" className="ordering-wizard-card ordering-wizard-card--link">

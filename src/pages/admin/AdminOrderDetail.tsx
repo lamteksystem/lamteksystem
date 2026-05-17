@@ -30,6 +30,11 @@ import { lamtekPortalLocations } from '@/lib/lamtekLocations'
 import { usePermission } from '@/hooks/usePermission'
 import { createPickListFromOrder } from '@/lib/pickLists'
 import { useAdminUi, type AdminOrderLinePricingMode } from '@/contexts/AdminUiContext'
+import CatalogProductPickerModal from '@/components/catalog/CatalogProductPickerModal'
+import type { CatalogPickerCommitPayload } from '@/components/catalog/CatalogProductPickerModal'
+import { useCatalogWorkbenchData } from '@/hooks/useCatalogWorkbenchData'
+import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
+import { insertAssemblyOrderLines, insertProductOrderLines } from '@/lib/orderLineInsert'
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   quotation: 'Quotation',
@@ -132,37 +137,17 @@ export default function AdminOrderDetail() {
     parent_order_id: '',
     link_reason: '',
   })
-  const [productId, setProductId] = useState('')
-  const [productQty, setProductQty] = useState(1)
-  const [productSearch, setProductSearch] = useState('')
-  const [productSort, setProductSort] = useState<'name' | 'price'>('name')
-  const [productCategoryId, setProductCategoryId] = useState<string>('')
-  const [productInStockOnly, setProductInStockOnly] = useState(false)
-  const [productPickText, setProductPickText] = useState('')
-  const [productPickerOpen, setProductPickerOpen] = useState(false)
-  const [productPickerTypeahead, setProductPickerTypeahead] = useState('')
-  const typeaheadResetRef = useRef<number | null>(null)
-  const productSearchRef = useRef<HTMLDivElement | null>(null)
-  const [productSearchOpen, setProductSearchOpen] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState<{
-    id: string
-    name: string
-    unit_price: number
-    description?: string
-    sku?: string
-    image_url?: string
-  } | null>(null)
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
-  const productPickerRef = useRef<HTMLDivElement | null>(null)
-  const [productSearchPage, setProductSearchPage] = useState(0)
-  const [productSearchHasMore, setProductSearchHasMore] = useState(false)
-  const [productSearchResults, setProductSearchResults] = useState<{ id: string; name: string; unit_price: number; description?: string; sku?: string; image_url?: string }[]>([])
-  const [productSearchLoading, setProductSearchLoading] = useState(false)
-
-  const [productPickerPage, setProductPickerPage] = useState(0)
-  const [productPickerHasMore, setProductPickerHasMore] = useState(false)
-  const [productPickerResults, setProductPickerResults] = useState<{ id: string; name: string; unit_price: number; description?: string; sku?: string; image_url?: string }[]>([])
-  const [productPickerLoading, setProductPickerLoading] = useState(false)
+  const [catalogPickerOpen, setCatalogPickerOpen] = useState(false)
+  const catalogPrograms = useMemo(
+    () => [CATALOG_PROGRAM.LAMTEK, CATALOG_PROGRAM.TEALBURY],
+    [],
+  )
+  const {
+    products: catalogProducts,
+    categories: catalogCategories,
+    assemblies: catalogAssemblies,
+    loading: catalogPickerLoading,
+  } = useCatalogWorkbenchData(catalogPickerOpen ? catalogPrograms : [])
   const [deliveryWindows, setDeliveryWindows] = useState<DeliveryWindowWithDays[]>([])
   const [cancelConfirm, setCancelConfirm] = useState(false)
   const [convertQuoteConfirm, setConvertQuoteConfirm] = useState(false)
@@ -236,110 +221,6 @@ export default function AdminOrderDetail() {
     const status = STATUS_LABELS[o.status] ?? o.status
     const date = new Date(o.created_at).toLocaleDateString('en-GB')
     return `${ref} · ${date} · ${status}`
-  }
-
-  // Close product picker when clicking away / pressing Escape.
-  // Must be above any conditional returns to keep hook order stable.
-  useEffect(() => {
-    if (!productPickerOpen) return
-
-    function onPointerDown(e: MouseEvent | TouchEvent) {
-      const el = productPickerRef.current
-      if (!el) return
-      if (!(e.target instanceof Node)) return
-      if (!el.contains(e.target)) setProductPickerOpen(false)
-    }
-
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setProductPickerOpen(false)
-    }
-
-    document.addEventListener('mousedown', onPointerDown)
-    document.addEventListener('touchstart', onPointerDown, { passive: true })
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown)
-      document.removeEventListener('touchstart', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [productPickerOpen])
-
-  useEffect(() => {
-    // When the dropdown closes, keep the last picked label but clear the hidden typeahead filter
-    // so the list doesn't "snap back" while the user is trying to click.
-    if (productPickerOpen) return
-    if (typeaheadResetRef.current != null) window.clearTimeout(typeaheadResetRef.current)
-    typeaheadResetRef.current = null
-    if (productPickerTypeahead) setProductPickerTypeahead('')
-  }, [productPickerOpen, productPickerTypeahead])
-
-  const productSearchQuery = useMemo(() => productSearch.trim(), [productSearch])
-  const productPickerQuery = useMemo(() => productPickerTypeahead.trim(), [productPickerTypeahead])
-
-  async function searchProducts(q: string, opts?: { append?: boolean; target: 'search' | 'picker' }) {
-    const target = opts?.target ?? 'search'
-    if (target === 'search') setProductSearchLoading(true)
-    else setProductPickerLoading(true)
-    try {
-      const pageSize = 50
-      const page = target === 'search' ? productSearchPage : productPickerPage
-      const from = (opts?.append ? page + 1 : 0) * pageSize
-      const to = from + pageSize - 1
-
-      let query = supabase
-        .from('products')
-        .select('id, name, unit_price, description, sku, image_url', { count: 'exact' })
-        .eq('active', true)
-
-      if (q) {
-        // Search by name OR sku. (Supabase uses PostgREST; `or()` string syntax.)
-        const escaped = q.replace(/%/g, '\\%').replace(/_/g, '\\_')
-        query = query.or(`name.ilike.%${escaped}%,sku.ilike.%${escaped}%`)
-      }
-
-      if (productCategoryId) query = query.eq('category_id', productCategoryId)
-      if (productInStockOnly) query = query.gt('stock_quantity', 0)
-
-      query = productSort === 'price'
-        ? query.order('unit_price', { ascending: true }).order('name', { ascending: true })
-        : query.order('name', { ascending: true })
-
-      const { data, count } = await query.range(from, to)
-      const mapped = (data ?? []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        unit_price: p.unit_price,
-        description: p.description ?? undefined,
-        sku: p.sku ?? undefined,
-        image_url: p.image_url ?? undefined,
-      }))
-
-      if (opts?.append) {
-        if (target === 'search') {
-          setProductSearchResults((prev) => [...prev, ...mapped])
-          setProductSearchPage((p) => p + 1)
-        } else {
-          setProductPickerResults((prev) => [...prev, ...mapped])
-          setProductPickerPage((p) => p + 1)
-        }
-        const nextCount = (from + mapped.length)
-        if (target === 'search') setProductSearchHasMore(count != null ? nextCount < count : mapped.length === pageSize)
-        else setProductPickerHasMore(count != null ? nextCount < count : mapped.length === pageSize)
-      } else {
-        if (target === 'search') {
-          setProductSearchResults(mapped)
-          setProductSearchPage(0)
-          setProductSearchHasMore(count != null ? mapped.length < count : mapped.length === pageSize)
-        } else {
-          setProductPickerResults(mapped)
-          setProductPickerPage(0)
-          setProductPickerHasMore(count != null ? mapped.length < count : mapped.length === pageSize)
-        }
-      }
-    } finally {
-      if (target === 'search') setProductSearchLoading(false)
-      else setProductPickerLoading(false)
-    }
   }
 
   async function load() {
@@ -555,61 +436,6 @@ export default function AdminOrderDetail() {
       note: 'Order opened in admin',
     }).catch(() => {})
   }, [orderId, staffProfile?.user_id])
-
-  useEffect(() => {
-    // Search bar should always work independently of the dropdown being open.
-    let cancelled = false
-    const t = setTimeout(() => {
-      if (cancelled) return
-      void searchProducts(productSearchQuery, { target: 'search' })
-    }, productSearchQuery ? 250 : 0)
-    return () => {
-      cancelled = true
-      clearTimeout(t)
-    }
-  }, [productSearchQuery, productSort, productCategoryId, productInStockOnly])
-
-  useEffect(() => {
-    if (!productPickerOpen) return
-    let cancelled = false
-    const t = setTimeout(() => {
-      if (cancelled) return
-      void searchProducts(productPickerQuery, { target: 'picker' })
-    }, productPickerQuery ? 120 : 0)
-    return () => {
-      cancelled = true
-      clearTimeout(t)
-    }
-  }, [productPickerOpen, productPickerQuery, productSort, productCategoryId, productInStockOnly])
-
-  useEffect(() => {
-    // Close the top search suggestions when clicking away.
-    if (!productSearchOpen) return
-    function onPointerDown(e: MouseEvent | TouchEvent) {
-      const el = productSearchRef.current
-      if (!el) return
-      if (!(e.target instanceof Node)) return
-      if (!el.contains(e.target)) setProductSearchOpen(false)
-    }
-    document.addEventListener('mousedown', onPointerDown)
-    document.addEventListener('touchstart', onPointerDown, { passive: true })
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown)
-      document.removeEventListener('touchstart', onPointerDown)
-    }
-  }, [productSearchOpen])
-
-  useEffect(() => {
-    // Categories for filtering the product picker.
-    supabase
-      .from('categories')
-      .select('id, name')
-      .order('sort_order')
-      .order('name')
-      .then(({ data }) => {
-        setCategories((data ?? []).map((c) => ({ id: c.id, name: c.name })))
-      })
-  }, [])
 
   async function setStatus(status: OrderRow['status']) {
     if (!orderId || saving || !order || !canEditOrders) return
@@ -1077,50 +903,53 @@ export default function AdminOrderDetail() {
     setShipping(false)
   }
 
-  async function addLine() {
-    if (!orderId || !productId || productQty < 1 || order?.is_archived === true) return
-    const prod = selectedProduct
-      ?? productPickerResults.find((p) => p.id === productId)
-      ?? productSearchResults.find((p) => p.id === productId)
-      ?? null
-    if (!prod) return
+  async function commitCatalogFromPicker(payload: CatalogPickerCommitPayload) {
+    if (!orderId || order?.is_archived === true) return
     setSaving(true)
-    await supabase.from('order_lines').insert({
-      order_id: orderId,
-      product_id: prod.id,
-      product_snapshot: { name: prod.name, description: prod.description, sku: prod.sku, image_url: prod.image_url },
-      quantity: productQty,
-      unit_price: prod.unit_price,
-      options: {},
-    })
-    const pricingMode = effectiveLineAddPricingMode()
-    if (pricingMode === 'customer_rules' && order?.user_id) {
-      try {
-        await repriceDraftOrderLinesForCustomer({ orderId, customerUserId: order.user_id })
-      } catch (e) {
-        setActionError(e instanceof Error ? e.message : 'Could not apply customer pricing to new line.')
+    setActionError(null)
+    const useCustomerPricing =
+      effectiveLineAddPricingMode() === 'customer_rules' && Boolean(order?.user_id)
+    try {
+      if (payload.products.length > 0) {
+        await insertProductOrderLines({
+          orderId,
+          lines: payload.products,
+          customerUserId: order?.user_id ?? undefined,
+          repriceCustomer: useCustomerPricing,
+        })
+      }
+      for (const line of payload.assemblies) {
+        await insertAssemblyOrderLines({
+          orderId,
+          assembly: line.assembly,
+          quantity: line.quantity,
+          customerUserId: order?.user_id ?? undefined,
+          repriceCustomer: useCustomerPricing,
+        })
+      }
+      if (!useCustomerPricing) {
         await recalcTotals()
       }
-    } else {
-      if (pricingMode === 'customer_rules' && !order?.user_id) {
-        setActionError('This order has no customer — cannot apply customer pricing. Line added at list price.')
+      if (effectiveLineAddPricingMode() === 'customer_rules' && !order?.user_id) {
+        setActionError('This order has no customer — lines added at list price.')
       }
-      await recalcTotals()
+      const noteParts = [
+        ...payload.products.map((l) => `${l.product.sku ?? ''} ${l.product.name} ×${l.quantity}`.trim()),
+        ...payload.assemblies.map((l) => `${l.assembly.name} ×${l.quantity}`),
+      ]
+      insertOrderEvent({
+        orderId,
+        actorUserId: staffProfile?.user_id ?? null,
+        eventType: 'line_added',
+        note: noteParts.slice(0, 3).join('; ') + (noteParts.length > 3 ? '…' : ''),
+      }).catch(() => {})
+      await reloadOrderLinesFromDb()
+      setCatalogPickerOpen(false)
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Could not add lines from product search.')
+    } finally {
+      setSaving(false)
     }
-    insertOrderEvent({
-      orderId,
-      actorUserId: staffProfile?.user_id ?? null,
-      eventType: 'line_added',
-      note: `${prod.sku ? `${prod.sku} — ` : ''}${prod.name} × ${productQty}`,
-    }).catch(() => {})
-    await reloadOrderLinesFromDb()
-    setProductId('')
-    setProductQty(1)
-    setSelectedProduct(null)
-    setProductPickText('')
-    setProductPickerOpen(false)
-    setProductPickerTypeahead('')
-    setSaving(false)
   }
 
   async function updateLineQty(lineId: string, delta: number) {
@@ -2795,175 +2624,18 @@ export default function AdminOrderDetail() {
                 {repricingBusy ? 'Applying…' : 'Apply customer pricing to all lines'}
               </button>
             </div>
-            <h3>Add line</h3>
-            <div className="admin-add-line-fields">
-              <div className="admin-add-line-search-row">
-                <div className="admin-product-search" ref={productSearchRef}>
-                  <input
-                    type="search"
-                    value={productSearch}
-                    onChange={(e) => {
-                      setProductSearch(e.target.value)
-                      setProductSearchOpen(true)
-                      setSelectedProduct(null)
-                      setProductId('')
-                    }}
-                    onFocus={() => setProductSearchOpen(true)}
-                    placeholder="Search products by name or SKU…"
-                  />
-                  {productSearchOpen && productSearchQuery && (
-                    <div className="admin-product-search-menu" role="listbox">
-                      {productSearchLoading ? (
-                        <div className="admin-product-picker-item admin-muted">Searching…</div>
-                      ) : productSearchResults.length === 0 ? (
-                        <div className="admin-product-picker-item admin-muted">No results.</div>
-                      ) : (
-                        <>
-                          {productSearchResults.slice(0, 30).map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              className="admin-product-picker-item"
-                              onClick={() => {
-                                setProductId(p.id)
-                                setSelectedProduct(p)
-                                const label = `${p.sku ? `${p.sku} — ` : ''}${p.name}`
-                                setProductPickText(label)
-                                setProductSearchOpen(false)
-                              }}
-                              title={p.sku ? p.sku : p.name}
-                            >
-                              <span className="admin-product-picker-main">
-                                {p.sku ? <strong>{p.sku}</strong> : null} {p.sku ? '— ' : ''}{p.name}
-                              </span>
-                              <span className="admin-product-picker-price">£{p.unit_price.toFixed(2)}</span>
-                            </button>
-                          ))}
-                          {productSearchHasMore && (
-                            <button
-                              type="button"
-                              className="admin-product-picker-loadmore"
-                              onClick={() => searchProducts(productSearchQuery, { append: true, target: 'search' })}
-                              disabled={productSearchLoading}
-                            >
-                              Load more…
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="admin-add-line-controls-row">
-                <select value={productCategoryId} onChange={(e) => setProductCategoryId(e.target.value)} title="Filter by category">
-                  <option value="">All categories</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <select value={productSort} onChange={(e) => setProductSort(e.target.value as typeof productSort)} title="Sort search results">
-                  <option value="name">Sort: Name</option>
-                  <option value="price">Sort: Price</option>
-                </select>
-                <label className="admin-inline-checkbox" title="Only show products with stock > 0">
-                  <input type="checkbox" checked={productInStockOnly} onChange={(e) => setProductInStockOnly(e.target.checked)} />
-                  In stock
-                </label>
-              </div>
-
-              <div className="admin-product-picker" ref={productPickerRef}>
-                <button
-                  type="button"
-                  className="admin-product-picker-trigger"
-                  onClick={() => setProductPickerOpen((v) => !v)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      setProductPickerOpen(false)
-                      return
-                    }
-                    if (e.key === 'Enter') {
-                      setProductPickerOpen(true)
-                      return
-                    }
-                    if (e.key === 'Backspace') {
-                      setProductPickerTypeahead((s) => s.slice(0, -1))
-                      return
-                    }
-                    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                      const ch = e.key
-                      setProductPickerOpen(true)
-                      setProductPickerTypeahead((s) => `${s}${ch}`)
-                      // Don't auto-clear while open; it makes the list "snap back" before the user can click.
-                    }
-                  }}
-                  aria-haspopup="listbox"
-                  aria-expanded={productPickerOpen}
-                  title="Select a product. Type letters to jump/filter the list."
-                >
-                  <span className="admin-product-picker-trigger-text">
-                    {productPickText || 'Select product…'}
-                  </span>
-                  <span className="admin-product-picker-trigger-caret" aria-hidden>▾</span>
-                </button>
-                {productPickerOpen && (
-                  <div className="admin-product-picker-menu" role="listbox">
-                    {productPickerLoading ? (
-                      <div className="admin-product-picker-item admin-muted">Searching…</div>
-                    ) : productPickerResults.length === 0 ? (
-                      <div className="admin-product-picker-item admin-muted">No results.</div>
-                    ) : (
-                      <>
-                        {productPickerResults.slice(0, 200).map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            className="admin-product-picker-item"
-                            onClick={() => {
-                              setProductId(p.id)
-                              setSelectedProduct(p)
-                              const label = `${p.sku ? `${p.sku} — ` : ''}${p.name}`
-                              setProductPickText(label)
-                              setProductPickerOpen(false)
-                              setProductPickerTypeahead('')
-                            }}
-                            title={p.sku ? p.sku : p.name}
-                          >
-                            <span className="admin-product-picker-main">
-                              {p.sku ? <strong>{p.sku}</strong> : null} {p.sku ? '— ' : ''}{p.name}
-                            </span>
-                            <span className="admin-product-picker-price">£{p.unit_price.toFixed(2)}</span>
-                          </button>
-                        ))}
-                        {productPickerHasMore && (
-                          <button
-                            type="button"
-                            className="admin-product-picker-loadmore"
-                            onClick={() => searchProducts(productPickerQuery, { append: true, target: 'picker' })}
-                            disabled={productPickerLoading}
-                          >
-                            Load more…
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="admin-add-line-qty-row">
-                <input
-                  type="number"
-                  min={1}
-                  value={productQty}
-                  onChange={(e) => setProductQty(Number(e.target.value) || 1)}
-                  aria-label="Quantity"
-                />
-                <button type="button" className="btn btn-small" onClick={addLine} disabled={!productId || saving}>
-                  Add line
-                </button>
-              </div>
-            </div>
+            <h3>Add lines</h3>
+            <p className="admin-muted" style={{ marginTop: 0, maxWidth: '42rem' }}>
+              Use the standard product search workbench — filters, details, customer pricing and a staging basket — for Lamtek and Tealbury catalogues.
+            </p>
+            <button
+              type="button"
+              className="btn"
+              disabled={saving || !order || !canEditLines(order.status) || order.is_archived === true}
+              onClick={() => setCatalogPickerOpen(true)}
+            >
+              Open product search
+            </button>
           </div>
         )}
 
@@ -2974,6 +2646,24 @@ export default function AdminOrderDetail() {
           <p className="admin-muted">Order lines are locked while archived.</p>
         )}
       </div>
+
+      <CatalogProductPickerModal
+        open={catalogPickerOpen}
+        title="Add products to order"
+        products={catalogProducts}
+        categories={catalogCategories}
+        assemblies={catalogAssemblies}
+        customerUserId={order?.user_id ?? null}
+        preferencesScope={orderId ? `admin_order_${orderId}` : 'admin_order'}
+        commitLabel="Add to order"
+        onClose={() => setCatalogPickerOpen(false)}
+        onCommit={commitCatalogFromPicker}
+      />
+      {catalogPickerOpen && catalogPickerLoading && catalogProducts.length === 0 && (
+        <p className="admin-muted" style={{ position: 'fixed', bottom: '1rem', left: '50%', transform: 'translateX(-50%)', zIndex: 10001 }}>
+          Loading catalogues…
+        </p>
+      )}
     </div>
   )
 }

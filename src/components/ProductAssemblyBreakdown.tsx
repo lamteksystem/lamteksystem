@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
-import {
-  ASSEMBLY_COMPONENT_ROLE_LABELS,
-  fetchProductAssemblyBom,
-  type AssemblyComponentRole,
-  type ProductAssemblyBom,
-} from '@/lib/productAssembly'
+import { ASSEMBLY_COMPONENT_ROLE_LABELS, fetchProductAssemblyBom, type ProductAssemblyBom } from '@/lib/productAssembly'
 
 interface ProductAssemblyBreakdownProps {
   productId: string
   /** Show per-line stock qty when provided (stock take). */
   stockByProductId?: Map<string, number>
+  /** Labels from assembly_part_types; falls back to built-in defaults. */
+  roleLabels?: Map<string, string>
   compact?: boolean
   className?: string
 }
@@ -17,9 +14,13 @@ interface ProductAssemblyBreakdownProps {
 export default function ProductAssemblyBreakdown({
   productId,
   stockByProductId,
+  roleLabels,
   compact,
   className,
 }: ProductAssemblyBreakdownProps) {
+  function roleLabel(code: string): string {
+    return roleLabels?.get(code) ?? ASSEMBLY_COMPONENT_ROLE_LABELS[code] ?? code
+  }
   const [bom, setBom] = useState<ProductAssemblyBom | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -74,7 +75,7 @@ export default function ProductAssemblyBreakdown({
         <tbody>
           {bom.assembly_lines.map((line) => (
             <tr key={line.id}>
-              <td>{ASSEMBLY_COMPONENT_ROLE_LABELS[line.component_role as AssemblyComponentRole]}</td>
+              <td>{roleLabel(line.component_role)}</td>
               <td>{line.product?.name ?? '—'}</td>
               <td><code>{line.product?.sku ?? '—'}</code></td>
               <td>{line.quantity}</td>

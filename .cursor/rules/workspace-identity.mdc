@@ -8,3 +8,14 @@ alwaysApply: true
 
 - New integrated terminals run `scripts/activate-workspace-context.ps1` (see `.vscode/settings.json`). That targets **lamteksystem** on GitHub CLI and the Lamtek Supabase token path in `scripts/identity.config.json`.
 - This is the **active** ordering portal repo (not other legacy folders on disk).
+
+## GitHub Pages (required)
+
+**Demo:** https://lamteksystem.github.io/lamteksystem/ — deploys automatically on every push to `main`.
+
+After any meaningful code/docs/migration work in this repo, **before ending the turn**:
+
+1. `npm run ship -- "short message"` — validate, remote migrations, commit, push to `main`.
+2. Confirm deploy: `gh run list --workflow=deploy-github-pages.yml --limit 1` (or tell the user to hard-refresh the demo in ~2 min).
+
+Do **not** leave UI fixes or features only on localhost. If `ship` fails, fix and retry. Never commit `.env`, `.secrets/`, `dist/`, or `supabase/.temp/`.

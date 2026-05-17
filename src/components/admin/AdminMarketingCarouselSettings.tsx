@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { usePermission } from '@/hooks/usePermission'
 import type { MarketingSiteSettingsRow, ProductRow } from '@/types/database'
 
-export default function AdminMarketingCarouselSettings() {
+export default function AdminMarketingCarouselSettings({ embedded = false }: { embedded?: boolean }) {
   const { allowed: canEdit, loading: permLoading } = usePermission('admin.settings', 'edit')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -128,10 +128,12 @@ export default function AdminMarketingCarouselSettings() {
     window.setTimeout(() => setSaved(false), 2500)
   }
 
+  const wrapClass = embedded ? 'admin-settings-embedded-panel' : 'card admin-settings-card'
+
   if (permLoading || loading) {
     return (
-      <section className="card admin-settings-card">
-        <h2>Public site — popular products carousel</h2>
+      <section className={wrapClass}>
+        {!embedded && <h2>Public site — popular products carousel</h2>}
         <p className="page-intro">Loading…</p>
       </section>
     )
@@ -139,16 +141,16 @@ export default function AdminMarketingCarouselSettings() {
 
   if (!canEdit) {
     return (
-      <section className="card admin-settings-card">
-        <h2>Public site — popular products carousel</h2>
+      <section className={wrapClass}>
+        {!embedded && <h2>Public site — popular products carousel</h2>}
         <p className="page-intro">You do not have permission to edit site marketing settings.</p>
       </section>
     )
   }
 
   return (
-    <section className="card admin-settings-card">
-      <h2>Public site — popular products carousel</h2>
+    <section className={wrapClass}>
+      {!embedded && <h2>Public site — popular products carousel</h2>}
       <p className="page-intro">
         Controls the homepage carousel on the public marketing site (before login). Choose how many slides to show and which catalogue products appear.
       </p>

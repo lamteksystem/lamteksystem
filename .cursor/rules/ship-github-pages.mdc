@@ -19,6 +19,8 @@ After **meaningful local changes** in this repo (features, fixes, migrations, ma
 **Demo URL:** https://lamteksystem.github.io/lamteksystem/  
 **Local dev:** http://localhost:5173/ (`VITE_DEV_PORT=5173 npm run dev`)
 
-If the user asks to keep demo in sync, run the full ship flow without waiting to be asked again for push/deploy.
+**Default:** run the full ship flow at the end of every task that changed tracked files — the user expects the GitHub Pages demo to stay in sync without a separate “push to GitHub” request.
 
 Optional one-shot: `npm run ship -- "commit message"` (see `scripts/ship-to-github.mjs`).
+
+Never stage: `.env`, `.env.*`, `.secrets/`, `dist/`, `supabase/.temp/`, `node_modules/`.

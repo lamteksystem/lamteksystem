@@ -549,6 +549,7 @@ export interface CustomerNoteRow {
   created_at: string
 }
 
+/** @deprecated Use string codes from assembly_part_types; built-ins listed in DEFAULT_ASSEMBLY_PART_TYPES. */
 export type AssemblyComponentRole =
   | 'unit'
   | 'door'
@@ -558,6 +559,16 @@ export type AssemblyComponentRole =
   | 'leg_kit'
   | 'fittings'
   | 'other'
+
+export interface AssemblyPartTypeRow {
+  code: string
+  label: string
+  sort_order: number
+  active: boolean
+  is_system: boolean
+  created_at: string
+  updated_at: string
+}
 
 export interface AssemblyRow {
   id: string
@@ -581,7 +592,7 @@ export interface AssemblyLineRow {
   product_id: string
   quantity: number
   sort_order: number
-  component_role: AssemblyComponentRole
+  component_role: string
 }
 
 export type AssemblyWithLines = AssemblyRow & {

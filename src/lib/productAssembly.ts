@@ -1,26 +1,13 @@
 import { supabase } from '@/lib/supabase'
+import { DEFAULT_ASSEMBLY_PART_TYPES, fetchAssemblyPartTypes, partTypeSortOrder } from '@/lib/assemblyPartTypes'
 import type { AssemblyLineRow, AssemblyRow, ProductRow } from '@/types/database'
 
-export type AssemblyComponentRole =
-  | 'unit'
-  | 'door'
-  | 'drawer'
-  | 'hinge'
-  | 'hinge_plate'
-  | 'leg_kit'
-  | 'fittings'
-  | 'other'
+export type AssemblyComponentRole = string
 
-export const ASSEMBLY_COMPONENT_ROLE_LABELS: Record<AssemblyComponentRole, string> = {
-  unit: 'Unit / carcass / cabinet',
-  door: 'Door',
-  drawer: 'Drawer',
-  hinge: 'Hinge',
-  hinge_plate: 'Hinge plate',
-  leg_kit: 'Leg kit',
-  fittings: 'Fittings bag',
-  other: 'Other',
-}
+/** Fallback labels when DB part types are unavailable (offline / pre-migration). */
+export const ASSEMBLY_COMPONENT_ROLE_LABELS: Record<string, string> = Object.fromEntries(
+  DEFAULT_ASSEMBLY_PART_TYPES.map((t) => [t.code, t.label])
+)
 
 export type AssemblyLineWithProduct = AssemblyLineRow & {
   component_role: AssemblyComponentRole
@@ -31,22 +18,17 @@ export type ProductAssemblyBom = AssemblyRow & {
   assembly_lines: AssemblyLineWithProduct[]
 }
 
-const ROLE_ORDER: AssemblyComponentRole[] = [
-  'unit',
-  'door',
-  'drawer',
-  'hinge',
-  'hinge_plate',
-  'leg_kit',
-  'fittings',
-  'other',
-]
-
-export function sortAssemblyLines<T extends { sort_order: number; component_role?: string }>(lines: T[]): T[] {
+export function sortAssemblyLines<T extends { sort_order: number; component_role?: string }>(
+  lines: T[],
+  roleOrder?: string[]
+): T[] {
+  const order = roleOrder ?? DEFAULT_ASSEMBLY_PART_TYPES.map((t) => t.code)
   return [...lines].sort((a, b) => {
-    const ra = ROLE_ORDER.indexOf((a.component_role ?? 'other') as AssemblyComponentRole)
-    const rb = ROLE_ORDER.indexOf((b.component_role ?? 'other') as AssemblyComponentRole)
-    if (ra !== rb) return ra - rb
+    const ra = order.indexOf(a.component_role ?? 'other')
+    const rb = order.indexOf(b.component_role ?? 'other')
+    const ia = ra === -1 ? order.length : ra
+    const ib = rb === -1 ? order.length : rb
+    if (ia !== ib) return ia - ib
     return a.sort_order - b.sort_order
   })
 }
@@ -100,6 +82,9 @@ export async function fetchProductAssemblyBom(productId: string): Promise<Produc
 
   if (lineErr) return null
 
+  const partTypes = await fetchAssemblyPartTypes()
+  const roleOrder = partTypeSortOrder(partTypes)
+
   const assemblyLines = sortAssemblyLines(
     (lines ?? []).map((row) => {
       const r = row as AssemblyLineRow & {
@@ -109,10 +94,11 @@ export async function fetchProductAssemblyBom(productId: string): Promise<Produc
       const product = Array.isArray(r.product) ? r.product[0] : r.product
       return {
         ...r,
-        component_role: (r.component_role ?? 'other') as AssemblyComponentRole,
+        component_role: r.component_role ?? 'other',
         product,
       }
-    })
+    }),
+    roleOrder
   ) as AssemblyLineWithProduct[]
 
   return { ...(assembly as AssemblyRow), assembly_lines: assemblyLines }

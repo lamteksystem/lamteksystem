@@ -66,7 +66,7 @@ export async function fetchCategoryProductCounts(): Promise<Map<string, number>>
   const counts = new Map<string, number>()
   const [{ data: links }, { data: products }] = await Promise.all([
     supabase.from('product_categories').select('product_id, category_id'),
-    supabase.from('products').select('id, category_id'),
+    supabase.from('products').select('id, category_id').not('category_id', 'is', null),
   ])
   const productIdsWithLinks = new Set((links ?? []).map((l) => l.product_id))
   for (const row of links ?? []) {

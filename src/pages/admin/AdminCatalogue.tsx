@@ -16,6 +16,7 @@ import { StockMtmSwitch } from '@/components/admin/StockMtmSwitch'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import { useColumnWidths } from '@/hooks/useColumnWidths'
 import { usePermission } from '@/hooks/usePermission'
+import { useAssemblyPartTypes } from '@/hooks/useAssemblyPartTypes'
 import { getProductAvailabilityMeta } from '@/lib/productAvailability'
 import { fetchCompleteProductIds } from '@/lib/productAssembly'
 import {
@@ -23,6 +24,7 @@ import {
   fetchProductCategoryMap,
   formatCategoryNames,
   getProductCategoryIds,
+  normalizeCategorySelection,
   productMatchesAnyCategorySlug,
   productMatchesCategoryFilter,
   saveProductCategories,
@@ -154,6 +156,11 @@ export default function AdminCatalogue() {
   const [viewType, setViewType] = useState<CatalogueViewType>('table')
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null)
   const [completeProductIds, setCompleteProductIds] = useState<Set<string>>(new Set())
+  const {
+    types: assemblyPartTypes,
+    labels: assemblyPartTypeLabels,
+    reload: reloadAssemblyPartTypes,
+  } = useAssemblyPartTypes(true)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
@@ -257,19 +264,23 @@ export default function AdminCatalogue() {
       return
     }
     setInlineSaving(true)
-    setEditingCell(null)
-    const { error } = await saveProductCategories(productId, ids, primary)
-    if (!error) {
-      setProductCategoryMap((prev) => {
-        const next = new Map(prev)
-        next.set(productId, ids)
-        return next
-      })
-      setProducts((prev) =>
-        prev.map((p) => (p.id === productId ? { ...p, category_id: primary } : p))
-      )
+    const normalized = normalizeCategorySelection(ids, primary)
+    const result = await saveProductCategories(productId, normalized.ids, normalized.primary)
+    if (result.error) {
+      window.alert(`Could not save categories: ${result.error}`)
+      setInlineSaving(false)
+      return
     }
+    setProductCategoryMap((prev) => {
+      const next = new Map(prev)
+      next.set(productId, result.categoryIds)
+      return next
+    })
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, category_id: result.primaryCategoryId } : p))
+    )
     setCategoryEditDraft(null)
+    setEditingCell(null)
     setInlineSaving(false)
   }
 
@@ -1795,12 +1806,31 @@ export default function AdminCatalogue() {
 
       {selectedProduct && (
         <AdminProductModal
+          key={selectedProduct.id}
           product={selectedProduct}
           categories={categories}
+          productCategoryMap={productCategoryMap}
+          canEditCatalogue={canEditCatalogue}
+          partTypes={assemblyPartTypes}
+          partTypeLabels={assemblyPartTypeLabels}
           allProducts={products}
           onClose={() => setSelectedProduct(null)}
-          onSaved={() => load()}
+          onSaved={() => void load()}
           onCategoriesChange={(next) => setCategories(next)}
+          onPartTypesChange={() => void reloadAssemblyPartTypes()}
+          onProductSaved={(productId, categoryIds, primary) => {
+            setProductCategoryMap((prev) => {
+              const next = new Map(prev)
+              next.set(productId, categoryIds)
+              return next
+            })
+            setProducts((prev) =>
+              prev.map((p) => (p.id === productId ? { ...p, category_id: primary } : p))
+            )
+            setSelectedProduct((prev) =>
+              prev && prev.id === productId ? { ...prev, category_id: primary } : prev
+            )
+          }}
         />
       )}
 

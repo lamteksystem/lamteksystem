@@ -1,22 +1,37 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { DEFAULT_ASSEMBLY_PART_TYPES } from '@/lib/assemblyPartTypes'
 import {
-  ASSEMBLY_COMPONENT_ROLE_LABELS,
   addAssemblyLine,
+  ASSEMBLY_COMPONENT_ROLE_LABELS,
   ensureAssemblyForProduct,
   fetchProductAssemblyBom,
   inferComponentRoleFromProduct,
   removeAssemblyLine,
-  type AssemblyComponentRole,
   type ProductAssemblyBom,
 } from '@/lib/productAssembly'
+import PartTypeSelectWithAdd from '@/components/admin/PartTypeSelectWithAdd'
 import ProductAssemblyBreakdown from '@/components/ProductAssemblyBreakdown'
-import type { CategoryRow, ProductRow } from '@/types/database'
+import { useAssemblyPartTypes } from '@/hooks/useAssemblyPartTypes'
+import type { AssemblyPartTypeRow, CategoryRow, ProductRow } from '@/types/database'
 
 interface ProductAssemblyEditorProps {
   product: ProductRow
   categories: CategoryRow[]
   allProducts: ProductRow[]
   canEdit: boolean
+  partTypes?: AssemblyPartTypeRow[]
+  partTypeLabels?: Map<string, string>
+  onPartTypesChange?: () => void
+}
+
+function toFallbackTypes(): AssemblyPartTypeRow[] {
+  return DEFAULT_ASSEMBLY_PART_TYPES.map((row) => ({
+    ...row,
+    active: true,
+    created_at: '',
+    updated_at: '',
+  }))
 }
 
 export default function ProductAssemblyEditor({
@@ -24,14 +39,33 @@ export default function ProductAssemblyEditor({
   categories,
   allProducts,
   canEdit,
+  partTypes: partTypesProp,
+  partTypeLabels: partTypeLabelsProp,
+  onPartTypesChange,
 }: ProductAssemblyEditorProps) {
+  const hookPartTypes = useAssemblyPartTypes(true)
+  const [localPartTypes, setLocalPartTypes] = useState<AssemblyPartTypeRow[] | null>(null)
+
+  const partTypes = useMemo(() => {
+    if (localPartTypes && localPartTypes.length > 0) return localPartTypes
+    if (partTypesProp && partTypesProp.length > 0) return partTypesProp
+    if (hookPartTypes.types.length > 0) return hookPartTypes.types
+    return toFallbackTypes()
+  }, [localPartTypes, partTypesProp, hookPartTypes.types])
+
+  const labels = useMemo(() => {
+    if (partTypeLabelsProp && partTypeLabelsProp.size > 0) return partTypeLabelsProp
+    if (hookPartTypes.labels.size > 0) return hookPartTypes.labels
+    return new Map(Object.entries(ASSEMBLY_COMPONENT_ROLE_LABELS))
+  }, [partTypeLabelsProp, hookPartTypes.labels])
+
   const [bom, setBom] = useState<ProductAssemblyBom | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [addProductId, setAddProductId] = useState('')
   const [addQty, setAddQty] = useState('1')
-  const [addRole, setAddRole] = useState<AssemblyComponentRole>('other')
+  const [addRole, setAddRole] = useState('other')
   const [componentPicker, setComponentPicker] = useState('')
 
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
@@ -54,6 +88,18 @@ export default function ProductAssemblyEditor({
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    if (partTypes.length > 0 && !partTypes.some((t) => t.code === addRole)) {
+      setAddRole(partTypes[0]?.code ?? 'other')
+    }
+  }, [partTypes, addRole])
+
+  function handlePartTypesUpdated(next: AssemblyPartTypeRow[]) {
+    setLocalPartTypes(next)
+    void hookPartTypes.reload()
+    onPartTypesChange?.()
+  }
 
   async function handleCreateBom() {
     setBusy(true)
@@ -106,6 +152,10 @@ export default function ProductAssemblyEditor({
     await refresh()
   }
 
+  function roleLabel(code: string): string {
+    return labels.get(code) ?? code
+  }
+
   if (loading) {
     return <p className="admin-muted">Loading complete-unit breakdown…</p>
   }
@@ -113,22 +163,45 @@ export default function ProductAssemblyEditor({
   return (
     <div className="product-assembly-editor">
       <p className="admin-muted product-assembly-editor-hint">
-        A Tealbury <strong>complete</strong> unit typically includes: carcass/cabinet (colours), door or drawer front,
-        hinges and plates, leg kit, and a fittings bag. Link each stocked SKU here — stock take counts these parts, not
-        the package line alone.
+        A Tealbury <strong>complete</strong> unit typically includes: carcass/cabinet, door or drawer front, hinges,
+        plates, leg kit, and fittings. Link each stocked SKU here — stock take counts these parts, not the package alone.{' '}
+        <Link to="/admin/settings?tab=products">Manage part types in Settings</Link>.
       </p>
+
+      {canEdit && (
+        <div className="product-assembly-editor-part-types card admin-card">
+          <h4 className="product-assembly-editor-add-title">Part types</h4>
+          <p className="admin-muted product-assembly-editor-part-types-hint">
+            Choose a type when adding components, or create a new one here without leaving this product.
+          </p>
+          <label className="product-assembly-editor-field">
+            <span className="product-assembly-editor-field-label">Default part type for new lines</span>
+            <PartTypeSelectWithAdd
+              partTypes={partTypes}
+              value={addRole}
+              onChange={setAddRole}
+              onPartTypesChange={handlePartTypesUpdated}
+            />
+          </label>
+        </div>
+      )}
 
       {!bom ? (
         canEdit ? (
-          <button type="button" className="btn btn-outline" disabled={busy} onClick={() => void handleCreateBom()}>
-            {busy ? 'Creating…' : 'Define component breakdown'}
-          </button>
+          <div className="product-assembly-editor-create">
+            <p className="admin-muted">
+              When you are ready, create the breakdown, then pick a component SKU and quantity below.
+            </p>
+            <button type="button" className="btn btn-outline" disabled={busy} onClick={() => void handleCreateBom()}>
+              {busy ? 'Creating…' : 'Define component breakdown'}
+            </button>
+          </div>
         ) : (
-          <ProductAssemblyBreakdown productId={product.id} />
+          <ProductAssemblyBreakdown productId={product.id} roleLabels={labels} />
         )
       ) : (
         <>
-          <ProductAssemblyBreakdown productId={product.id} />
+          <ProductAssemblyBreakdown productId={product.id} roleLabels={labels} />
           {canEdit && (
             <div className="product-assembly-editor-add card admin-card">
               <h4 className="product-assembly-editor-add-title">Add component line</h4>
@@ -165,17 +238,12 @@ export default function ProductAssemblyEditor({
                 <div className="product-assembly-editor-add-row">
                   <label className="product-assembly-editor-field">
                     <span className="product-assembly-editor-field-label">Part type</span>
-                    <select
+                    <PartTypeSelectWithAdd
+                      partTypes={partTypes}
                       value={addRole}
-                      onChange={(e) => setAddRole(e.target.value as AssemblyComponentRole)}
-                      className="admin-select"
-                    >
-                      {(Object.keys(ASSEMBLY_COMPONENT_ROLE_LABELS) as AssemblyComponentRole[]).map((role) => (
-                        <option key={role} value={role}>
-                          {ASSEMBLY_COMPONENT_ROLE_LABELS[role]}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setAddRole}
+                      onPartTypesChange={handlePartTypesUpdated}
+                    />
                   </label>
                   <label className="product-assembly-editor-field">
                     <span className="product-assembly-editor-field-label">Qty per complete unit</span>
@@ -206,7 +274,7 @@ export default function ProductAssemblyEditor({
                     {bom.assembly_lines.map((line) => (
                       <li key={line.id}>
                         <span className="product-assembly-editor-line-text">
-                          {ASSEMBLY_COMPONENT_ROLE_LABELS[line.component_role]} ×{line.quantity} —{' '}
+                          {roleLabel(line.component_role)} ×{line.quantity} —{' '}
                           <code>{line.product?.sku}</code>
                         </span>
                         <button

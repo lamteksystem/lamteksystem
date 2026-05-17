@@ -65,8 +65,6 @@ export default function ProductDetailModal({
   onCloseRef.current = onClose
   /** Ignore backdrop dismiss briefly so stray pointer events cannot close immediately after mount. */
   const backdropDismissReadyAtRef = useRef(0)
-  /** True only after primary pointer pressed down on backdrop (not on card then released on backdrop — that must not dismiss). */
-  const pointerBackdropPrimedRef = useRef(false)
   const [assemblies, setAssemblies] = useState<AssemblyWithName[]>([])
   const [hasBom, setHasBom] = useState(false)
   const [technicalDocs, setTechnicalDocs] = useState<DocumentRow[]>([])
@@ -202,18 +200,6 @@ export default function ProductDetailModal({
     setAdding(false)
   }, [product.id])
 
-  /** If primed dismiss on backdrop but pointer released over the dialog (same overlay), abandon — otherwise primed leaks. */
-  useEffect(() => {
-    function clearPrimedUnlessBackdropSurface(ev: PointerEvent) {
-      if (!pointerBackdropPrimedRef.current) return
-      const back = backdropElRef.current
-      if (!back) return
-      if (ev.target !== back) pointerBackdropPrimedRef.current = false
-    }
-    document.addEventListener('pointerup', clearPrimedUnlessBackdropSurface, true)
-    return () => document.removeEventListener('pointerup', clearPrimedUnlessBackdropSurface, true)
-  }, [])
-
   const modalTitleId = useMemo(() => `product-modal-title-${product.id}`, [product.id])
 
   async function handleAdd() {
@@ -233,25 +219,10 @@ export default function ProductDetailModal({
     return performance.now() < backdropDismissReadyAtRef.current
   }
 
-  function handleBackdropPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    pointerBackdropPrimedRef.current = false
-    if (e.button !== 0) return
+  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
     if (e.target !== e.currentTarget) return
-    if (shouldIgnoreBackdropDismiss()) return
-    pointerBackdropPrimedRef.current = true
-  }
-
-  function handleBackdropPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.button !== 0) return
-    if (e.target !== e.currentTarget) return
-    if (!pointerBackdropPrimedRef.current) return
-    pointerBackdropPrimedRef.current = false
     if (shouldIgnoreBackdropDismiss()) return
     onCloseRef.current()
-  }
-
-  function handleBackdropPointerCancel() {
-    pointerBackdropPrimedRef.current = false
   }
 
   const modalTree = (
@@ -261,10 +232,7 @@ export default function ProductDetailModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={modalTitleId}
-      onPointerDown={handleBackdropPointerDown}
-      onPointerUp={handleBackdropPointerUp}
-      onPointerCancel={handleBackdropPointerCancel}
-      onLostPointerCapture={handleBackdropPointerCancel}
+      onClick={handleBackdropClick}
     >
       <div className="product-modal card" ref={modalRef}>
         <button

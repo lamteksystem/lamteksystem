@@ -34,19 +34,25 @@ function runGit(args) {
 }
 
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+/** npm.cmd requires shell on Windows (spawnSync EINVAL otherwise). */
+const npmOpts = process.platform === 'win32' ? { shell: true } : {}
+
+function runNpm(args) {
+  run(npmCmd, args, npmOpts)
+}
 
 console.log('→ Lint & typecheck…')
-run(npmCmd, ['run', 'lint'])
-run(npmCmd, ['run', 'typecheck'])
+runNpm(['run', 'lint'])
+runNpm(['run', 'typecheck'])
 
 console.log('→ Unit tests…')
-run(npmCmd, ['run', 'test'])
+runNpm(['run', 'test'])
 
 console.log('→ Building…')
-run(npmCmd, ['run', 'build'])
+runNpm(['run', 'build'])
 
 console.log('→ Pushing Supabase migrations to remote…')
-run(npmCmd, ['run', 'db:push:remote'])
+runNpm(['run', 'db:push:remote'])
 
 const status = spawnSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' })
 const dirty = (status.stdout ?? '').trim()

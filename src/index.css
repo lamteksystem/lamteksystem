@@ -2551,6 +2551,33 @@ a.ordering-wizard-card--link:hover {
   .cart-fab { display: none; }
 }
 
+.ordering-toast {
+  margin: 0 0 1rem;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-weight: 500;
+}
+
+.ordering-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ordering-header-actions {
+  flex-shrink: 0;
+}
+
+.ordering-result-count {
+  align-self: center;
+  font-size: 0.9rem;
+}
+
 /* Admin staff: floating quick actions (quote / order) */
 .admin-fab-backdrop {
   position: fixed;

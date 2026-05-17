@@ -540,15 +540,6 @@ export default function CatalogProductWorkbench({
               </button>
             )}
           </form>
-          <button
-            type="button"
-            className="tb-pane-toggle tb-pane-toggle--detail"
-            onClick={() => setRightDetailVisible((v) => !v)}
-            aria-pressed={rightDetailVisible}
-            title={rightDetailVisible ? 'Hide product details' : 'Show product details'}
-          >
-            {rightDetailVisible ? 'Hide details' : 'Show details'}
-          </button>
           <p className="tb-result-meta">
             <strong>{mainTab === 'products' ? filtered.length : filteredAssemblies.length}</strong>{' '}
             {mainTab === 'products' ? 'product' : 'unit'}
@@ -832,6 +823,18 @@ export default function CatalogProductWorkbench({
       </section>
 
       <aside className="tb-workbench-right" aria-label="Details and basket">
+        <div className="tb-right-pane-toolbar">
+          <span className="tb-right-pane-toolbar-label">Product panel</span>
+          <button
+            type="button"
+            className="tb-pane-toggle tb-pane-toggle--detail"
+            onClick={() => setRightDetailVisible((v) => !v)}
+            aria-pressed={rightDetailVisible}
+            title={rightDetailVisible ? 'Hide product details' : 'Show product details'}
+          >
+            {rightDetailVisible ? 'Hide product details' : 'Show product details'}
+          </button>
+        </div>
         {rightDetailVisible && (
           selectedProduct && mainTab === 'products' ? (
             <CatalogProductDetailPanel

@@ -327,7 +327,7 @@ export default function Ordering() {
   }
 
   return (
-    <div className="ordering-page">
+    <div className="ordering-page ordering-page--workbench">
       <PageNav
         backTo={workflowComplete ? '/ordering/start' : '/'}
         backLabel={workflowComplete ? 'Choose manual or Guided Order' : 'Dashboard'}

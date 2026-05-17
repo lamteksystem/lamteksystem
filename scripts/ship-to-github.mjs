@@ -53,8 +53,7 @@ if (!dirty) {
 
 console.log('→ Committing…')
 run('git', ['add', '-A'])
-// Quote message for Windows shells (semicolons/spaces break unquoted -m args).
-run('git', [`commit -m "${message.replace(/"/g, '\\"')}"`])
+run('git', ['commit', '-m', message])
 
 console.log('→ Pushing to origin main (GitHub Pages will deploy)…')
 run('git', ['push', 'origin', 'main'])

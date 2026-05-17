@@ -10,6 +10,14 @@ import BrandLogo from '@/components/BrandLogo'
 import type { DocumentRow, OrderRow, ProductRow, TicketRow } from '@/types/database'
 import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
 
+function headerNavLinkClass(isActive: boolean, extra = ''): string {
+  return ['header-nav-link', extra, isActive ? 'active' : ''].filter(Boolean).join(' ')
+}
+
+function isCreateOrderPath(pathname: string): boolean {
+  return pathname === '/ordering/start' || pathname === '/ordering' || pathname.startsWith('/ordering/mto')
+}
+
 export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -508,17 +516,43 @@ export default function Layout() {
 
   const userDisplayName = profileName || user?.email || 'Account'
 
+  const pathname = location.pathname
+
   const navLinks = (
     <>
-      <Link to="/" onClick={() => setMobileMenuOpen(false)}>Dashboard</Link>
-      <Link to="/products" onClick={() => setMobileMenuOpen(false)}>Products</Link>
-      <Link to="/ordering/start" onClick={() => setMobileMenuOpen(false)}>Create Order</Link>
-      <Link to="/ordering/tealbury" onClick={() => setMobileMenuOpen(false)}>Tealbury kitchens</Link>
-      <Link to="/downloads" onClick={() => setMobileMenuOpen(false)}>Downloads</Link>
-      <Link to="/depots" onClick={() => setMobileMenuOpen(false)}>Depots</Link>
-      <Link to="/account" onClick={() => setMobileMenuOpen(false)}>My Account</Link>
+      <NavLink to="/" end className={({ isActive }) => headerNavLinkClass(isActive)} onClick={() => setMobileMenuOpen(false)}>
+        Dashboard
+      </NavLink>
+      <NavLink to="/products" className={({ isActive }) => headerNavLinkClass(isActive)} onClick={() => setMobileMenuOpen(false)}>
+        Products
+      </NavLink>
+      <NavLink
+        to="/ordering/start"
+        className={() => headerNavLinkClass(isCreateOrderPath(pathname))}
+        onClick={() => setMobileMenuOpen(false)}
+      >
+        Create Order
+      </NavLink>
+      <NavLink to="/ordering/tealbury" className={({ isActive }) => headerNavLinkClass(isActive)} onClick={() => setMobileMenuOpen(false)}>
+        Tealbury kitchens
+      </NavLink>
+      <NavLink to="/downloads" className={({ isActive }) => headerNavLinkClass(isActive)} onClick={() => setMobileMenuOpen(false)}>
+        Downloads
+      </NavLink>
+      <NavLink to="/depots" className={({ isActive }) => headerNavLinkClass(isActive)} onClick={() => setMobileMenuOpen(false)}>
+        Depots
+      </NavLink>
+      <NavLink to="/account" className={({ isActive }) => headerNavLinkClass(isActive)} onClick={() => setMobileMenuOpen(false)}>
+        My Account
+      </NavLink>
       {isStaff && (
-        <Link to="/admin" className="nav-staff-link" onClick={() => setMobileMenuOpen(false)}>Staff backend</Link>
+        <NavLink
+          to="/admin"
+          className={({ isActive }) => headerNavLinkClass(isActive, 'nav-staff-link')}
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          Staff backend
+        </NavLink>
       )}
       <div className={`header-user-dropdown ${userMenuOpen ? 'open' : ''}`}>
         <button

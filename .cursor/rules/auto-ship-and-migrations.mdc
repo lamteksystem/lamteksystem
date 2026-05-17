@@ -1,0 +1,68 @@
+---
+description: Automatically ship every change to GitHub Pages and apply Supabase migrations — never ask the user
+alwaysApply: true
+---
+
+# Auto-ship + auto-migrations (mandatory)
+
+The user must **never** be asked to push to GitHub, deploy to GitHub Pages, or run database migrations. You have shell access, `gh`, and Supabase CLI via this repo. Do it yourself every time.
+
+## When to run (end of turn)
+
+Before you finish **any** turn where you created or modified tracked files in this repo:
+
+1. Apply migrations (see below).
+2. Ship to GitHub (see below).
+
+Do not skip because the task felt small. Do not wait for the user to say "push" or "ship".
+
+## Supabase migrations (you run them)
+
+- **Never** tell the user to run migrations, `db push`, or open the Supabase dashboard for SQL you added.
+- When you add or change `supabase/migrations/*.sql`, run immediately:
+  ```bash
+  npm run db:push:remote
+  ```
+- At ship time, `npm run ship` already runs `db:push:remote` again — that is fine.
+- Credentials: `.env` and `scripts/identity.config.json` / `scripts/push-migrations.mjs` (Lamtek remote). Use the integrated terminal with workspace context if needed.
+- If push fails, read the error, fix the migration or connection, retry. Only report to the user if you are blocked after retry.
+
+## Ship to GitHub + GitHub Pages (you run it)
+
+- **Never** ask the user to push, commit, or refresh GitHub Pages manually (except they may hard-refresh the browser after deploy).
+- **Demo URL:** https://lamteksystem.github.io/lamteksystem/
+- **Branch:** `main` → triggers `.github/workflows/deploy-github-pages.yml`
+
+### One command (preferred)
+
+```bash
+npm run ship -- "type: short description of all changes in this turn"
+```
+
+`scripts/ship-to-github.mjs` runs: lint → typecheck → test → build → `db:push:remote` → commit all tracked changes → `push origin main`.
+
+### If `ship` fails
+
+1. Fix lint/typecheck/test/build errors, then re-run `npm run ship`.
+2. Do not leave changes only on localhost.
+3. Do not ask the user to run `npm run ship` for you.
+
+### Git safety
+
+Never commit or push: `.env`, `.env.*`, `.secrets/`, `dist/`, `supabase/.temp/`, `node_modules/`.
+
+### After push
+
+Briefly note: pushed to `main`, Pages deploy ~1–2 min, demo URL. Optional: `gh run list --workflow=deploy-github-pages.yml --limit 1`.
+
+## Commit message
+
+One commit per turn when possible; message should summarize **why**, not every file.
+
+## Exceptions (rare)
+
+- User explicitly says **do not commit** or **do not push** this session.
+- User is only asking a question with no file edits.
+- WIP explicitly requested to stay local (user must say so clearly).
+
+Otherwise: **always ship, always migrate.**

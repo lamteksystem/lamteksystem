@@ -20,28 +20,33 @@ if (!message) {
   process.exit(1)
 }
 
-function run(cmd, args, opts = {}) {
+function run(cmd, args, { shell = false } = {}) {
   const r = spawnSync(cmd, args, {
     cwd: root,
     stdio: 'inherit',
-    shell: true,
-    ...opts,
+    shell,
   })
   if ((r.status ?? 1) !== 0) process.exit(r.status ?? 1)
 }
 
+function runGit(args) {
+  run('git', args, { shell: false })
+}
+
+const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+
 console.log('→ Lint & typecheck…')
-run('npm', ['run', 'lint'])
-run('npm', ['run', 'typecheck'])
+run(npmCmd, ['run', 'lint'])
+run(npmCmd, ['run', 'typecheck'])
 
 console.log('→ Unit tests…')
-run('npm', ['run', 'test'])
+run(npmCmd, ['run', 'test'])
 
 console.log('→ Building…')
-run('npm', ['run', 'build'])
+run(npmCmd, ['run', 'build'])
 
 console.log('→ Pushing Supabase migrations to remote…')
-run('npm', ['run', 'db:push:remote'])
+run(npmCmd, ['run', 'db:push:remote'])
 
 const status = spawnSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' })
 const dirty = (status.stdout ?? '').trim()
@@ -52,11 +57,11 @@ if (!dirty) {
 }
 
 console.log('→ Committing…')
-run('git', ['add', '-A'])
-run('git', ['commit', '-m', message])
+runGit(['add', '-A'])
+runGit(['commit', '-m', message])
 
 console.log('→ Pushing to origin main (GitHub Pages will deploy)…')
-run('git', ['push', 'origin', 'main'])
+runGit(['push', 'origin', 'main'])
 
 console.log('→ Done. Pages deploy: Actions → Deploy GitHub Pages')
 console.log('   Demo: https://lamteksystem.github.io/lamteksystem/')

@@ -1,26 +1,12 @@
 ---
-description: Keep GitHub main and GitHub Pages in sync after Lamtek portal work
-globs:
+description: Deprecated pointer — use auto-ship-and-migrations.mdc
 alwaysApply: true
 ---
 
-# Ship to GitHub + GitHub Pages
+# Ship + migrations
 
-After **meaningful local changes** in this repo (features, fixes, migrations, manual/docs the user cares about on demo):
+All shipping and migration steps live in **`auto-ship-and-migrations.mdc`**.
 
-1. **Migrations** — apply to remote Supabase:
-   - `npm run db:push:remote`
-   - Do not skip when `supabase/migrations/*.sql` changed.
-2. **Verify** — `npm run validate` (lint, typecheck, test, build) when TypeScript/React changed.
-3. **Commit** — stage relevant files only (never `.env`, `.secrets/`, `dist/`, `supabase/.temp/`).
-4. **Push** — `git push origin main` (triggers **Deploy GitHub Pages** on push to `main`).
-5. **Confirm deploy** — `gh run watch --workflow deploy-github-pages.yml` or check Actions until green.
+Quick reference: `npm run ship -- "message"` → validate, `db:push:remote`, commit, `git push origin main` → GitHub Pages deploy.
 
-**Demo URL:** https://lamteksystem.github.io/lamteksystem/  
-**Local dev:** http://localhost:5173/ (`VITE_DEV_PORT=5173 npm run dev`)
-
-**Default:** run the full ship flow at the end of every task that changed tracked files — the user expects the GitHub Pages demo to stay in sync without a separate “push to GitHub” request.
-
-Optional one-shot: `npm run ship -- "commit message"` (see `scripts/ship-to-github.mjs`).
-
-Never stage: `.env`, `.env.*`, `.secrets/`, `dist/`, `supabase/.temp/`, `node_modules/`.
+Never ask the user to push or run migrations.

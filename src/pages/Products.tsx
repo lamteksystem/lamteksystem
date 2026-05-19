@@ -1,14 +1,50 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { PageNav } from '@/components/PageNav'
 import ProductDetailModal from '@/components/ProductDetailModal'
 import { supabase } from '@/lib/supabase'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { getProductAvailabilityMeta } from '@/lib/productAvailability'
+import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
+import { PAGE_SIZE_OPTIONS, type PageSize } from '@/lib/listPagination'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
 type ViewType = 'grid' | 'list' | 'compact' | 'large' | 'table'
 type SortOption = 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'sku_asc' | 'sku_desc'
+type SortKey = 'name' | 'sku' | 'price' | 'availability'
+type SortDir = 'asc' | 'desc'
+
+/** Default page size — matches the shared admin pagers. */
+const DEFAULT_PAGE_SIZE: PageSize = 50
+
+/** Persistent prefs (stored in supabase user_preferences — never localStorage per workspace rules). */
+const PREF_VIEW = 'products.view'
+const PREF_PAGE_SIZE = 'products.pageSize'
+const PREF_SORT = 'products.sort'
+
+function sortOptionFromKey(key: SortKey, dir: SortDir): SortOption {
+  if (key === 'availability') return 'name_asc'
+  if (key === 'price') return dir === 'asc' ? 'price_asc' : 'price_desc'
+  if (key === 'sku') return dir === 'asc' ? 'sku_asc' : 'sku_desc'
+  return dir === 'asc' ? 'name_asc' : 'name_desc'
+}
+
+function keyFromSortOption(opt: SortOption): { key: SortKey; dir: SortDir } {
+  switch (opt) {
+    case 'name_asc':
+      return { key: 'name', dir: 'asc' }
+    case 'name_desc':
+      return { key: 'name', dir: 'desc' }
+    case 'price_asc':
+      return { key: 'price', dir: 'asc' }
+    case 'price_desc':
+      return { key: 'price', dir: 'desc' }
+    case 'sku_asc':
+      return { key: 'sku', dir: 'asc' }
+    case 'sku_desc':
+      return { key: 'sku', dir: 'desc' }
+  }
+}
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'name_asc', label: 'Name A–Z' },
@@ -807,23 +843,58 @@ export default function Products() {
         </div>
       ) : viewType === 'table' ? (
         <div className="products-table-wrap">
-          <table className="products-table">
+          <div ref={listTopRef} />
+          <table className="products-table products-table--modern">
             <thead>
               <tr>
-                <th scope="col" className="product-table-cell product-table-image">Image</th>
-                <th scope="col" className="product-table-cell product-table-name">Name</th>
-                <th scope="col" className="product-table-cell product-table-sku">SKU</th>
-                <th scope="col" className="product-table-cell">Availability</th>
-                <th scope="col" className="product-table-cell product-table-desc">Description</th>
-                <th scope="col" className="product-table-cell product-table-price">Price</th>
-                <th scope="col" className="product-table-cell product-table-action">Action</th>
+                <th
+                  scope="col"
+                  className="product-table-cell product-table-rownum"
+                  aria-label="Row number"
+                >
+                  #
+                </th>
+                <th scope="col" className="product-table-cell product-table-image">
+                  Image
+                </th>
+                <SortableHeader
+                  label="Name"
+                  sortKey="name"
+                  activeKey={sortKeyDir.key}
+                  dir={sortKeyDir.dir}
+                  onSort={requestSort}
+                  className="product-table-cell product-table-name"
+                />
+                <SortableHeader
+                  label="SKU"
+                  sortKey="sku"
+                  activeKey={sortKeyDir.key}
+                  dir={sortKeyDir.dir}
+                  onSort={requestSort}
+                  className="product-table-cell product-table-sku"
+                />
+                <th scope="col" className="product-table-cell product-table-availability">
+                  Availability
+                </th>
+                <SortableHeader
+                  label="Price"
+                  sortKey="price"
+                  activeKey={sortKeyDir.key}
+                  dir={sortKeyDir.dir}
+                  onSort={requestSort}
+                  className="product-table-cell product-table-price"
+                />
+                <th scope="col" className="product-table-cell product-table-action">
+                  Action
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((product) => (
+              {visible.map((product, i) => (
                 <ProductTableRow
                   key={product.id}
                   product={product}
+                  index={pageStart + i}
                   onOpenDetail={setSelectedProduct}
                 />
               ))}
@@ -831,16 +902,29 @@ export default function Products() {
           </table>
         </div>
       ) : (
-        <div className={`products-grid products-view--${viewType}`}>
-          {filtered.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              view={viewType}
-              onOpenDetail={setSelectedProduct}
-            />
-          ))}
-        </div>
+        <>
+          <div ref={listTopRef} />
+          <div className={`products-grid products-view--${viewType}`}>
+            {visible.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                view={viewType}
+                onOpenDetail={setSelectedProduct}
+              />
+            ))}
+          </div>
+        </>
+      )}
+      {!loading && filtered.length > 0 && (
+        <ProductsPagination
+          page={safePage}
+          setPage={setPage}
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+          total={filtered.length}
+          scrollTopRef={listTopRef}
+        />
       )}
 
       {selectedProduct && (
@@ -895,6 +979,48 @@ function LargeIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <rect x="3" y="3" width="18" height="18" />
     </svg>
+  )
+}
+
+/**
+ * Sortable column header. Click toggles asc → desc → asc on the selected key.
+ * Shows an arrow indicator (▲ / ▼) when the key is active, neutral (↕) when not.
+ */
+function SortableHeader({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+  className,
+}: {
+  label: string
+  sortKey: SortKey
+  activeKey: SortKey
+  dir: SortDir
+  onSort: (key: SortKey) => void
+  className?: string
+}) {
+  const isActive = activeKey === sortKey
+  const arrow = isActive ? (dir === 'asc' ? '▲' : '▼') : '↕'
+  return (
+    <th
+      scope="col"
+      className={`products-table-th-sortable${isActive ? ' is-active' : ''} ${className ?? ''}`}
+      aria-sort={isActive ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        className="products-table-th-btn"
+        onClick={() => onSort(sortKey)}
+        title={`Sort by ${label}`}
+      >
+        <span>{label}</span>
+        <span className="products-table-th-arrow" aria-hidden>
+          {arrow}
+        </span>
+      </button>
+    </th>
   )
 }
 

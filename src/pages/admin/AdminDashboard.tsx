@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -101,6 +101,8 @@ export default function AdminDashboard() {
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
       const todayIso = todayStart.toISOString()
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
       const [
         ordersRes,
@@ -170,7 +172,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="admin-dashboard">
-      <header className="admin-dashboard-hero">
+      <header className="admin-dashboard-hero admin-dashboard-hero-visual">
         <div className="admin-dashboard-hero-text">
           <h1 className="admin-dashboard-hero-title">{greeting}, {displayName}</h1>
           <p className="admin-dashboard-hero-meta">{dateStr}</p>
@@ -202,55 +204,37 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <section className="admin-dashboard-metrics" aria-label="Key metrics">
-        <Link to="/admin/orders" className="admin-stat-card admin-stat-card--link admin-stat-card--orders">
-          <span className="admin-stat-card-icon" aria-hidden>
-            <ClipboardList size={24} strokeWidth={2} />
-          </span>
-          <span className="admin-stat-value">{stats.ordersCount}</span>
-          <span className="admin-stat-label">Total orders</span>
-          <span className="admin-stat-card-hint">View all →</span>
-        </Link>
-        <Link to="/admin/orders/processing" className="admin-stat-card admin-stat-card--link admin-stat-card--placed">
-          <span className="admin-stat-card-icon" aria-hidden>
-            <Zap size={24} strokeWidth={2} />
-          </span>
-          <span className="admin-stat-value">{stats.ordersPlaced}</span>
-          <span className="admin-stat-label">Awaiting process</span>
-          <span className="admin-stat-card-hint">Process →</span>
-        </Link>
-        <div className="admin-stat-card admin-stat-card--today">
-          <span className="admin-stat-card-icon" aria-hidden>
-            <Calendar size={24} strokeWidth={2} />
-          </span>
-          <span className="admin-stat-value">{stats.ordersToday}</span>
-          <span className="admin-stat-label">Orders today</span>
-        </div>
-        <Link to="/admin/customers" className="admin-stat-card admin-stat-card--link admin-stat-card--customers">
-          <span className="admin-stat-card-icon" aria-hidden>
-            <Users size={24} strokeWidth={2} />
-          </span>
-          <span className="admin-stat-value">{stats.customersCount}</span>
-          <span className="admin-stat-label">Customers</span>
-          <span className="admin-stat-card-hint">View →</span>
-        </Link>
-        <Link to="/admin/catalogue" className="admin-stat-card admin-stat-card--link admin-stat-card--products">
-          <span className="admin-stat-card-icon" aria-hidden>
-            <Package size={24} strokeWidth={2} />
-          </span>
-          <span className="admin-stat-value">{stats.productsCount}</span>
-          <span className="admin-stat-label">Products</span>
-          <span className="admin-stat-card-hint">Catalogue →</span>
-        </Link>
-        <div className="admin-stat-card admin-stat-card--revenue">
-          <span className="admin-stat-card-icon" aria-hidden>
-            <PoundSterling size={24} strokeWidth={2} />
-          </span>
-          <span className="admin-stat-value">{formatCurrency(stats.revenuePaid)}</span>
-          <span className="admin-stat-label">Paid / invoiced value</span>
+      <section className="dashboard-visual-metrics" aria-label="Key metrics">
+        <VisualStatCard value={stats.ordersCount} label="Total orders (30d)" icon={<StatOrdersGlyph />} sparkline={orderSpark} to="/admin/orders" hint="View all →" />
+        <VisualStatCard value={stats.ordersPlaced} label="Awaiting process" icon={<Zap size={22} strokeWidth={2} />} to="/admin/orders/processing" hint="Process →" />
+        <VisualStatCard value={stats.ordersToday} label="Orders today" icon={<Calendar size={22} strokeWidth={2} />} />
+        <VisualStatCard value={formatDashboardCurrency(stats.revenuePaid)} label="Paid / invoiced" icon={<StatRevenueGlyph />} sparkline={revenueSpark} accent="success" />
+        <VisualStatCard value={stats.customersCount} label="Customers" icon={<Users size={22} strokeWidth={2} />} to="/admin/customers" />
+        <VisualStatCard value={stats.productsCount} label="Products" icon={<Package size={22} strokeWidth={2} />} to="/admin/catalogue" />
+        <VisualStatCard value={stats.assembliesCount} label="Assemblies" icon={<BookOpen size={22} strokeWidth={2} />} to="/admin/catalogue" />
+      </section>
+      <section className="admin-dashboard-charts-section" aria-label="Analytics">
+        <h2><BarChart3 size={20} strokeWidth={2} style={{ verticalAlign: 'middle', marginRight: 6 }} aria-hidden /> Last 30 days</h2>
+        <div className="dashboard-charts-grid">
+          <article className="chart-card">
+            <div className="chart-card-head"><div><h3>Order volume</h3><p>Daily orders</p></div><AnimatedChartIllustration /></div>
+            <BarTrendChart data={orderVolumeTrend} ariaLabel="Order volume" />
+          </article>
+          <article className="chart-card">
+            <div className="chart-card-head"><div><h3>Status mix</h3></div></div>
+            <DonutChart data={statusChart} ariaLabel="Status mix" />
+          </article>
+          <article className="chart-card">
+            <div className="chart-card-head"><div><h3>Revenue trend</h3><p>Placed, invoiced &amp; paid</p></div></div>
+            <AreaTrendChart data={revenueTrend} valueFormatter={formatDashboardCurrency} ariaLabel="Revenue" />
+          </article>
         </div>
       </section>
-
+      <section className="dashboard-reports-preview" aria-label="Reports">
+        <Link to="/admin/reports" className="report-preview-card"><strong>{trendOrders.length}</strong><span>Orders (30d) — full reports</span></Link>
+        <Link to="/admin/reports" className="report-preview-card"><strong>{formatDashboardCurrency(revenueTrend.reduce((s, p) => s + p.value, 0))}</strong><span>30-day revenue</span></Link>
+        <Link to="/admin/crm/pipeline" className="report-preview-card"><strong>{stats.ordersPlaced}</strong><span>Awaiting processing</span></Link>
+      </section>
       <div className="admin-dashboard-main">
         <section className="admin-dashboard-section admin-dashboard-recent">
           <div className="admin-dashboard-section-head">

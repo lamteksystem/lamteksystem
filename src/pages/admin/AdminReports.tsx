@@ -4,6 +4,9 @@ import { supabase } from '@/lib/supabase'
 import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
 import type { OrderRow, OrderLineRow, ProductRow, CustomerProfileRow, LocationRow, ProductStockRow } from '@/types/database'
 import { lamtekPortalLocations } from '@/lib/lamtekLocations'
+import { AreaTrendChart } from '@/components/charts/AreaTrendChart'
+import { DonutChart } from '@/components/charts/DonutChart'
+import { formatDashboardCurrency, statusBreakdown, trendToChartPoints } from '@/lib/dashboardAnalytics'
 
 type DatePreset = '7d' | '30d' | '90d' | 'ytd'
 
@@ -167,7 +170,7 @@ export default function AdminReports() {
       setStockLocationId((prev) => (prev && locs.some((l) => l.id === prev) ? prev : (locs[0]?.id ?? '')))
     }
     loadLocations()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   useEffect(() => {
@@ -658,14 +661,7 @@ export default function AdminReports() {
           {metrics.revenueTrend.length === 0 ? (
             <p className="admin-muted">No data.</p>
           ) : (
-            <ul className="admin-report-list">
-              {metrics.revenueTrend.map((p) => (
-                <li key={p.date} className="admin-report-list-item">
-                  <span className="admin-report-list-label">{p.date}</span>
-                  <span className="admin-report-list-value">£{p.rev.toFixed(2)}</span>
-                </li>
-              ))}
-            </ul>
+            <AreaTrendChart data={revenueChartData} height={200} valueFormatter={(n) => formatDashboardCurrency(n)} ariaLabel="Revenue trend" />
           )}
           <div className="admin-inline-form--stack" style={{ marginTop: '0.75rem' }}>
             <button
@@ -689,16 +685,7 @@ export default function AdminReports() {
           {metrics.marginTrend.length === 0 ? (
             <p className="admin-muted">No data.</p>
           ) : (
-            <ul className="admin-report-list">
-              {metrics.marginTrend.map((p) => (
-                <li key={p.date} className="admin-report-list-item">
-                  <span className="admin-report-list-label">{p.date}</span>
-                  <span className="admin-report-list-value">
-                    £{p.margin.toFixed(2)} <span className="admin-muted">({p.rev.toFixed(2)} rev / {p.cogs.toFixed(2)} cogs)</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <AreaTrendChart data={marginChartData} height={200} valueFormatter={(n) => formatDashboardCurrency(n)} ariaLabel="Margin trend" />
           )}
           <div className="admin-inline-form--stack" style={{ marginTop: '0.75rem' }}>
             <button

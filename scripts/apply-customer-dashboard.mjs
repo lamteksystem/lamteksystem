@@ -1,4 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import fs from 'fs'
+import path from 'path'
+
+const out = path.join(import.meta.dirname, '..', 'src/pages/Dashboard.tsx')
+const content = `import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
@@ -78,7 +82,7 @@ export default function Dashboard() {
   const orderSpark = useMemo(() => sparklineFromPoints(orderVolumeTrend), [orderVolumeTrend])
 
   return (
-    <div className="dashboard">
+    <TAGV className="dashboard">
       <section className="dashboard-hero dashboard-hero-visual">
         <h1 className="dashboard-hero-title">Carcasses, components &amp; complete solutions</h1>
         <p className="dashboard-hero-tagline">Lamtek — component and complete-unit ordering, brochures, and pricelists in one place.</p>
@@ -97,16 +101,16 @@ export default function Dashboard() {
       {effectiveUserId && userOrders.length > 0 && (
         <section className="admin-dashboard-charts-section" aria-label="Your order activity">
           <h2>Your last 30 days</h2>
-          <div className="dashboard-charts-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <TAGV className="dashboard-charts-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <article className="chart-card">
-              <div className="chart-card-head"><div><h3>Order activity</h3><p>Orders per day</p></div></div>
+              <TAGV className="chart-card-head"><TAGV><h3>Order activity</h3><p>Orders per day</p></TAGV></TAGV>
               <BarTrendChart data={orderVolumeTrend} ariaLabel="Your order activity" />
             </article>
             <article className="chart-card">
-              <div className="chart-card-head"><div><h3>Status breakdown</h3></div></div>
+              <TAGV className="chart-card-head"><TAGV><h3>Status breakdown</h3></TAGV></TAGV>
               <DonutChart data={statusChart} ariaLabel="Your order status mix" />
             </article>
-          </div>
+          </TAGV>
         </section>
       )}
 
@@ -146,10 +150,10 @@ export default function Dashboard() {
         <section className="dashboard-draft card">
           <h2 className="dashboard-draft-title">Your draft order</h2>
           <p className="dashboard-draft-text">You have <strong>{draftLineCount}</strong> item{draftLineCount !== 1 ? 's' : ''} in your cart.</p>
-          <div className="dashboard-draft-actions">
+          <TAGV className="dashboard-draft-actions">
             <Link to="/ordering/cart" className="btn">Continue to cart →</Link>
             <Link to="/ordering" className="btn btn-outline">Add more items</Link>
-          </div>
+          </TAGV>
         </section>
       )}
 
@@ -159,10 +163,10 @@ export default function Dashboard() {
           <ul className="dashboard-recent-list">
             {recentOrders.map((o) => (
               <li key={o.id}>
-                <Link to={`/account/orders/${o.id}`}>{formatOrderReferenceOrFallback(o)}</Link>
+                <Link to={\`/account/orders/\${o.id}\`}>{formatOrderReferenceOrFallback(o)}</Link>
                 <span className="dashboard-recent-meta">
                   {new Date(o.created_at).toLocaleDateString()} · {o.status}
-                  {o.total_inc_vat != null ? ` · ${formatDashboardCurrency(Number(o.total_inc_vat))}` : ''}
+                  {o.total_inc_vat != null ? \` · \${formatDashboardCurrency(Number(o.total_inc_vat))}\` : ''}
                 </span>
               </li>
             ))}
@@ -173,14 +177,18 @@ export default function Dashboard() {
 
       <section className="dashboard-ctas">
         <h2 className="dashboard-ctas-title">Quick actions</h2>
-        <div className="dashboard-grid">
+        <TAGV className="dashboard-grid">
           <Link to="/products" className="dashboard-card card"><h2>Browse products</h2><p>Door ranges, cabinets, handles, lighting, and accessories.</p><span className="dashboard-cta">View ranges →</span></Link>
           <Link to="/ordering/start" className="dashboard-card card"><h2>Create order</h2><p>Build a complete kitchen or bedroom estimate.</p><span className="dashboard-cta">Start order →</span></Link>
           <Link to="/downloads" className="dashboard-card card"><h2>Downloads</h2><p>Price lists, brochures, and order forms.</p><span className="dashboard-cta">View downloads →</span></Link>
           <Link to="/depots" className="dashboard-card card"><h2>Depots &amp; locations</h2><p>Lamtek depots and contact details.</p><span className="dashboard-cta">View depots →</span></Link>
           <Link to="/account" className="dashboard-card card"><h2>My account</h2><p>Outstanding orders and order history.</p><span className="dashboard-cta">Account →</span></Link>
-        </div>
+        </TAGV>
       </section>
-    </div>
+    </TAGV>
   )
 }
+`.replace(/TAGV/g, 'div')
+
+fs.writeFileSync(out, content)
+console.log('customer dashboard written')

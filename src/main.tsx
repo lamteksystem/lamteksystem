@@ -11,6 +11,7 @@ import './styles/marketing-refresh.css'
 import './styles/admin-refresh.css'
 import './styles/tealbury-workbench.css'
 import './styles/catalog-picker.css'
+import './styles/dashboard-visuals.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

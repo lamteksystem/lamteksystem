@@ -1,0 +1,31 @@
+      <section className="dashboard-visual-metrics" aria-label="Key metrics">
+        <VisualStatCard value={stats.ordersCount} label="Total orders (30d)" icon={<StatOrdersGlyph />} sparkline={orderSpark} to="/admin/orders" hint="View all →" />
+        <VisualStatCard value={stats.ordersPlaced} label="Awaiting process" icon={<Zap size={22} strokeWidth={2} />} to="/admin/orders/processing" hint="Process →" />
+        <VisualStatCard value={stats.ordersToday} label="Orders today" icon={<Calendar size={22} strokeWidth={2} />} />
+        <VisualStatCard value={formatDashboardCurrency(stats.revenuePaid)} label="Paid / invoiced" icon={<StatRevenueGlyph />} sparkline={revenueSpark} accent="success" />
+        <VisualStatCard value={stats.customersCount} label="Customers" icon={<Users size={22} strokeWidth={2} />} to="/admin/customers" />
+        <VisualStatCard value={stats.productsCount} label="Products" icon={<Package size={22} strokeWidth={2} />} to="/admin/catalogue" />
+        <VisualStatCard value={stats.assembliesCount} label="Assemblies" icon={<BookOpen size={22} strokeWidth={2} />} to="/admin/catalogue" />
+      </section>
+      <section className="admin-dashboard-charts-section" aria-label="Analytics">
+        <h2><BarChart3 size={20} strokeWidth={2} style={{ verticalAlign: 'middle', marginRight: 6 }} aria-hidden /> Last 30 days</h2>
+        <TAGV className="dashboard-charts-grid">
+          <article className="chart-card">
+            <TAGV className="chart-card-head"><TAGV><h3>Order volume</h3><p>Daily orders</p></TAGV><AnimatedChartIllustration /></TAGV>
+            <BarTrendChart data={orderVolumeTrend} ariaLabel="Order volume" />
+          </article>
+          <article className="chart-card">
+            <TAGV className="chart-card-head"><TAGV><h3>Status mix</h3></TAGV></TAGV>
+            <DonutChart data={statusChart} ariaLabel="Status mix" />
+          </article>
+          <article className="chart-card">
+            <TAGV className="chart-card-head"><TAGV><h3>Revenue trend</h3><p>Placed, invoiced &amp; paid</p></TAGV></TAGV>
+            <AreaTrendChart data={revenueTrend} valueFormatter={formatDashboardCurrency} ariaLabel="Revenue" />
+          </article>
+        </TAGV>
+      </section>
+      <section className="dashboard-reports-preview" aria-label="Reports">
+        <Link to="/admin/reports" className="report-preview-card"><strong>{trendOrders.length}</strong><span>Orders (30d) — full reports</span></Link>
+        <Link to="/admin/reports" className="report-preview-card"><strong>{formatDashboardCurrency(revenueTrend.reduce((s, p) => s + p.value, 0))}</strong><span>30-day revenue</span></Link>
+        <Link to="/admin/crm/pipeline" className="report-preview-card"><strong>{stats.ordersPlaced}</strong><span>Awaiting processing</span></Link>
+      </section>

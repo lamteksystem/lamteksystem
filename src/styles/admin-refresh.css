@@ -604,15 +604,310 @@
   z-index: 1100;
 }
 
-.admin-smart-categorize-modal {
-  width: min(94vw, 1100px);
-  max-width: 1100px;
-  max-height: min(92vh, 1000px);
+.admin-smart-categorise-page {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  padding: 1.25rem 1.5rem;
-  box-sizing: border-box;
+  gap: 1rem;
+}
+
+.admin-smart-categorise-header h1 {
+  margin: 0 0 0.25rem;
+}
+
+.admin-smart-categorise-help {
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.admin-callout {
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  background: rgba(29, 78, 216, 0.07);
+  border: 1px solid rgba(29, 78, 216, 0.18);
+  color: var(--lamtek-text);
+}
+
+.admin-callout--info {
+  background: rgba(29, 78, 216, 0.07);
+  border-color: rgba(29, 78, 216, 0.18);
+}
+
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+  margin-bottom: 0.25rem;
+}
+
+.admin-tab {
+  background: none;
+  border: none;
+  padding: 0.6rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--lamtek-text-muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.admin-tab:hover {
+  color: var(--lamtek-text);
+}
+
+.admin-tab--active {
+  color: var(--lamtek-text);
+  border-bottom-color: var(--lamtek-gold, #c89b3a);
+}
+
+.admin-tab-badge {
+  background: var(--lamtek-gray-light);
+  color: var(--lamtek-text);
+  font-size: 0.75rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+}
+
+.admin-smart-categorise-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-smart-categorise-suggestions,
+.admin-smart-categorise-history,
+.admin-smart-categorise-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.admin-smart-categorise-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  align-items: flex-end;
+}
+
+.admin-smart-categorise-search {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.admin-smart-categorise-search input {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 6px;
+  min-width: 14rem;
+}
+
+.admin-smart-categorise-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.admin-smart-categorise-table thead th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--lamtek-text-muted);
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+  background: rgba(15, 23, 42, 0.03);
+  white-space: nowrap;
+}
+
+.admin-smart-categorise-th-check {
+  width: 2.5rem;
+}
+
+.admin-smart-categorise-tr td {
+  padding: 0.55rem 0.55rem;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+  vertical-align: top;
+}
+
+.admin-smart-categorise-tr:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.admin-smart-categorise-tr--overridden {
+  background: rgba(217, 119, 6, 0.06);
+}
+
+.admin-smart-categorise-tr--noop {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.admin-smart-categorise-arrow-cell {
+  color: var(--lamtek-text-muted);
+  font-weight: 700;
+  text-align: center;
+  width: 1.5rem;
+}
+
+.admin-smart-categorise-product-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.admin-smart-categorise-product-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.admin-smart-categorise-product-name {
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.admin-smart-categorise-empty {
+  text-align: center;
+  padding: 1.5rem;
+}
+
+.admin-smart-categorise-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  align-items: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--lamtek-gray-light);
+}
+
+.admin-smart-categorise-actions--inline {
+  border-top: none;
+  padding-top: 0;
+  justify-content: flex-start;
+}
+
+.admin-smart-categorise-history-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.admin-smart-categorise-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.85rem;
+}
+
+.admin-smart-categorise-history-group {
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-smart-categorise-history-group h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.admin-smart-categorise-history-tokens {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.admin-smart-categorise-history-tokens li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  background: rgba(15, 23, 42, 0.05);
+  border-radius: 999px;
+}
+
+.admin-smart-categorise-token {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.admin-smart-categorise-token-weight {
+  font-weight: 600;
+  color: var(--lamtek-text-muted);
+}
+
+.admin-smart-categorise-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.85rem;
+}
+
+.admin-smart-categorise-setting-card {
+  padding: 1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.admin-smart-categorise-setting-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.admin-smart-categorise-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.3rem 1rem;
+  margin: 0;
+}
+
+.admin-smart-categorise-stats-grid dt {
+  color: var(--lamtek-text-muted);
+  font-size: 0.88rem;
+}
+
+.admin-smart-categorise-stats-grid dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.admin-smart-categorise-thresholds {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.admin-smart-categorise-thresholds th,
+.admin-smart-categorise-thresholds td {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+  vertical-align: top;
+}
+
+.admin-danger {
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.45);
+}
+
+.admin-danger:hover {
+  background: rgba(220, 38, 38, 0.08);
 }
 
 .admin-smart-categorize-intro {

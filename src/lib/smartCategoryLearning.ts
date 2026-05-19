@@ -13,9 +13,31 @@ export interface LearningRow {
   token: string
   category_id: string
   weight: number
+  last_learned_at?: string
 }
 
 export type LearningIndex = Map<string, Map<string, number>>
+
+/** Sorted list of learned rows for the History UI. */
+export async function loadSmartCategoryHistory(): Promise<LearningRow[]> {
+  const { data, error } = await supabase
+    .from('smart_category_learning')
+    .select('token, category_id, weight, last_learned_at')
+    .order('last_learned_at', { ascending: false })
+    .limit(500)
+  if (error || !data) return []
+  return data as LearningRow[]
+}
+
+/** Wipe everything the smart categorise heuristic has learnt. */
+export async function resetSmartCategoryLearning(): Promise<{ deleted: number; error: string | null }> {
+  const { error, count } = await supabase
+    .from('smart_category_learning')
+    .delete({ count: 'exact' })
+    .neq('token', '')
+  if (error) return { deleted: 0, error: error.message }
+  return { deleted: count ?? 0, error: null }
+}
 
 const STOP_WORDS = new Set([
   'the',

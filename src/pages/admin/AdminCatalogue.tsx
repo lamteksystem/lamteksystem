@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import CatalogueTealburyImportBlock from '@/components/admin/CatalogueTealburyImportBlock'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { supabase } from '@/lib/supabase'
@@ -31,7 +31,6 @@ import {
   type ProductCategoryMap,
 } from '@/lib/productCategories'
 import { ProductCategoryMultiSelect } from '@/components/admin/ProductCategoryMultiSelect'
-import SmartCategorizePanel from '@/components/admin/SmartCategorizePanel'
 import type { CategoryRow } from '@/types/database'
 import type { ProductRow } from '@/types/database'
 import {
@@ -143,7 +142,6 @@ export default function AdminCatalogue() {
   const [activeOnly, setActiveOnly] = useState(true)
   const [stockOnly, setStockOnly] = useState(false)
   const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'sku_asc' | 'sku_desc' | 'price_asc' | 'price_desc'>('name_asc')
-  const [smartCategorizeOpen, setSmartCategorizeOpen] = useState(false)
   const [catalogProgramFilter, setCatalogProgramFilter] = useState<'all' | 'lamtek' | 'tealbury'>('all')
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
@@ -1113,14 +1111,13 @@ export default function AdminCatalogue() {
           Stock items only
         </label>
         {canEditCatalogue && (
-          <button
-            type="button"
+          <Link
+            to="/admin/catalogue/smart-categorise"
             className="btn btn-outline btn-small"
-            onClick={() => setSmartCategorizeOpen(true)}
-            title="Suggest categories from product names"
+            title="Open the dedicated smart categorisation tool — suggestions, history, settings"
           >
             Smart categorise
-          </button>
+          </Link>
         )}
         <label>
           Sort by
@@ -1842,17 +1839,6 @@ export default function AdminCatalogue() {
             setSelectedProduct((prev) =>
               prev && prev.id === productId ? { ...prev, category_id: primary } : prev
             )
-          }}
-        />
-      )}
-
-      {smartCategorizeOpen && (
-        <SmartCategorizePanel
-          products={products}
-          categories={categories}
-          onClose={() => setSmartCategorizeOpen(false)}
-          onApplied={() => {
-            void load()
           }}
         />
       )}

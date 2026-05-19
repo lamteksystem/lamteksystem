@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
+import { normalizePageSize } from '@/lib/listPagination'
 
 export type TableDensity = 'compact' | 'comfortable' | 'spacious'
 export type DateFormat = 'locale' | 'ddmmyyyy' | 'iso'
@@ -30,7 +31,7 @@ const defaults: AdminUiPrefs = {
   },
   tableDensity: 'comfortable',
   dateFormat: 'locale',
-  rowsPerPage: 25,
+  rowsPerPage: 50,
   defaultOrderStatusFilter: '',
   adminOrderLinePricingDefault: 'catalogue',
 }
@@ -61,7 +62,11 @@ export function AdminUiProvider({ children }: { children: ReactNode }) {
       if (raw) {
         try {
           const parsed = JSON.parse(raw) as Partial<AdminUiPrefs>
-          setPrefsState({ ...defaults, ...parsed })
+          const merged = { ...defaults, ...parsed }
+          if (typeof merged.rowsPerPage === 'number') {
+            merged.rowsPerPage = normalizePageSize(merged.rowsPerPage)
+          }
+          setPrefsState(merged)
         } catch (_) {
           setPrefsState({ ...defaults })
         }
@@ -94,7 +99,7 @@ export function AdminUiProvider({ children }: { children: ReactNode }) {
     setSidebarCollapsed: (v) => setPrefs({ sidebarCollapsed: v }),
     setTableDensity: (v) => setPrefs({ tableDensity: v }),
     setDateFormat: (v) => setPrefs({ dateFormat: v }),
-    setRowsPerPage: (v) => setPrefs({ rowsPerPage: v }),
+    setRowsPerPage: (v) => setPrefs({ rowsPerPage: normalizePageSize(v) }),
     setDefaultOrderStatusFilter: (v) => setPrefs({ defaultOrderStatusFilter: v }),
     setAdminOrderLinePricingDefault: (v) => setPrefs({ adminOrderLinePricingDefault: v }),
     updatePrefs: setPrefs,

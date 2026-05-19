@@ -47,6 +47,8 @@ import { rebucketTealburyAccessories } from '@/lib/tealburyAccessoryRebucket'
 import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productCategories'
 import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 import AdminAssemblyPartTypesSettings from '@/components/admin/AdminAssemblyPartTypesSettings'
+import ListPager from '@/components/admin/ListPager'
+import { useListPagination } from '@/lib/listPagination'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
 type Section = 'general' | 'smart' | 'parts'
@@ -54,8 +56,6 @@ type Tab = 'suggestions' | 'history' | 'settings'
 export type ConfidenceLevel = 'low' | 'medium' | 'high'
 
 export const CONFIDENCE_LEVELS: ConfidenceLevel[] = ['high', 'medium', 'low']
-export const PAGE_SIZE_OPTIONS = [20, 50, 100, 250, 500] as const
-export type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
 
 export interface ResultInfo {
   tone: 'success' | 'mixed' | 'error'
@@ -366,9 +366,6 @@ export function SuggestionsTab({
   const [overrides, setOverrides] = useState<
     Map<string, { primary?: string; additional: string[] }>
   >(new Map())
-  const [pageSize, setPageSize] = useState<PageSize>(20)
-  const [page, setPage] = useState(1)
-  const [pageInput, setPageInput] = useState('1')
   const [applying, setApplying] = useState(false)
   const [syncingKinds, setSyncingKinds] = useState(false)
   const [rebucketing, setRebucketing] = useState(false)
@@ -399,16 +396,19 @@ export function SuggestionsTab({
     })
   }, [allSuggestions, confidenceFilter, search, productById])
 
-  const totalPages = Math.max(1, Math.ceil(suggestions.length / pageSize))
-  const currentPage = Math.min(page, totalPages)
-  useEffect(() => {
-    setPageInput(String(currentPage))
-  }, [currentPage])
-
-  const pageSuggestions = useMemo(() => {
-    const start = (currentPage - 1) * pageSize
-    return suggestions.slice(start, start + pageSize)
-  }, [suggestions, currentPage, pageSize])
+  const {
+    pageItems: pageSuggestions,
+    totalItems: suggestionTotal,
+    totalPages,
+    currentPage,
+    pageSize,
+    setPageSize,
+    rangeStart,
+    rangeEnd,
+    goToPage,
+  } = useListPagination(suggestions, {
+    resetDeps: [search, confidenceFilter.high, confidenceFilter.medium, confidenceFilter.low],
+  })
 
   const selectedSuggestions = useMemo(
     () => suggestions.filter((s) => selected.has(s.productId)),
@@ -420,7 +420,6 @@ export function SuggestionsTab({
 
   function toggleConfidence(level: ConfidenceLevel) {
     setConfidenceFilter((prev) => ({ ...prev, [level]: !prev[level] }))
-    setPage(1)
   }
 
   function togglePageAll(checked: boolean) {
@@ -499,11 +498,6 @@ export function SuggestionsTab({
       }
       return next
     })
-  }
-
-  function goToPage(n: number) {
-    const clamped = Math.max(1, Math.min(totalPages, Math.floor(n) || 1))
-    setPage(clamped)
   }
 
   async function applySelected() {
@@ -654,30 +648,9 @@ export function SuggestionsTab({
           <input
             type="search"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Product name or SKU"
           />
-        </label>
-
-        <label className="admin-smart-categorize-pagesize">
-          Per page
-          <select
-            value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value) as PageSize)
-              setPage(1)
-            }}
-            disabled={applying}
-          >
-            {PAGE_SIZE_OPTIONS.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
         </label>
 
         <button
@@ -981,71 +954,21 @@ export function SuggestionsTab({
         </tbody>
       </table>
 
-      {suggestions.length > pageSize && (
-        <div className="admin-smart-categorize-pager" role="navigation" aria-label="Suggestion pages">
-          <button
-            type="button"
-            className="btn btn-outline btn-small"
-            onClick={() => goToPage(1)}
-            disabled={currentPage === 1}
-            aria-label="First page"
-          >
-            «
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline btn-small"
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage === 1}
-            aria-label="Previous page"
-          >
-            ‹ Prev
-          </button>
-          <span className="admin-smart-categorize-page-input">
-            Page
-            <input
-              type="number"
-              min={1}
-              max={totalPages}
-              value={pageInput}
-              onChange={(e) => setPageInput(e.target.value)}
-              onBlur={() => goToPage(Number(pageInput))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  goToPage(Number(pageInput))
-                }
-              }}
-              aria-label="Go to page"
-            />
-            of <strong>{totalPages}</strong>
-          </span>
-          <button
-            type="button"
-            className="btn btn-outline btn-small"
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            aria-label="Next page"
-          >
-            Next ›
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline btn-small"
-            onClick={() => goToPage(totalPages)}
-            disabled={currentPage === totalPages}
-            aria-label="Last page"
-          >
-            »
-          </button>
-          <span className="admin-muted admin-smart-categorize-page-range">
-            Showing {(currentPage - 1) * pageSize + 1}–
-            {Math.min(currentPage * pageSize, suggestions.length)} of {suggestions.length}
-          </span>
-        </div>
-      )}
+            <ListPager
+        totalItems={suggestionTotal}
+        totalPages={totalPages}
+        currentPage={currentPage}
+        pageSize={pageSize}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
+        onPageChange={goToPage}
+        onPageSizeChange={setPageSize}
+        disabled={applying}
+        itemLabel={suggestionTotal === 1 ? 'suggestion' : 'suggestions'}
+        ariaLabel="Suggestion pages"
+      />
 
-      <div className="admin-smart-categorise-actions">
+            <div className="admin-smart-categorise-actions">
         <Link to="/admin/catalogue" className="btn btn-outline">
           Back to catalogue
         </Link>

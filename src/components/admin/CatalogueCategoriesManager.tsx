@@ -5,6 +5,8 @@
  */
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import ListPager from '@/components/admin/ListPager'
+import { useListPagination } from '@/lib/listPagination'
 import {
   createCategory,
   deleteCategory,
@@ -79,6 +81,18 @@ export default function CatalogueCategoriesManager({
     if (!q) return sorted
     return sorted.filter((c) => c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q))
   }, [categories, search])
+
+  const {
+    pageItems: pagedCategories,
+    totalItems: filteredTotal,
+    totalPages,
+    currentPage,
+    pageSize,
+    setPageSize,
+    rangeStart,
+    rangeEnd,
+    goToPage,
+  } = useListPagination(filtered, { resetDeps: [search] })
 
   const slugPreview = newSlug.trim() || (newName.trim() ? slugifyCategoryName(newName) : '')
 
@@ -248,8 +262,8 @@ export default function CatalogueCategoriesManager({
 
         <div className="admin-catalogue-categories-list-toolbar">
           <h3 className="admin-modal-form-section-title">
-            All categories ({filtered.length}
-            {filtered.length !== categories.length ? ` of ${categories.length}` : ''})
+            All categories ({filteredTotal}
+            {filteredTotal !== categories.length ? ` of ${categories.length}` : ''})
           </h3>
           <input
             type="search"
@@ -260,9 +274,10 @@ export default function CatalogueCategoriesManager({
           />
         </div>
 
-        {filtered.length === 0 ? (
+        {filteredTotal === 0 ? (
           <p className="admin-muted">No categories match your search.</p>
         ) : (
+          <>
           <table className="admin-catalogue-categories-table">
             <thead>
               <tr>
@@ -278,7 +293,7 @@ export default function CatalogueCategoriesManager({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => {
+              {pagedCategories.map((c) => {
                 const parent = c.parent_id ? categories.find((p) => p.id === c.parent_id) : null
                 const kind = c.category_kind ?? inferCategoryKindFromName(c.name)
                 const productCount = productCountByCategory.get(c.id) ?? 0
@@ -368,6 +383,19 @@ export default function CatalogueCategoriesManager({
               })}
             </tbody>
           </table>
+          <ListPager
+            totalItems={filteredTotal}
+            totalPages={totalPages}
+            currentPage={currentPage}
+            pageSize={pageSize}
+            rangeStart={rangeStart}
+            rangeEnd={rangeEnd}
+            onPageChange={goToPage}
+            onPageSizeChange={setPageSize}
+            itemLabel={filteredTotal === 1 ? 'category' : 'categories'}
+            ariaLabel="Category list"
+          />
+          </>
         )}
       </div>
   )

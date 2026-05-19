@@ -35,6 +35,8 @@ import {
 import { ProductCategoryMultiSelect } from '@/components/admin/ProductCategoryMultiSelect'
 import type { CategoryRow } from '@/types/database'
 import type { ProductRow } from '@/types/database'
+import ListPager from '@/components/admin/ListPager'
+import { useListPagination, normalizePageSize } from '@/lib/listPagination'
 import {
   buildExportRows,
   downloadCsv,
@@ -114,7 +116,7 @@ function slugify(name: string): string {
 }
 
 export default function AdminCatalogue() {
-  const { tableDensity } = useAdminUi()
+  const { tableDensity, rowsPerPage } = useAdminUi()
   const { allowed: canEditCatalogue } = usePermission('admin.catalogue', 'edit')
   const columnVisibility = useColumnVisibility('catalogue', CATALOGUE_COLUMNS)
   const { visibleIds, setColumnVisible, setColumnOrder, resetToDefault, isVisible, columnDefs, order } = columnVisibility
@@ -339,53 +341,90 @@ export default function AdminCatalogue() {
     })
   }
 
-  const filteredProducts = products
-    .filter((p) => {
-      if (categoryFilter) {
-        const catIds = getProductCategoryIds(p.id, p.category_id, productCategoryMap)
-        if (
-          !productMatchesCategoryFilter(
-            catIds,
-            p.category_id,
-            categoryFilter,
-            categoryMap,
-            categorySlugMatchesImported
-          )
-        ) {
-          return false
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter((p) => {
+        if (categoryFilter) {
+          const catIds = getProductCategoryIds(p.id, p.category_id, productCategoryMap)
+          if (
+            !productMatchesCategoryFilter(
+              catIds,
+              p.category_id,
+              categoryFilter,
+              categoryMap,
+              categorySlugMatchesImported,
+            )
+          ) {
+            return false
+          }
         }
-      }
-      if (catalogProgramFilter !== 'all') {
-        const prog = p.catalog_program ?? CATALOG_PROGRAM.LAMTEK
-        if (prog !== catalogProgramFilter) return false
-      }
-      if (!matchesProductGroup(p)) return false
-      if (activeOnly && !p.active) return false
-      if (stockOnly && (p.is_stock === false)) return false
-      if (!searchLower) return true
-      const name = (p.name ?? '').toLowerCase()
-      const sku = (p.sku ?? '').toLowerCase()
-      const desc = (p.description ?? '').toLowerCase()
-      return name.includes(searchLower) || sku.includes(searchLower) || desc.includes(searchLower)
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'name_asc':
-          return (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' })
-        case 'name_desc':
-          return (b.name ?? '').localeCompare(a.name ?? '', undefined, { sensitivity: 'base' })
-        case 'sku_asc':
-          return (a.sku ?? '').localeCompare(b.sku ?? '', undefined, { sensitivity: 'base' })
-        case 'sku_desc':
-          return (b.sku ?? '').localeCompare(a.sku ?? '', undefined, { sensitivity: 'base' })
-        case 'price_asc':
-          return Number(a.unit_price) - Number(b.unit_price)
-        case 'price_desc':
-          return Number(b.unit_price) - Number(a.unit_price)
-        default:
-          return 0
-      }
-    })
+        if (catalogProgramFilter !== 'all') {
+          const prog = p.catalog_program ?? CATALOG_PROGRAM.LAMTEK
+          if (prog !== catalogProgramFilter) return false
+        }
+        if (!matchesProductGroup(p)) return false
+        if (activeOnly && !p.active) return false
+        if (stockOnly && p.is_stock === false) return false
+        if (!searchLower) return true
+        const name = (p.name ?? '').toLowerCase()
+        const sku = (p.sku ?? '').toLowerCase()
+        const desc = (p.description ?? '').toLowerCase()
+        return name.includes(searchLower) || sku.includes(searchLower) || desc.includes(searchLower)
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'name_asc':
+            return (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' })
+          case 'name_desc':
+            return (b.name ?? '').localeCompare(a.name ?? '', undefined, { sensitivity: 'base' })
+          case 'sku_asc':
+            return (a.sku ?? '').localeCompare(b.sku ?? '', undefined, { sensitivity: 'base' })
+          case 'sku_desc':
+            return (b.sku ?? '').localeCompare(a.sku ?? '', undefined, { sensitivity: 'base' })
+          case 'price_asc':
+            return Number(a.unit_price) - Number(b.unit_price)
+          case 'price_desc':
+            return Number(b.unit_price) - Number(a.unit_price)
+          default:
+            return 0
+        }
+      })
+  }, [
+    products,
+    categoryFilter,
+    productCategoryMap,
+    categoryMap,
+    categories,
+    catalogProgramFilter,
+    productGroupFilter,
+    activeOnly,
+    stockOnly,
+    searchLower,
+    sortBy,
+  ])
+
+  const {
+    pageItems: pagedProducts,
+    totalItems: filteredTotal,
+    totalPages,
+    currentPage,
+    pageSize,
+    setPageSize,
+    rangeStart,
+    rangeEnd,
+    goToPage,
+  } = useListPagination(filteredProducts, {
+    defaultPageSize: normalizePageSize(rowsPerPage),
+    resetDeps: [
+      categoryFilter,
+      searchFilter,
+      activeOnly,
+      stockOnly,
+      sortBy,
+      catalogProgramFilter,
+      productGroupFilter,
+    ],
+  })
 
   const categoriesByParent = categories.filter((c) => !c.parent_id)
 
@@ -1180,7 +1219,10 @@ export default function AdminCatalogue() {
 
       <div className="card admin-card">
         <div className="admin-card-heading-row">
-          <h2>Products ({filteredProducts.length})</h2>
+          <h2>
+            Products ({filteredTotal}
+            {filteredTotal !== products.length ? ` of ${products.length}` : ''})
+          </h2>
           <div className="admin-catalogue-heading-actions">
             <HorizontalScrollToolbarArrows
               canScrollLeft={catalogueScrollState.canScrollLeft}
@@ -1298,12 +1340,12 @@ export default function AdminCatalogue() {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.length === 0 ? (
+                {filteredTotal === 0 ? (
                   <tr>
                     <td colSpan={visibleIds.length || 1} className="admin-table-empty">No products match.</td>
                   </tr>
                 ) : (
-                  filteredProducts.map((p) => {
+                  pagedProducts.map((p) => {
                     const isStock = p.is_stock !== false
                     const availability = getProductAvailabilityMeta(p)
                     return (
@@ -1653,10 +1695,10 @@ export default function AdminCatalogue() {
           </div>
         ) : (
           <div className={`admin-catalogue-grid admin-catalogue-view--${viewType}`}>
-            {filteredProducts.length === 0 ? (
+            {filteredTotal === 0 ? (
               <p className="admin-muted">No products match.</p>
             ) : (
-              filteredProducts.map((p) => {
+              pagedProducts.map((p) => {
                 const isStock = p.is_stock !== false
                 const availability = getProductAvailabilityMeta(p)
                 const isEditing = (field: string) => editingCell?.productId === p.id && editingCell?.field === (field === 'category' ? 'category_id' : field)
@@ -1815,6 +1857,18 @@ export default function AdminCatalogue() {
           </div>
         )}
         </HorizontalScrollWithArrows>
+        <ListPager
+          totalItems={filteredTotal}
+          totalPages={totalPages}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          onPageChange={goToPage}
+          onPageSizeChange={setPageSize}
+          itemLabel={filteredTotal === 1 ? 'product' : 'products'}
+          ariaLabel="Catalogue products"
+        />
       </div>
 
       {selectedProduct && (

@@ -1791,7 +1791,8 @@
   text-decoration: none;
 }
 
-.admin-smart-categorize-pager {
+.admin-smart-categorize-pager,
+.admin-list-pager {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1801,14 +1802,16 @@
   margin-top: 0.5rem;
 }
 
-.admin-smart-categorize-page-input {
+.admin-smart-categorize-page-input,
+.admin-list-pager-page-input {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   font-size: 0.9rem;
 }
 
-.admin-smart-categorize-page-input input {
+.admin-smart-categorize-page-input input,
+.admin-list-pager-page-input input {
   width: 4.5rem;
   padding: 0.25rem 0.4rem;
   border: 1px solid var(--lamtek-gray-light);
@@ -1817,9 +1820,24 @@
   text-align: center;
 }
 
-.admin-smart-categorize-page-range {
+.admin-smart-categorize-page-range,
+.admin-list-pager-range {
   margin-left: auto;
   font-size: 0.85rem;
+}
+
+.admin-list-pager-pagesize {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.admin-list-pager-pagesize select {
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 6px;
+  font: inherit;
 }
 
 .admin-modal-overlay--nested {

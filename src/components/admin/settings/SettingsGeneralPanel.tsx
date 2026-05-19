@@ -1,5 +1,6 @@
 import { useAdminUi, type DateFormat, type AdminOrderLinePricingMode } from '@/contexts/AdminUiContext'
 import { formatAdminDate } from '@/contexts/AdminUiContext'
+import { PAGE_SIZE_OPTIONS } from '@/lib/listPagination'
 
 export default function SettingsGeneralPanel() {
   const adminUi = useAdminUi()
@@ -35,10 +36,11 @@ export default function SettingsGeneralPanel() {
         <label className="admin-settings-row">
           <span className="admin-settings-label">Rows per page (tables)</span>
           <select value={rowsPerPage} onChange={(e) => setRowsPerPage(Number(e.target.value))}>
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
           </select>
         </label>
         <label className="admin-settings-row">

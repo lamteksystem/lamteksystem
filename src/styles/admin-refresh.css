@@ -906,8 +906,194 @@
   border-color: rgba(220, 38, 38, 0.45);
 }
 
-.admin-danger:hover {
+.admin-danger:hover:not(:disabled) {
   background: rgba(220, 38, 38, 0.08);
+}
+
+.admin-danger:disabled {
+  color: var(--lamtek-text-muted);
+  text-decoration: none;
+  cursor: not-allowed;
+}
+
+/* Catalogue categories manager (inline, collapsible) */
+.admin-catalogue-categories-manager {
+  padding: 0;
+  overflow: hidden;
+}
+
+.admin-catalogue-categories-manager > .admin-catalogue-categories-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  user-select: none;
+  position: relative;
+}
+
+.admin-catalogue-categories-manager > .admin-catalogue-categories-summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-catalogue-categories-manager > .admin-catalogue-categories-summary::before {
+  content: '▸';
+  display: inline-block;
+  transition: transform 0.15s ease;
+  color: var(--lamtek-text-muted);
+  font-size: 0.9rem;
+  margin-right: 0.25rem;
+}
+
+.admin-catalogue-categories-manager[open] > .admin-catalogue-categories-summary::before {
+  transform: rotate(90deg);
+}
+
+.admin-catalogue-categories-summary-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.admin-catalogue-categories-summary-meta {
+  margin-left: auto;
+  font-size: 0.85rem;
+}
+
+.admin-catalogue-categories-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0 1.25rem 1.25rem;
+  border-top: 1px solid var(--lamtek-gray-light);
+  padding-top: 1rem;
+}
+
+.admin-catalogue-categories-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  background: rgba(15, 23, 42, 0.03);
+  border-radius: 8px;
+}
+
+.admin-catalogue-categories-add-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.6rem 0.85rem;
+}
+
+.admin-catalogue-categories-add-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.admin-catalogue-categories-add-grid input,
+.admin-catalogue-categories-add-grid select {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.admin-catalogue-categories-list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.admin-catalogue-categories-list-toolbar h3 {
+  margin: 0;
+}
+
+.admin-catalogue-categories-list-toolbar .admin-categories-search {
+  flex: 1 1 16rem;
+  min-width: 12rem;
+  max-width: 24rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 6px;
+}
+
+.admin-catalogue-categories-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.admin-catalogue-categories-table thead th {
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--lamtek-text-muted);
+  border-bottom: 1px solid var(--lamtek-gray-light);
+  background: rgba(15, 23, 42, 0.03);
+  white-space: nowrap;
+}
+
+.admin-catalogue-categories-table tbody td {
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+  vertical-align: middle;
+}
+
+.admin-catalogue-categories-table tbody tr:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.admin-catalogue-categories-row--busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.admin-catalogue-categories-table input[type='text'] {
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  background: transparent;
+}
+
+.admin-catalogue-categories-table input[type='text']:focus,
+.admin-catalogue-categories-table input[type='text']:hover {
+  border-color: var(--lamtek-gray-light);
+  background: white;
+}
+
+.admin-catalogue-categories-table select {
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 6px;
+  font: inherit;
+  background: white;
+}
+
+.admin-catalogue-categories-slug {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  padding: 0.1rem 0.4rem;
+  background: rgba(15, 23, 42, 0.06);
+  border-radius: 4px;
+  color: var(--lamtek-text-muted);
+  white-space: nowrap;
+}
+
+.admin-catalogue-categories-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--lamtek-text);
+  width: 4rem;
 }
 
 .admin-smart-categorize-intro {

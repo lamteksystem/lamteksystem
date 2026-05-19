@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 import CatalogueTealburyImportBlock from '@/components/admin/CatalogueTealburyImportBlock'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { supabase } from '@/lib/supabase'
@@ -1843,19 +1844,14 @@ export default function AdminCatalogue() {
         />
       )}
 
-      <div className="card admin-card admin-catalogue-summary">
-        <h2>Categories ({categories.length})</h2>
-        <ul className="admin-catalogue-cats">
-          {categoriesByParent.map((c) => (
-            <li key={c.id}>
-              <strong>{c.name}</strong>
-              <span className="admin-muted">
-                {products.filter((p) => getProductCategoryIds(p.id, p.category_id, productCategoryMap).includes(c.id)).length} products
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <CatalogueCategoriesManager
+        categories={categories}
+        products={products}
+        productCategoryMap={productCategoryMap}
+        onChanged={() => {
+          void load()
+        }}
+      />
       </>
       )}
     </div>

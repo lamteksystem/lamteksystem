@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DEFAULT_ASSEMBLY_PART_TYPES } from '@/lib/assemblyPartTypes'
 import {
@@ -66,9 +66,12 @@ export default function ProductAssemblyEditor({
   const [addProductId, setAddProductId] = useState('')
   const [addQty, setAddQty] = useState('1')
   const [addRole, setAddRole] = useState('other')
-  const [componentPicker, setComponentPicker] = useState('')
+  const [componentSearch, setComponentSearch] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const pickerRef = useRef<HTMLDivElement | null>(null)
 
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
+  const productMap = useMemo(() => new Map(allProducts.map((p) => [p.id, p])), [allProducts])
 
   const pickerProducts = useMemo(
     () =>
@@ -77,6 +80,32 @@ export default function ProductAssemblyEditor({
         .sort((a, b) => (a.sku ?? a.name).localeCompare(b.sku ?? b.name)),
     [allProducts, product.id]
   )
+
+  const filteredPickerProducts = useMemo(() => {
+    const q = componentSearch.trim().toLowerCase()
+    if (!q) return pickerProducts.slice(0, 100)
+    return pickerProducts
+      .filter((p) => {
+        const sku = (p.sku ?? '').toLowerCase()
+        const name = p.name.toLowerCase()
+        return sku.includes(q) || name.includes(q)
+      })
+      .slice(0, 100)
+  }, [pickerProducts, componentSearch])
+
+  const selectedProduct = addProductId ? productMap.get(addProductId) ?? null : null
+
+  useEffect(() => {
+    if (!pickerOpen) return
+    function onDocClick(e: MouseEvent) {
+      if (!pickerRef.current) return
+      if (e.target instanceof Node && !pickerRef.current.contains(e.target)) {
+        setPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [pickerOpen])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -115,7 +144,14 @@ export default function ProductAssemblyEditor({
   }
 
   async function handleAddLine() {
-    if (!bom || !addProductId) return
+    if (!bom) {
+      setMessage({ type: 'err', text: 'Create the breakdown first.' })
+      return
+    }
+    if (!addProductId) {
+      setMessage({ type: 'err', text: 'Pick a component SKU from the search list first.' })
+      return
+    }
     const qty = parseInt(addQty, 10)
     if (!Number.isFinite(qty) || qty < 1) {
       setMessage({ type: 'err', text: 'Quantity must be at least 1.' })
@@ -136,9 +172,24 @@ export default function ProductAssemblyEditor({
     }
     setAddProductId('')
     setAddQty('1')
-    setComponentPicker('')
-    setMessage({ type: 'ok', text: 'Component added.' })
+    setComponentSearch('')
+    setPickerOpen(false)
+    setMessage({ type: 'ok', text: 'Component added to breakdown.' })
     await refresh()
+  }
+
+  function handleSelectComponent(p: ProductRow) {
+    setAddProductId(p.id)
+    setComponentSearch(`${p.sku ?? p.id} — ${p.name}`)
+    const cat = categoryMap.get(p.category_id)
+    setAddRole(inferComponentRoleFromProduct(p, cat?.slug))
+    setPickerOpen(false)
+  }
+
+  function handleClearComponent() {
+    setAddProductId('')
+    setComponentSearch('')
+    setPickerOpen(true)
   }
 
   async function handleRemoveLine(lineId: string) {
@@ -199,40 +250,67 @@ export default function ProductAssemblyEditor({
         )
       ) : (
         <>
-          <ProductAssemblyBreakdown productId={product.id} roleLabels={labels} />
+          {!canEdit && <ProductAssemblyBreakdown productId={product.id} roleLabels={labels} />}
           {canEdit && (
             <div className="product-assembly-editor-add card admin-card">
               <h4 className="product-assembly-editor-add-title">Add component line</h4>
               <div className="product-assembly-editor-add-form">
-                <label className="product-assembly-editor-field product-assembly-editor-field--full">
+                <div className="product-assembly-editor-field product-assembly-editor-field--full">
                   <span className="product-assembly-editor-field-label">Component product (SKU)</span>
-                  <input
-                    type="search"
-                    list="assembly-component-products"
-                    className="admin-input"
-                    value={componentPicker}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setComponentPicker(v)
-                      const match = pickerProducts.find(
-                        (p) => p.sku === v || `${p.sku} — ${p.name}` === v || p.id === v
-                      )
-                      if (match) {
-                        setAddProductId(match.id)
-                        const cat = categoryMap.get(match.category_id)
-                        setAddRole(inferComponentRoleFromProduct(match, cat?.slug))
-                      } else if (!v.trim()) {
-                        setAddProductId('')
-                      }
-                    }}
-                    placeholder="Search SKU or name…"
-                  />
-                </label>
-                <datalist id="assembly-component-products">
-                  {pickerProducts.slice(0, 500).map((p) => (
-                    <option key={p.id} value={`${p.sku ?? p.id} — ${p.name}`} />
-                  ))}
-                </datalist>
+                  {selectedProduct ? (
+                    <div className="product-assembly-picker-selected" role="status">
+                      <div className="product-assembly-picker-selected-text">
+                        <strong>{selectedProduct.sku ?? '(no SKU)'}</strong>
+                        <span> — {selectedProduct.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline"
+                        onClick={handleClearComponent}
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="product-assembly-picker" ref={pickerRef}>
+                      <input
+                        type="search"
+                        className="admin-input"
+                        value={componentSearch}
+                        onChange={(e) => {
+                          setComponentSearch(e.target.value)
+                          setPickerOpen(true)
+                        }}
+                        onFocus={() => setPickerOpen(true)}
+                        placeholder="Search SKU or name…"
+                        aria-label="Search component product"
+                        autoComplete="off"
+                      />
+                      {pickerOpen && (
+                        <ul className="product-assembly-picker-list" role="listbox">
+                          {filteredPickerProducts.length === 0 ? (
+                            <li className="product-assembly-picker-empty">No matching products.</li>
+                          ) : (
+                            filteredPickerProducts.map((p) => (
+                              <li key={p.id}>
+                                <button
+                                  type="button"
+                                  className="product-assembly-picker-option"
+                                  onClick={() => handleSelectComponent(p)}
+                                >
+                                  <span className="product-assembly-picker-option-sku">
+                                    {p.sku ?? '(no SKU)'}
+                                  </span>
+                                  <span className="product-assembly-picker-option-name">{p.name}</span>
+                                </button>
+                              </li>
+                            ))
+                          )}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <div className="product-assembly-editor-add-row">
                   <div className="product-assembly-editor-field product-assembly-editor-field--part-type">
                     <PartTypeSelectWithAdd
@@ -261,20 +339,30 @@ export default function ProductAssemblyEditor({
                     className="btn"
                     disabled={busy || !addProductId}
                     onClick={() => void handleAddLine()}
+                    title={!addProductId ? 'Pick a component from the search list first' : undefined}
                   >
-                    Add to breakdown
+                    {busy ? 'Adding…' : 'Add to breakdown'}
                   </button>
                 </div>
               </div>
-              {bom.assembly_lines.length > 0 && (
-                <div className="product-assembly-editor-lines-wrap">
-                  <p className="product-assembly-editor-lines-heading">Lines in this breakdown</p>
+              <div className="product-assembly-editor-lines-wrap">
+                <p className="product-assembly-editor-lines-heading">
+                  Lines in this breakdown ({bom.assembly_lines.length})
+                </p>
+                {bom.assembly_lines.length === 0 ? (
+                  <p className="admin-muted">
+                    No components yet. Pick a SKU above, set the quantity and part type, then click
+                    <em> Add to breakdown</em>.
+                  </p>
+                ) : (
                   <ul className="product-assembly-editor-lines">
                     {bom.assembly_lines.map((line) => (
                       <li key={line.id}>
                         <span className="product-assembly-editor-line-text">
-                          {roleLabel(line.component_role)} ×{line.quantity} —{' '}
-                          <code>{line.product?.sku}</code>
+                          <strong>×{line.quantity}</strong>{' '}
+                          <code>{line.product?.sku ?? '—'}</code>{' '}
+                          {line.product?.name ?? ''}{' '}
+                          <span className="admin-muted">({roleLabel(line.component_role)})</span>
                         </span>
                         <button
                           type="button"
@@ -287,8 +375,8 @@ export default function ProductAssemblyEditor({
                       </li>
                     ))}
                   </ul>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </>

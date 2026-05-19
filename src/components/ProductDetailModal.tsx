@@ -63,8 +63,13 @@ export default function ProductDetailModal({
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
-  /** Ignore backdrop dismiss briefly so stray pointer events cannot close immediately after mount. */
-  const backdropDismissReadyAtRef = useRef(0)
+  /**
+   * Hard warm-up window. For this many milliseconds after mount we refuse to close via ANY path
+   * (backdrop, escape, X button, focus shenanigans). This is the only fully robust guard against
+   * the "modal flashes up for a split second then disappears" bug — every other guard is
+   * heuristic and only protects one specific dismiss path.
+   */
+  const closeReadyAtRef = useRef(0)
   /**
    * True only when the user pressed mousedown DIRECTLY on the backdrop (not on the modal card).
    * Without this, the opening click — which dispatches mousedown/mouseup/click on the original
@@ -152,9 +157,18 @@ export default function ProductDetailModal({
   }
 
   useLayoutEffect(() => {
-    // Long window + mousedown suppression: opening click/pointer can otherwise land on the backdrop as a ghost click.
-    backdropDismissReadyAtRef.current = performance.now() + 750
+    // 600ms warm-up: empirically enough to outlast React Strict Mode's double-effect run,
+    // the trigger element's synthetic "click after mount" ghost, and any focus-restore round-trips
+    // from rAF/setTimeout callbacks queued by the parent during the mount frame.
+    closeReadyAtRef.current = performance.now() + 600
   }, [])
+
+  // Single guard used by every dismiss path (backdrop, escape, X button).
+  const isCloseReady = () => performance.now() >= closeReadyAtRef.current
+  const requestClose = () => {
+    if (!isCloseReady()) return
+    onCloseRef.current()
+  }
 
   useEffect(() => {
     returnFocusRef.current = (document.activeElement as HTMLElement | null) ?? null
@@ -163,7 +177,11 @@ export default function ProductDetailModal({
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        if (!e.repeat) onCloseRef.current()
+        // Inline the warm-up guard so this effect doesn't need `requestClose` in its
+        // dependency array (which would force a re-bind on every render).
+        if (!e.repeat && performance.now() >= closeReadyAtRef.current) {
+          onCloseRef.current()
+        }
         return
       }
       if (e.key !== 'Tab') return
@@ -222,10 +240,6 @@ export default function ProductDetailModal({
     }
   }
 
-  function shouldIgnoreBackdropDismiss(): boolean {
-    return performance.now() < backdropDismissReadyAtRef.current
-  }
-
   function handleBackdropMouseDown(e: React.MouseEvent<HTMLDivElement>) {
     // Only prime dismiss when the press lands directly on the backdrop and not on the card.
     // The opening click's mousedown is on the product card (outside the backdrop entirely),
@@ -247,8 +261,7 @@ export default function ProductDetailModal({
       return
     }
     backdropPrimedRef.current = false
-    if (shouldIgnoreBackdropDismiss()) return
-    onCloseRef.current()
+    requestClose()
   }
 
   // Defensive: if pointer is released anywhere that is NOT the backdrop, abandon the primed state.
@@ -276,7 +289,7 @@ export default function ProductDetailModal({
         <button
           type="button"
           className="product-modal-close"
-          onClick={onClose}
+          onClick={requestClose}
           aria-label="Close"
           ref={closeBtnRef}
         >

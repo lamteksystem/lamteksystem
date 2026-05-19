@@ -284,7 +284,7 @@ async function main() {
   const results = []
   try {
     for (const section of SECTIONS) {
-      // eslint-disable-next-line no-console
+       
       console.log(`Recording: ${section.label}`)
       const out = await recordSection(browser, section)
       if (out) results.push(out)
@@ -293,12 +293,12 @@ async function main() {
     await browser.close()
   }
   await createIndex(results)
-  // eslint-disable-next-line no-console
+   
   console.log(`Done. Videos and captions are in: ${OUTPUT_DIR}`)
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
+   
   console.error(err)
   process.exit(1)
 })

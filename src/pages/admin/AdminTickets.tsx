@@ -65,7 +65,7 @@ export default function AdminTickets() {
   useEffect(() => {
     if (!canView) return
     load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [canView])
 
   const visible = useMemo(() => {

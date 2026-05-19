@@ -45,7 +45,7 @@ export default function Support() {
       body: f.body || template.body,
       selectedLineIds: new Set<string>(),
     }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [searchParams])
 
   async function load() {
@@ -132,7 +132,7 @@ export default function Support() {
       setOrderLines((data ?? []) as OrderLineRow[])
     }
     loadLines()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [form.order_id])
 
   function toggleLine(id: string) {

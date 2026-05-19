@@ -118,7 +118,11 @@ function ProductCard({
 }) {
   const opts = product.options as Record<string, unknown>
   const availability = getProductAvailabilityMeta(product)
-  const openDetail = () => onOpenDetail(product)
+  // See the matching comment in ProductTableRow for why stopPropagation matters here.
+  const openDetail = (e?: { stopPropagation: () => void }) => {
+    e?.stopPropagation()
+    onOpenDetail(product)
+  }
   return (
     <div
       key={product.id}
@@ -199,7 +203,15 @@ function ProductTableRow({
       : availability.label.startsWith('Out of stock')
         ? 'bad'
         : 'neutral'
-  const openDetail = () => onOpenDetail(product)
+  // Open the modal exactly ONCE per gesture. Without stopPropagation, clicking the inner button
+  // would also bubble to the <tr onClick>, triggering setSelectedProduct twice in the same React
+  // batch — harmless on its own, but combined with StrictMode's double-effect it has historically
+  // looked like the modal "flashes". Stopping propagation also lets the row's onClick still cover
+  // empty cell areas (clicks that don't hit any inner button) without double-firing.
+  const openDetail = (e?: { stopPropagation: () => void }) => {
+    e?.stopPropagation()
+    onOpenDetail(product)
+  }
   const opts = product.options as Record<string, unknown> | null
   const optionEntries =
     opts && typeof opts === 'object'

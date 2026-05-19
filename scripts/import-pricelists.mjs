@@ -121,6 +121,37 @@ function tealburyShouldAppendDoorRange(sheetName, productiveSheetNames, skipPric
   return productiveSheetNames.length === 1
 }
 
+/**
+ * Classify a PLAIN END PANEL into base/wall/tower/showback based on dimensions.
+ *
+ * The Tealbury catalogue lumps every end-panel variant under one "PLAIN END PANEL" name even
+ * though the same product code can describe a tiny wall-cabinet side panel, a tower-height
+ * panel, or a full-wall showback panel. The kitchen-trade convention is to read the panel
+ * type from its height + width:
+ *
+ *   - Showback panel:  H >= 2000 AND W >= 800   (tall + wide enough to back a wall area)
+ *   - Tower panel:     H >= 2000 AND W < 800    (tall but only cabinet-depth-wide)
+ *   - Wall panel:      H < 1500 AND W < 500     (short, narrow — wall cabinet side)
+ *   - Base panel:      H < 1500 AND W >= 500    (short, wider — base cabinet side)
+ *
+ * Returns "" when the desc isn't a PLAIN END PANEL or the dimensions don't classify cleanly,
+ * otherwise " - SHOWBACK PANEL" etc. (note the leading " - "). Callers append it to the
+ * existing `Item: <desc>` line so the augmented description looks like:
+ *   Item: PLAIN END PANEL - SHOWBACK PANEL
+ *   Dimensions: H 2450mm, W 910mm, D 18mm
+ */
+function panelSubtypeSuffix(desc, hRaw, wRaw) {
+  if (!desc || !/PLAIN END PANEL/i.test(desc)) return ''
+  const h = Number(hRaw)
+  const w = Number(wRaw)
+  if (!Number.isFinite(h) || !Number.isFinite(w) || h <= 0 || w <= 0) return ''
+  if (h >= 2000 && w >= 800) return ' - SHOWBACK PANEL'
+  if (h >= 2000 && w >= 400 && w < 800) return ' - TOWER PANEL'
+  if (h < 1500 && w < 500) return ' - WALL PANEL'
+  if (h < 1500 && w >= 500) return ' - BASE PANEL'
+  return ''
+}
+
 function buildTealburyStorageSku(tradeCode, sheetName) {
   const s = `${tradeCode} · ${sheetName}`.replace(/\s{2,}/g, ' ').trim()
   return s.length > 200 ? s.slice(0, 200) : s
@@ -220,8 +251,16 @@ function parseTealburyCustomerCatalogMatrix(data, sheetName, doorRangeCtx) {
     const wm = colMap.w >= 0 ? trimCell(line[colMap.w]) : ''
     const dm = colMap.d >= 0 ? trimCell(line[colMap.d]) : ''
     const dims = [hm && `H ${hm}mm`, wm && `W ${wm}mm`, dm && `D ${dm}mm`].filter(Boolean).join(', ')
-    const name = [code, desc ? desc.slice(0, 160) : null].filter(Boolean).join(' — ').slice(0, 300)
-    const description = [`Section: ${section}`, desc ? `Item: ${desc}` : null, dims ? `Dimensions: ${dims}` : null]
+    // Name is the human-readable description; SKU stays in the `sku` column. Falling back to
+    // `code` only when no description exists at all (e.g. pure accessory rows).
+    const name = (desc ? desc.slice(0, 160) : code).slice(0, 300)
+    // Description excludes the redundant "Section: ..." line — the category column already
+    // encodes that. We keep Item + Dimensions because those carry information the category
+    // doesn't (item variant + measured size).
+    const description = [
+      desc ? `Item: ${desc}${dims ? panelSubtypeSuffix(desc, hm, wm) : ''}` : null,
+      dims ? `Dimensions: ${dims}` : null,
+    ]
       .filter(Boolean)
       .join('\n')
     let parsed = {
@@ -376,8 +415,14 @@ function parseKitchenMatrix(data, sheetLabel) {
 
     const prices = Object.values(finishPrices)
     const unitPrice = Math.min(...prices)
-    const name = [code, size || null, desc ? desc.slice(0, 120) : null].filter(Boolean).join(' — ').slice(0, 300)
-    const description = [`Section: ${section}`, desc ? `Specification: ${desc}` : null, size ? `Size: ${size}` : null]
+    // Human-friendly name: just the spec/desc (+ optional size suffix). SKU lives in `sku`.
+    const namePieces = [desc ? desc.slice(0, 120) : null, size || null].filter(Boolean)
+    const name = (namePieces.length ? namePieces.join(' — ') : code).slice(0, 300)
+    // Drop the redundant Section: line — the category column already encodes that.
+    const description = [
+      desc ? `Specification: ${desc}` : null,
+      size ? `Size: ${size}` : null,
+    ]
       .filter(Boolean)
       .join('\n')
 
@@ -466,8 +511,10 @@ function parseBedroomMatrix(data, sheetLabel) {
     if (!Object.keys(finishPrices).length) continue
 
     const unitPrice = Math.min(...Object.values(finishPrices))
-    const name = [code, desc ? desc.slice(0, 200) : null].filter(Boolean).join(' — ').slice(0, 300)
-    const description = [`Section: ${section}`, desc ? `Specification: ${desc}` : null].filter(Boolean).join('\n')
+    // Human-friendly name from the spec, falling back to the code when there's nothing else.
+    const name = (desc ? desc.slice(0, 200) : code).slice(0, 300)
+    // Drop the redundant Section: line — the category column already encodes that.
+    const description = desc ? `Specification: ${desc}` : ''
 
     if (bySku.has(code)) {
       const prev = bySku.get(code)

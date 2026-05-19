@@ -29,13 +29,13 @@ import { rebucketTealburyAccessories } from '@/lib/tealburyAccessoryRebucket'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
 type Tab = 'suggestions' | 'history' | 'settings'
-type ConfidenceLevel = 'low' | 'medium' | 'high'
+export type ConfidenceLevel = 'low' | 'medium' | 'high'
 
-const CONFIDENCE_LEVELS: ConfidenceLevel[] = ['high', 'medium', 'low']
-const PAGE_SIZE_OPTIONS = [20, 50, 100, 250, 500] as const
-type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
+export const CONFIDENCE_LEVELS: ConfidenceLevel[] = ['high', 'medium', 'low']
+export const PAGE_SIZE_OPTIONS = [20, 50, 100, 250, 500] as const
+export type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
 
-interface ResultInfo {
+export interface ResultInfo {
   tone: 'success' | 'mixed' | 'error'
   title: string
   lines: string[]
@@ -165,7 +165,7 @@ export default function AdminSmartCategorise() {
         )}
       </div>
 
-      {result && <ResultModal info={result} onClose={() => setResult(null)} />}
+      {result && <SmartCategoriseResultModal info={result} onClose={() => setResult(null)} />}
     </section>
   )
 }
@@ -174,21 +174,23 @@ export default function AdminSmartCategorise() {
 // Suggestions tab
 // ---------------------------------------------------------------------------
 
-function SuggestionsTab({
-  products,
-  categories,
-  categoryById,
-  learning,
-  onApplied,
-  setResult,
-}: {
+export interface SuggestionsTabProps {
   products: ProductRow[]
   categories: CategoryRow[]
   categoryById: Map<string, CategoryRow>
   learning: LearningIndex
   onApplied: () => Promise<void>
   setResult: (r: ResultInfo) => void
-}) {
+}
+
+export function SuggestionsTab({
+  products,
+  categories,
+  categoryById,
+  learning,
+  onApplied,
+  setResult,
+}: SuggestionsTabProps) {
   const [confidenceFilter, setConfidenceFilter] = useState<Record<ConfidenceLevel, boolean>>({
     high: true,
     medium: true,
@@ -1062,7 +1064,7 @@ function SettingsTab({
 // Shared result modal
 // ---------------------------------------------------------------------------
 
-function ResultModal({ info, onClose }: { info: ResultInfo; onClose: () => void }) {
+export function SmartCategoriseResultModal({ info, onClose }: { info: ResultInfo; onClose: () => void }) {
   const icon = info.tone === 'success' ? '✓' : info.tone === 'mixed' ? '!' : '×'
   return (
     <div

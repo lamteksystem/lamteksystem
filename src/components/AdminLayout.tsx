@@ -29,6 +29,7 @@ import {
   PoundSterling,
   BookOpen,
   Settings,
+  Sparkles,
   Ticket,
   Users,
   Zap,
@@ -163,6 +164,26 @@ export default function AdminLayout() {
     if (location.pathname === '/admin/create-order') return { pageTitle: 'Create order', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Create order' }] }
     if (location.pathname === '/admin/create-quote') return { pageTitle: 'Create quote', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Create quote' }] }
     if (location.pathname === '/admin/catalogue') return { pageTitle: 'Catalogue', breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Catalogue' }] }
+    if (location.pathname === '/admin/catalogue/smart-categorise') {
+      return {
+        pageTitle: 'Smart categorise',
+        breadcrumb: [
+          { to: '/admin', label: 'Today' },
+          { to: '/admin/catalogue', label: 'Catalogue' },
+          { label: 'Smart categorise' },
+        ],
+      }
+    }
+    if (location.pathname === '/admin/catalogue/tealbury') {
+      return {
+        pageTitle: 'Tealbury pricelist',
+        breadcrumb: [
+          { to: '/admin', label: 'Today' },
+          { to: '/admin/catalogue', label: 'Catalogue' },
+          { label: 'Tealbury pricelist' },
+        ],
+      }
+    }
     if (location.pathname === '/admin/stock') return { pageTitle: 'Stock take', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/catalogue', label: 'Catalogue' }, { label: 'Stock take' }] }
     if (location.pathname === '/admin/locations') return { pageTitle: 'Locations', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/stock', label: 'Stock take' }, { label: 'Locations' }] }
     if (location.pathname === '/admin/delivery-windows') return { pageTitle: 'Delivery windows', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/stock', label: 'Stock take' }, { label: 'Delivery windows' }] }
@@ -489,11 +510,27 @@ export default function AdminLayout() {
                 )}
                 <div className={`admin-nav-children ${open ? 'open' : ''}`}>
                   {canViewCatalogue && (
-                    <NavLink to="/admin/catalogue" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+                    <NavLink
+                      to="/admin/catalogue"
+                      end
+                      className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}
+                    >
                       <span className="admin-nav-icon">
                         <ClipboardList size={16} strokeWidth={2} aria-hidden />
                       </span>
                       {!sidebarCollapsed && <span>Catalogue</span>}
+                    </NavLink>
+                  )}
+                  {canViewCatalogue && (
+                    <NavLink
+                      to="/admin/catalogue/smart-categorise"
+                      className={({ isActive }) => `admin-nav-item admin-nav-item--sub ${isActive ? 'active' : ''}`}
+                      title="AI-assisted category suggestions, learning history, and settings"
+                    >
+                      <span className="admin-nav-icon">
+                        <Sparkles size={16} strokeWidth={2} aria-hidden />
+                      </span>
+                      {!sidebarCollapsed && <span>Smart categorise</span>}
                     </NavLink>
                   )}
                   {canViewStock && (
@@ -705,6 +742,7 @@ export default function AdminLayout() {
                 {canViewCustomers && <option value="/admin/customers">Customers</option>}
                 {canViewCustomers && <option value="/admin/crm/open-orders">CRM open orders</option>}
                 {canViewCatalogue && <option value="/admin/catalogue">Catalogue</option>}
+                {canViewCatalogue && <option value="/admin/catalogue/smart-categorise">Smart categorise</option>}
                 {canViewStock && <option value="/admin/stock">Stock take</option>}
                 {canViewReports && <option value="/admin/reports">Reports</option>}
                 {canViewTickets && <option value="/admin/tickets">Support tickets</option>}

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 import CatalogueTealburyImportBlock from '@/components/admin/CatalogueTealburyImportBlock'
+import SmartCategoriseModal from '@/components/admin/SmartCategoriseModal'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { supabase } from '@/lib/supabase'
 import { useAdminUi } from '@/contexts/AdminUiContext'
@@ -156,6 +157,7 @@ export default function AdminCatalogue() {
   const [productGroupFilter, setProductGroupFilter] = useState<'all' | 'doors_fronts' | 'carcasses' | 'accessories'>('all')
   const [viewType, setViewType] = useState<CatalogueViewType>('table')
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null)
+  const [smartCategoriseOpen, setSmartCategoriseOpen] = useState(false)
   const [completeProductIds, setCompleteProductIds] = useState<Set<string>>(new Set())
   const {
     types: assemblyPartTypes,
@@ -1112,13 +1114,14 @@ export default function AdminCatalogue() {
           Stock items only
         </label>
         {canEditCatalogue && (
-          <Link
-            to="/admin/catalogue/smart-categorise"
+          <button
+            type="button"
             className="btn btn-outline btn-small"
-            title="Open the dedicated smart categorisation tool — suggestions, history, settings"
+            onClick={() => setSmartCategoriseOpen(true)}
+            title="Open the smart categorisation tool. Use the full page for history & settings."
           >
             Smart categorise
-          </Link>
+          </button>
         )}
         <label>
           Sort by
@@ -1849,6 +1852,16 @@ export default function AdminCatalogue() {
         products={products}
         productCategoryMap={productCategoryMap}
         onChanged={() => {
+          void load()
+        }}
+      />
+
+      <SmartCategoriseModal
+        open={smartCategoriseOpen}
+        onClose={() => setSmartCategoriseOpen(false)}
+        products={products}
+        categories={categories}
+        onApplied={() => {
           void load()
         }}
       />

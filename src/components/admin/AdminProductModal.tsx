@@ -10,7 +10,7 @@ import {
   saveProductCategories,
   type ProductCategoryMap,
 } from '@/lib/productCategories'
-import AdminCategoriesModal from '@/components/admin/AdminCategoriesModal'
+import ProductCategoriesAssignModal from '@/components/admin/ProductCategoriesAssignModal'
 import { ProductCategoryMultiSelect } from '@/components/admin/ProductCategoryMultiSelect'
 import ProductAssemblyEditor from '@/components/admin/ProductAssemblyEditor'
 import { usePermission } from '@/hooks/usePermission'
@@ -184,10 +184,14 @@ export default function AdminProductModal({
     setCategoriesModalOpen(true)
   }, [])
 
-  function handleCategoryCreated(cat: CategoryRow, assignToProduct: boolean) {
-    if (!assignToProduct) return
-    setCategoryIds((prev) => (prev.includes(cat.id) ? prev : [...prev, cat.id]))
-    setPrimaryCategoryId((prev) => prev || cat.id)
+  function handleCategoriesAssignSaved(ids: string[], primary: string) {
+    setCategoryIds(ids)
+    setPrimaryCategoryId(primary)
+    setLiveProduct((prev) => ({ ...prev, category_id: primary }))
+    onProductSaved?.(liveProduct.id, ids, primary)
+    if (inlineCategoryDraft) {
+      setInlineCategoryDraft({ ids, primary })
+    }
   }
 
   async function handleSave() {
@@ -448,31 +452,13 @@ export default function AdminProductModal({
                 onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
                 placeholder="SKU"
               />
-              <div className="admin-category-section-header">
-                <button
-                  type="button"
-                  className="admin-category-section-title-btn"
-                  onClick={openCategoriesModal}
-                  title="View all categories and add new ones"
-                >
-                  <span className="admin-modal-form-section-title admin-category-section-title">Categories</span>
-                  <span className="admin-category-section-manage">Manage…</span>
-                </button>
-              </div>
+              <h3 className="admin-modal-form-section-title">Categories</h3>
               <p className="admin-muted admin-category-section-hint">
-                Assign one or more categories. Primary is used for pricing rules scoped to category and spreadsheet export.
-                Click <strong>Categories</strong> to add a new category on the fly.
+                {displayCategoryNames || 'No categories assigned yet.'}
               </p>
-              <ProductCategoryMultiSelect
-                categories={categoriesList}
-                selectedIds={categoryIds}
-                primaryId={primaryCategoryId}
-                onChange={(ids, primary) => {
-                  const normalized = normalizeCategorySelection(ids, primary)
-                  setCategoryIds(normalized.ids)
-                  setPrimaryCategoryId(normalized.primary)
-                }}
-              />
+              <button type="button" className="btn btn-sm btn-outline" onClick={openCategoriesModal}>
+                Assign categories…
+              </button>
             </div>
             <div className="admin-modal-form-section">
               <h3 className="admin-modal-form-section-title">Complete unit make-up</h3>
@@ -689,7 +675,7 @@ export default function AdminProductModal({
                           className="btn btn-sm btn-outline"
                           onClick={openCategoriesModal}
                         >
-                          Manage…
+                          Assign categories…
                         </button>
                       </div>
                     </div>
@@ -703,7 +689,7 @@ export default function AdminProductModal({
                             className="btn btn-sm btn-outline"
                             onClick={openCategoriesModal}
                           >
-                            Manage categories
+                            Assign categories…
                           </button>
                         </div>
                       )}
@@ -958,14 +944,16 @@ export default function AdminProductModal({
       {createPortal(modalTree, document.body)}
       {preloadCategoriesModal &&
         createPortal(
-          <AdminCategoriesModal
+          <ProductCategoriesAssignModal
             open={categoriesModalOpen}
+            productId={liveProduct.id}
+            productName={liveProduct.name}
             categories={categoriesList}
-            productName={product.name}
-            skipProductCounts
+            selectedIds={categoryIds}
+            primaryCategoryId={primaryCategoryId}
             onClose={() => setCategoriesModalOpen(false)}
             onCategoriesUpdated={handleCategoriesUpdated}
-            onCategoryCreated={handleCategoryCreated}
+            onSaved={handleCategoriesAssignSaved}
           />,
           document.body
         )}

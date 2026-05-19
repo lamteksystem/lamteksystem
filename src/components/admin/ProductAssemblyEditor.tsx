@@ -170,19 +170,17 @@ export default function ProductAssemblyEditor({
 
       {canEdit && (
         <div className="product-assembly-editor-part-types card admin-card">
-          <h4 className="product-assembly-editor-add-title">Part types</h4>
+          <h4 className="product-assembly-editor-add-title">Default part type</h4>
           <p className="admin-muted product-assembly-editor-part-types-hint">
-            Choose a type when adding components, or create a new one here without leaving this product.
+            Pre-selects the part type when you add a component below. Changes apply immediately — no separate save.
           </p>
-          <label className="product-assembly-editor-field">
-            <span className="product-assembly-editor-field-label">Default part type for new lines</span>
-            <PartTypeSelectWithAdd
-              partTypes={partTypes}
-              value={addRole}
-              onChange={setAddRole}
-              onPartTypesChange={handlePartTypesUpdated}
-            />
-          </label>
+          <PartTypeSelectWithAdd
+            partTypes={partTypes}
+            value={addRole}
+            onChange={setAddRole}
+            onPartTypesChange={handlePartTypesUpdated}
+            selectLabel="Default part type for new component lines"
+          />
         </div>
       )}
 
@@ -236,15 +234,16 @@ export default function ProductAssemblyEditor({
                   ))}
                 </datalist>
                 <div className="product-assembly-editor-add-row">
-                  <label className="product-assembly-editor-field">
-                    <span className="product-assembly-editor-field-label">Part type</span>
+                  <div className="product-assembly-editor-field product-assembly-editor-field--part-type">
                     <PartTypeSelectWithAdd
                       partTypes={partTypes}
                       value={addRole}
                       onChange={setAddRole}
                       onPartTypesChange={handlePartTypesUpdated}
+                      selectLabel="Part type for this line"
+                      allowCreate={false}
                     />
-                  </label>
+                  </div>
                   <label className="product-assembly-editor-field">
                     <span className="product-assembly-editor-field-label">Qty per complete unit</span>
                     <input

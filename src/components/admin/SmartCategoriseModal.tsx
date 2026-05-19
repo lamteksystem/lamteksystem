@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Smart Categorise quick-access modal.
  *
  * Lightweight wrapper around the shared `SuggestionsTab` used on the dedicated
@@ -20,7 +20,11 @@ import {
   loadUserSmartStopWords,
   type LearningIndex,
 } from '@/lib/smartCategoryLearning'
-import { loadSmartCategorySettings } from '@/lib/smartCategorySettings'
+import {
+  DEFAULT_SMART_CATEGORY_SETTINGS,
+  loadSmartCategorySettings,
+  type SmartCategorySettings,
+} from '@/lib/smartCategorySettings'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
 interface SmartCategoriseModalProps {
@@ -40,6 +44,7 @@ export default function SmartCategoriseModal({
   onApplied,
 }: SmartCategoriseModalProps) {
   const [learning, setLearning] = useState<LearningIndex>(new Map())
+  const [settings, setSettings] = useState<SmartCategorySettings>(DEFAULT_SMART_CATEGORY_SETTINGS)
   const [loadingLearning, setLoadingLearning] = useState(false)
   const [result, setResult] = useState<ResultInfo | null>(null)
 
@@ -54,12 +59,13 @@ export default function SmartCategoriseModal({
     try {
       // Refresh all three caches the heuristic depends on (learning, stop-words, settings) before
       // we compute suggestions so they reflect any tweaks made on the Settings or History tabs.
-      const [idx] = await Promise.all([
+      const [idx, , opts] = await Promise.all([
         loadSmartCategoryLearning(),
         loadUserSmartStopWords(),
         loadSmartCategorySettings(),
       ])
       setLearning(idx)
+      setSettings(opts)
     } finally {
       setLoadingLearning(false)
     }
@@ -110,19 +116,20 @@ export default function SmartCategoriseModal({
             onClick={onClose}
             aria-label="Close smart categorise"
           >
-            ×
+            Ã—
           </button>
         </header>
 
         <div className="admin-smart-categorise-modal-body">
           {loadingLearning ? (
-            <p className="admin-muted">Loading suggestions…</p>
+            <p className="admin-muted">Loading suggestionsâ€¦</p>
           ) : (
             <SuggestionsTab
               products={products}
               categories={categories}
               categoryById={categoryById}
               learning={learning}
+              settings={settings}
               onApplied={async () => {
                 await refreshLearning()
                 await onApplied()

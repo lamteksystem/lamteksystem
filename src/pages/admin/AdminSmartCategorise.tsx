@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Categories admin hub.
  *
  * Top-level sections (URL: ?section=general|smart|parts, default `general`):
@@ -300,6 +300,7 @@ function SmartSection({
             categories={categories}
             categoryById={categoryById}
             learning={learning}
+            settings={settings}
             onApplied={async () => {
               await refreshLearning()
               await loadAll()
@@ -319,6 +320,7 @@ function SmartSection({
           <SettingsTab
             categories={categories}
             products={products}
+            learning={learning}
             settings={settings}
             onSettingsChanged={onSettingsChanged}
             onChanged={async () => {
@@ -341,6 +343,8 @@ export interface SuggestionsTabProps {
   categories: CategoryRow[]
   categoryById: Map<string, CategoryRow>
   learning: LearningIndex
+  /** Settings drive band labels/descriptions used on chips + table badges. */
+  settings: SmartCategorySettings
   onApplied: () => Promise<void>
   setResult: (r: ResultInfo) => void
 }
@@ -350,6 +354,7 @@ export function SuggestionsTab({
   categories,
   categoryById,
   learning,
+  settings,
   onApplied,
   setResult,
 }: SuggestionsTabProps) {
@@ -442,6 +447,18 @@ export function SuggestionsTab({
     })
   }
 
+  // UX paper-cut: previously the user had to change the category AND also tick the row's checkbox
+  // before Apply. The obvious gesture "I'm tweaking this row" already implies "include this row in
+  // the next Apply", so we auto-tick on every override mutation. The user can still untick.
+  function autoSelect(productId: string) {
+    setSelected((prev) => {
+      if (prev.has(productId)) return prev
+      const next = new Set(prev)
+      next.add(productId)
+      return next
+    })
+  }
+
   function setPrimaryOverride(productId: string, categoryId: string) {
     setOverrides((prev) => {
       const next = new Map(prev)
@@ -453,6 +470,7 @@ export function SuggestionsTab({
       })
       return next
     })
+    autoSelect(productId)
   }
 
   function clearPrimaryOverride(productId: string) {
@@ -483,6 +501,7 @@ export function SuggestionsTab({
       })
       return next
     })
+    autoSelect(productId)
   }
 
   function removeAdditionalCategory(productId: string, categoryId: string) {
@@ -498,6 +517,7 @@ export function SuggestionsTab({
       }
       return next
     })
+    autoSelect(productId)
   }
 
   async function applySelected() {
@@ -624,13 +644,7 @@ export function SuggestionsTab({
             <label
               key={level}
               className={`admin-confidence-chip admin-confidence-chip--${level}`}
-              title={
-                level === 'high'
-                  ? 'Strong match — the system is very confident'
-                  : level === 'medium'
-                    ? 'Likely match — review before applying'
-                    : 'Weak match — usually needs manual correction'
-              }
+              title={settings.bands[level].description}
             >
               <input
                 type="checkbox"
@@ -638,7 +652,9 @@ export function SuggestionsTab({
                 onChange={() => toggleConfidence(level)}
                 disabled={applying}
               />
-              <span className={`admin-badge admin-badge--${level}`}>{level}</span>
+              <span className={`admin-badge admin-badge--${level}`}>
+                {settings.bands[level].label || level}
+              </span>
             </label>
           ))}
         </fieldset>
@@ -942,9 +958,11 @@ export function SuggestionsTab({
                   <td>
                     <span
                       className={`admin-badge admin-badge--${s.confidence}`}
-                      title={`Match score: ${Math.round(s.score * 100)}%`}
+                      title={`${settings.bands[s.confidence].description}\n\nMatch score: ${Math.round(
+                        s.score * 100,
+                      )}%`}
                     >
-                      {s.confidence}
+                      {settings.bands[s.confidence].label || s.confidence}
                     </span>
                   </td>
                 </tr>
@@ -968,10 +986,27 @@ export function SuggestionsTab({
         ariaLabel="Suggestion pages"
       />
 
-            <div className="admin-smart-categorise-actions">
+            {/* Sticky action bar — pinned to the bottom of the viewport so Apply is always
+                reachable, no matter how many suggestions are on screen. Becomes "armed" (highlighted)
+                the moment the user has something selected. */}
+            <div
+              className={`admin-smart-categorise-actions admin-smart-categorise-actions--sticky${
+                selectedSuggestions.length > 0 ? ' admin-smart-categorise-actions--armed' : ''
+              }`}
+            >
         <Link to="/admin/catalogue" className="btn btn-outline">
           Back to catalogue
         </Link>
+        <span className="admin-smart-categorise-actions-summary">
+          {selectedSuggestions.length === 0 ? (
+            <span className="admin-muted">Tick rows to enable apply</span>
+          ) : (
+            <>
+              <strong>{selectedSuggestions.length}</strong> row
+              {selectedSuggestions.length === 1 ? '' : 's'} selected
+            </>
+          )}
+        </span>
         <button
           type="button"
           className="btn"
@@ -1572,6 +1607,8 @@ function HistoryTab({
 interface SettingsTabProps {
   categories: CategoryRow[]
   products: ProductRow[]
+  /** Learning index — used by the distribution preview to score the catalogue accurately. */
+  learning: LearningIndex
   settings: SmartCategorySettings
   onSettingsChanged: (next: SmartCategorySettings) => void
   onChanged: () => Promise<void>
@@ -1581,6 +1618,7 @@ interface SettingsTabProps {
 function SettingsTab({
   categories,
   products,
+  learning,
   settings,
   onSettingsChanged,
   onChanged,
@@ -1707,15 +1745,15 @@ function SettingsTab({
       >
         <div className="admin-smart-settings-grid">
           {/* ----------- Confidence bands ----------- */}
-          <section className="card admin-smart-categorise-setting-card">
+          <section className="card admin-smart-categorise-setting-card admin-smart-bands-card">
             <h3>Confidence bands</h3>
             <p className="admin-muted">
-              Each suggestion gets a final score from <code>0.0</code> to <code>1.0</code>. These
-              thresholds decide which band it lands in — and below <strong>min score</strong> the
-              suggestion is dropped entirely.
+              Each suggestion gets a final score from <code>0.0</code> to <code>1.0</code>. Below{' '}
+              <strong>min score</strong> the suggestion is dropped entirely. The three bands below
+              let you label, document and gate the rest however your team works.
             </p>
 
-            <label className="admin-smart-settings-field">
+            <label className="admin-smart-settings-field admin-smart-bands-minscore">
               <span className="admin-smart-settings-label">
                 Min score <small>(suggestions below this are not returned)</small>
               </span>
@@ -1728,53 +1766,191 @@ function SettingsTab({
                   value={draft.minScore}
                   onChange={(e) => setDraft((d) => ({ ...d, minScore: Number(e.target.value) }))}
                 />
-                <span className="admin-smart-settings-value">{draft.minScore.toFixed(2)}</span>
-              </div>
-            </label>
-
-            <label className="admin-smart-settings-field">
-              <span className="admin-smart-settings-label">
-                <span className="admin-badge admin-badge--medium">medium</span> threshold{' '}
-                <small>(score ≥ this → medium band)</small>
-              </span>
-              <div className="admin-smart-settings-slider-row">
                 <input
-                  type="range"
+                  type="number"
                   min={0.1}
-                  max={0.95}
+                  max={0.9}
                   step={0.01}
-                  value={draft.mediumThreshold}
+                  value={draft.minScore}
                   onChange={(e) =>
-                    setDraft((d) => ({ ...d, mediumThreshold: Number(e.target.value) }))
+                    setDraft((d) => ({
+                      ...d,
+                      minScore: Math.max(0, Math.min(1, Number(e.target.value) || 0)),
+                    }))
                   }
+                  className="admin-smart-settings-num"
                 />
-                <span className="admin-smart-settings-value">
-                  {draft.mediumThreshold.toFixed(2)}
-                </span>
               </div>
             </label>
 
-            <label className="admin-smart-settings-field">
-              <span className="admin-smart-settings-label">
-                <span className="admin-badge admin-badge--high">high</span> threshold{' '}
-                <small>(score ≥ this → high band — "safe to bulk apply")</small>
-              </span>
-              <div className="admin-smart-settings-slider-row">
-                <input
-                  type="range"
-                  min={0.1}
-                  max={0.99}
-                  step={0.01}
-                  value={draft.highThreshold}
-                  onChange={(e) =>
-                    setDraft((d) => ({ ...d, highThreshold: Number(e.target.value) }))
-                  }
-                />
-                <span className="admin-smart-settings-value">{draft.highThreshold.toFixed(2)}</span>
-              </div>
-            </label>
+            <ul className="admin-smart-bands-list">
+              {(
+                [
+                  {
+                    key: 'low' as const,
+                    title: 'Low band',
+                    badgeClass: 'admin-badge--low',
+                    threshold: draft.minScore,
+                    nextThreshold: draft.mediumThreshold,
+                    hint: 'Score from min-score up to (but not including) the medium threshold.',
+                    onThresholdChange: undefined,
+                  },
+                  {
+                    key: 'medium' as const,
+                    title: 'Medium band',
+                    badgeClass: 'admin-badge--medium',
+                    threshold: draft.mediumThreshold,
+                    nextThreshold: draft.highThreshold,
+                    hint: 'Score ≥ the medium threshold and below the high threshold.',
+                    onThresholdChange: (n: number) =>
+                      setDraft((d) => ({ ...d, mediumThreshold: n })),
+                  },
+                  {
+                    key: 'high' as const,
+                    title: 'High band',
+                    badgeClass: 'admin-badge--high',
+                    threshold: draft.highThreshold,
+                    nextThreshold: 1,
+                    hint: 'Score ≥ the high threshold (top of the scale, 1.0).',
+                    onThresholdChange: (n: number) =>
+                      setDraft((d) => ({ ...d, highThreshold: n })),
+                  },
+                ] as const
+              ).map((b) => {
+                const cfg = draft.bands[b.key]
+                return (
+                  <li key={b.key} className={`admin-smart-band-row admin-smart-band-row--${b.key}`}>
+                    <header className="admin-smart-band-row-head">
+                      <span className={`admin-badge ${b.badgeClass}`}>{cfg.label || b.key}</span>
+                      <strong className="admin-smart-band-row-title">{b.title}</strong>
+                      <span className="admin-muted admin-smart-band-row-range">
+                        {b.threshold.toFixed(2)} –{' '}
+                        {b.nextThreshold === 1 ? '1.00' : `<${b.nextThreshold.toFixed(2)}`}
+                      </span>
+                    </header>
 
-            {draft.minScore > draft.mediumThreshold || draft.mediumThreshold > draft.highThreshold ? (
+                    <div className="admin-smart-band-row-grid">
+                      <label className="admin-smart-settings-field">
+                        <span className="admin-smart-settings-label">
+                          Label <small>(text shown on the chip)</small>
+                        </span>
+                        <input
+                          type="text"
+                          maxLength={32}
+                          value={cfg.label}
+                          onChange={(e) =>
+                            setDraft((d) => ({
+                              ...d,
+                              bands: {
+                                ...d.bands,
+                                [b.key]: { ...d.bands[b.key], label: e.target.value },
+                              },
+                            }))
+                          }
+                          placeholder={b.key}
+                        />
+                      </label>
+
+                      {b.onThresholdChange ? (
+                        <label className="admin-smart-settings-field">
+                          <span className="admin-smart-settings-label">
+                            Threshold{' '}
+                            <small>
+                              (score ≥ this → <strong>{cfg.label || b.key}</strong>)
+                            </small>
+                          </span>
+                          <div className="admin-smart-settings-slider-row">
+                            <input
+                              type="range"
+                              min={0.1}
+                              max={0.99}
+                              step={0.01}
+                              value={b.threshold}
+                              onChange={(e) => b.onThresholdChange?.(Number(e.target.value))}
+                            />
+                            <input
+                              type="number"
+                              min={0}
+                              max={1}
+                              step={0.01}
+                              value={b.threshold}
+                              onChange={(e) =>
+                                b.onThresholdChange?.(
+                                  Math.max(0, Math.min(1, Number(e.target.value) || 0)),
+                                )
+                              }
+                              className="admin-smart-settings-num"
+                            />
+                          </div>
+                        </label>
+                      ) : (
+                        <div className="admin-smart-band-row-rangefixed">
+                          <span className="admin-smart-settings-label">
+                            Range start <small>(matches min score above)</small>
+                          </span>
+                          <p className="admin-muted admin-smart-band-row-rangenote">{b.hint}</p>
+                        </div>
+                      )}
+
+                      <label className="admin-smart-settings-field admin-smart-band-row-desc">
+                        <span className="admin-smart-settings-label">
+                          Description <small>(tooltip + reviewer guidance)</small>
+                        </span>
+                        <textarea
+                          rows={2}
+                          maxLength={240}
+                          value={cfg.description}
+                          onChange={(e) =>
+                            setDraft((d) => ({
+                              ...d,
+                              bands: {
+                                ...d.bands,
+                                [b.key]: { ...d.bands[b.key], description: e.target.value },
+                              },
+                            }))
+                          }
+                          placeholder={`What '${cfg.label || b.key}' means in your workflow`}
+                        />
+                      </label>
+
+                      <label className="admin-check-row admin-smart-band-row-auto">
+                        <input
+                          type="checkbox"
+                          checked={cfg.autoApply}
+                          onChange={(e) =>
+                            setDraft((d) => ({
+                              ...d,
+                              bands: {
+                                ...d.bands,
+                                [b.key]: { ...d.bands[b.key], autoApply: e.target.checked },
+                              },
+                            }))
+                          }
+                        />
+                        <span>
+                          <strong>Include in bulk-apply</strong>{' '}
+                          <small className="admin-muted">
+                            — when on, future <em>Apply confident</em> shortcuts may include this
+                            band.
+                          </small>
+                        </span>
+                      </label>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+
+            {/* Live distribution preview — see <DistributionPreview/> below */}
+            <DistributionPreview
+              draft={draft}
+              products={products}
+              categories={categories}
+              learning={learning}
+            />
+
+            {draft.minScore > draft.mediumThreshold ||
+            draft.mediumThreshold > draft.highThreshold ? (
               <p className="admin-callout admin-callout--warn">
                 Thresholds will be auto-clamped on save so that min ≤ medium ≤ high.
               </p>
@@ -2050,14 +2226,140 @@ function SettingsTab({
 }
 
 // ---------------------------------------------------------------------------
+// Distribution preview — used by SettingsTab to visualise band carve-up
+// ---------------------------------------------------------------------------
+
+/**
+ * Renders a live preview of how the draft thresholds + min-score would carve up
+ * the current catalogue. We call the same `buildSmartCategorizationSuggestions`
+ * the Suggestions tab uses, then bucket the resulting scores against the *draft*
+ * thresholds (not the persisted ones) so the admin can see the impact before
+ * Save. Products that wouldn't be suggested at all (no signal, or already in
+ * the right place) are reported as "no change".
+ */
+function DistributionPreview({
+  draft,
+  products,
+  categories,
+  learning,
+}: {
+  draft: SmartCategorySettings
+  products: ProductRow[]
+  categories: CategoryRow[]
+  learning: LearningIndex
+}) {
+  // Compute raw scores once; recompute only when products/categories/learning change.
+  // Bucketing then becomes a cheap synchronous threshold compare on every slider drag.
+  const rawScores = useMemo(() => {
+    const sugs = buildSmartCategorizationSuggestions(products, categories, learning)
+    return sugs.map((s) => s.score)
+  }, [products, categories, learning])
+
+  const distribution = useMemo(() => {
+    let low = 0
+    let medium = 0
+    let high = 0
+    let belowMin = 0
+    for (const s of rawScores) {
+      if (s < draft.minScore) belowMin += 1
+      else if (s >= draft.highThreshold) high += 1
+      else if (s >= draft.mediumThreshold) medium += 1
+      else low += 1
+    }
+    const noChange = Math.max(0, products.length - rawScores.length)
+    const total = products.length || 1
+    return {
+      total: products.length,
+      noChange,
+      belowMin,
+      low,
+      medium,
+      high,
+      pct: (n: number) => Math.round((n / total) * 100),
+    }
+  }, [rawScores, draft.minScore, draft.mediumThreshold, draft.highThreshold, products.length])
+
+  const segments = [
+    {
+      key: 'high',
+      label: draft.bands.high.label || 'High',
+      n: distribution.high,
+      cls: 'admin-smart-bands-seg--high',
+    },
+    {
+      key: 'medium',
+      label: draft.bands.medium.label || 'Medium',
+      n: distribution.medium,
+      cls: 'admin-smart-bands-seg--medium',
+    },
+    {
+      key: 'low',
+      label: draft.bands.low.label || 'Low',
+      n: distribution.low,
+      cls: 'admin-smart-bands-seg--low',
+    },
+    { key: 'below', label: 'Dropped', n: distribution.belowMin, cls: 'admin-smart-bands-seg--below' },
+    { key: 'noop', label: 'No change', n: distribution.noChange, cls: 'admin-smart-bands-seg--noop' },
+  ]
+
+  return (
+    <div className="admin-smart-bands-dist">
+      <header className="admin-smart-bands-dist-head">
+        <h4>Distribution preview</h4>
+        <span className="admin-muted">
+          With these thresholds, here&apos;s how the {distribution.total} product
+          {distribution.total === 1 ? '' : 's'} in the catalogue would be carved up if you ran a
+          smart-categorise pass right now.
+        </span>
+      </header>
+
+      <div
+        className="admin-smart-bands-dist-bar"
+        role="img"
+        aria-label={`Distribution: ${segments
+          .filter((s) => s.n > 0)
+          .map((s) => `${s.label} ${s.n}`)
+          .join(', ')}`}
+      >
+        {segments.map((s) => {
+          const pct = distribution.total > 0 ? (s.n / distribution.total) * 100 : 0
+          if (pct <= 0) return null
+          return (
+            <span
+              key={s.key}
+              className={`admin-smart-bands-seg ${s.cls}`}
+              style={{ width: `${pct}%` }}
+              title={`${s.label}: ${s.n} (${distribution.pct(s.n)}%)`}
+            />
+          )
+        })}
+      </div>
+
+      <ul className="admin-smart-bands-dist-legend">
+        {segments.map((s) => (
+          <li key={s.key} className={s.cls}>
+            <span className="admin-smart-bands-seg-swatch" aria-hidden="true" />
+            <span className="admin-smart-bands-seg-label">{s.label}</span>
+            <strong className="admin-smart-bands-seg-count">{s.n}</strong>
+            <span className="admin-muted">({distribution.pct(s.n)}%)</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Shared result modal
 // ---------------------------------------------------------------------------
 
 export function SmartCategoriseResultModal({ info, onClose }: { info: ResultInfo; onClose: () => void }) {
   const icon = info.tone === 'success' ? '✓' : info.tone === 'mixed' ? '!' : '×'
   return (
+    // `--top` anchors the result modal to the top of the viewport. Without it the modal centred
+    // and on long Suggestions screens it ended up below the fold — users missed the confirmation.
     <div
-      className="admin-modal-overlay admin-modal-overlay--nested"
+      className="admin-modal-overlay admin-modal-overlay--nested admin-modal-overlay--top"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="smart-cat-result-title"

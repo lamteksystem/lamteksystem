@@ -10,6 +10,15 @@
  */
 import { supabase } from '@/lib/supabase'
 
+export interface ConfidenceBandConfig {
+  /** Chip text shown to users — e.g. "High", "Strong match", "Auto-apply". */
+  label: string
+  /** Tooltip + Settings-page description authored by the admin. */
+  description: string
+  /** Whether bulk "Apply confident" actions are allowed to include this band. */
+  autoApply: boolean
+}
+
 export interface SmartCategorySettings {
   /** Suggestions with score below this are not returned at all. */
   minScore: number
@@ -34,6 +43,30 @@ export interface SmartCategorySettings {
   learningEnabled: boolean
   /** Master switch: when false, learned tokens do NOT boost scoring. */
   boostEnabled: boolean
+  /** Per-band metadata (label/description/auto-apply) — editable from Settings. */
+  bands: {
+    low: ConfidenceBandConfig
+    medium: ConfidenceBandConfig
+    high: ConfidenceBandConfig
+  }
+}
+
+const DEFAULT_BANDS: SmartCategorySettings['bands'] = {
+  low: {
+    label: 'Low',
+    description: 'Weak signal — usually needs manual correction.',
+    autoApply: false,
+  },
+  medium: {
+    label: 'Medium',
+    description: 'Plausible match — review before applying.',
+    autoApply: true,
+  },
+  high: {
+    label: 'High',
+    description: 'Strong word/phrase overlap — safe to apply in bulk.',
+    autoApply: true,
+  },
 }
 
 export const DEFAULT_SMART_CATEGORY_SETTINGS: SmartCategorySettings = {
@@ -47,6 +80,7 @@ export const DEFAULT_SMART_CATEGORY_SETTINGS: SmartCategorySettings = {
   autoAmbiguousThreshold: 2,
   learningEnabled: true,
   boostEnabled: true,
+  bands: DEFAULT_BANDS,
 }
 
 let cache: SmartCategorySettings = { ...DEFAULT_SMART_CATEGORY_SETTINGS }
@@ -68,7 +102,37 @@ interface SmartCategorySettingsRow {
   auto_ambiguous_threshold: number
   learning_enabled: boolean
   boost_enabled: boolean
+  low_label?: string | null
+  medium_label?: string | null
+  high_label?: string | null
+  low_description?: string | null
+  medium_description?: string | null
+  high_description?: string | null
+  low_auto_apply?: boolean | null
+  medium_auto_apply?: boolean | null
+  high_auto_apply?: boolean | null
   updated_at: string
+}
+
+function bandsFromRow(row: SmartCategorySettingsRow): SmartCategorySettings['bands'] {
+  const d = DEFAULT_BANDS
+  return {
+    low: {
+      label: row.low_label?.trim() || d.low.label,
+      description: row.low_description?.trim() || d.low.description,
+      autoApply: row.low_auto_apply ?? d.low.autoApply,
+    },
+    medium: {
+      label: row.medium_label?.trim() || d.medium.label,
+      description: row.medium_description?.trim() || d.medium.description,
+      autoApply: row.medium_auto_apply ?? d.medium.autoApply,
+    },
+    high: {
+      label: row.high_label?.trim() || d.high.label,
+      description: row.high_description?.trim() || d.high.description,
+      autoApply: row.high_auto_apply ?? d.high.autoApply,
+    },
+  }
 }
 
 function rowToSettings(row: SmartCategorySettingsRow | null | undefined): SmartCategorySettings {
@@ -94,6 +158,7 @@ function rowToSettings(row: SmartCategorySettingsRow | null | undefined): SmartC
       row.auto_ambiguous_threshold ?? DEFAULT_SMART_CATEGORY_SETTINGS.autoAmbiguousThreshold,
     learningEnabled: row.learning_enabled ?? DEFAULT_SMART_CATEGORY_SETTINGS.learningEnabled,
     boostEnabled: row.boost_enabled ?? DEFAULT_SMART_CATEGORY_SETTINGS.boostEnabled,
+    bands: bandsFromRow(row),
   }
 }
 
@@ -131,6 +196,15 @@ export async function saveSmartCategorySettings(
     auto_ambiguous_threshold: next.autoAmbiguousThreshold,
     learning_enabled: next.learningEnabled,
     boost_enabled: next.boostEnabled,
+    low_label: next.bands.low.label,
+    medium_label: next.bands.medium.label,
+    high_label: next.bands.high.label,
+    low_description: next.bands.low.description,
+    medium_description: next.bands.medium.description,
+    high_description: next.bands.high.description,
+    low_auto_apply: next.bands.low.autoApply,
+    medium_auto_apply: next.bands.medium.autoApply,
+    high_auto_apply: next.bands.high.autoApply,
     updated_at: new Date().toISOString(),
   }
   const { error } = await supabase

@@ -118,13 +118,13 @@ export default function AdminComponentImport() {
         </p>
       </div>
 
-      <div className="admin-modal-card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-        <h2 style={{ marginTop: 0 }}>1. Get a template or export current data</h2>
+      <section className="admin-modal-card admin-wipe-section">
+        <h2>1. Get a template or export current data</h2>
         <p>
           The template includes example rows for a carcass and a door so you can see the expected
           shape. The current-data export lets you bulk-edit existing components and re-import.
         </p>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div className="admin-page-actions-row">
           <button
             type="button"
             className="btn"
@@ -165,10 +165,10 @@ export default function AdminComponentImport() {
             must match a category with kind <code>door_range</code>.
           </p>
         </details>
-      </div>
+      </section>
 
-      <div className="admin-modal-card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-        <h2 style={{ marginTop: 0 }}>2. Upload and preview</h2>
+      <section className="admin-modal-card admin-wipe-section">
+        <h2>2. Upload and preview</h2>
         <input
           ref={fileInputRef}
           type="file"
@@ -196,11 +196,11 @@ export default function AdminComponentImport() {
             Unknown header(s) ignored: {parseResult.unknownHeaders.join(', ')}
           </p>
         )}
-      </div>
+      </section>
 
       {plan && (
-        <div className="admin-modal-card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-          <h2 style={{ marginTop: 0 }}>3. Dry-run preview</h2>
+        <section className="admin-modal-card admin-wipe-section">
+          <h2>3. Dry-run preview</h2>
           <p>
             <strong>{plan.totals.create}</strong> new components will be created,{' '}
             <strong>{plan.totals.update}</strong> existing will be updated,{' '}
@@ -225,8 +225,8 @@ export default function AdminComponentImport() {
             </p>
           )}
 
-          <div style={{ overflowX: 'auto', marginTop: '0.75rem' }}>
-            <table className="admin-table" style={{ minWidth: '900px' }}>
+          <div className="admin-table-scroll" style={{ marginTop: '0.75rem' }}>
+            <table className="admin-table">
               <thead>
                 <tr>
                   <th>Row</th>
@@ -263,7 +263,7 @@ export default function AdminComponentImport() {
             )}
           </div>
 
-          <div className="admin-modal-actions" style={{ marginTop: '1rem' }}>
+          <div className="admin-page-actions-row" style={{ marginTop: '1rem' }}>
             <button
               type="button"
               className="btn"
@@ -288,14 +288,11 @@ export default function AdminComponentImport() {
               Discard
             </button>
           </div>
-        </div>
+        </section>
       )}
 
       {applyResult && (
-        <div
-          className="admin-message-ok admin-modal-card"
-          style={{ padding: '1.25rem', marginBottom: '1.25rem' }}
-        >
+        <section className="admin-message-ok admin-modal-card admin-wipe-section">
           <p style={{ marginTop: 0 }}>
             <strong>Import complete.</strong> Created: {applyResult.created}. Updated:{' '}
             {applyResult.updated}. Failed: {applyResult.failed}.
@@ -312,7 +309,7 @@ export default function AdminComponentImport() {
               </ul>
             </details>
           )}
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div className="admin-page-actions-row">
             <Link to="/admin/catalogue" className="btn">
               View catalogue
             </Link>
@@ -320,7 +317,7 @@ export default function AdminComponentImport() {
               Open variant matrix builder
             </Link>
           </div>
-        </div>
+        </section>
       )}
     </div>
   )

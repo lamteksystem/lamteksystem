@@ -307,21 +307,20 @@ export default function AdminVariantBuilder() {
         </p>
       </div>
 
-      <div className="admin-modal-card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-        <h2 style={{ marginTop: 0 }}>1. Base template</h2>
+      <section className="admin-modal-card admin-wipe-section">
+        <h2>1. Base template</h2>
         <p className="admin-muted" style={{ marginTop: 0 }}>
           Use <code>&#123;FINISH&#125;</code>, <code>&#123;FINISH_CODE&#125;</code>,{' '}
           <code>&#123;SIZE&#125;</code>, <code>&#123;RANGE&#125;</code>, or{' '}
           <code>&#123;RANGE_CODE&#125;</code> as placeholders.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+        <div className="admin-form-grid">
           <label>
             <span className="admin-muted">SKU pattern</span>
             <input
               className="admin-input"
               value={skuPattern}
               onChange={(e) => setSkuPattern(e.target.value)}
-              style={{ width: '100%' }}
             />
           </label>
           <label>
@@ -330,16 +329,14 @@ export default function AdminVariantBuilder() {
               className="admin-input"
               value={namePattern}
               onChange={(e) => setNamePattern(e.target.value)}
-              style={{ width: '100%' }}
             />
           </label>
-          <label style={{ gridColumn: '1 / -1' }}>
+          <label className="admin-form-grid--span-full">
             <span className="admin-muted">Description pattern (optional)</span>
             <input
               className="admin-input"
               value={descriptionPattern}
               onChange={(e) => setDescriptionPattern(e.target.value)}
-              style={{ width: '100%' }}
             />
           </label>
           <label>
@@ -350,7 +347,6 @@ export default function AdminVariantBuilder() {
               step="0.01"
               value={unitPrice}
               onChange={(e) => setUnitPrice(e.target.value)}
-              style={{ width: '100%' }}
             />
           </label>
           <label>
@@ -361,7 +357,6 @@ export default function AdminVariantBuilder() {
               step="0.01"
               value={costPrice}
               onChange={(e) => setCostPrice(e.target.value)}
-              style={{ width: '100%' }}
             />
           </label>
           <div>
@@ -381,7 +376,6 @@ export default function AdminVariantBuilder() {
               className="admin-input"
               value={primaryCategoryId}
               onChange={(e) => setPrimaryCategoryId(e.target.value)}
-              style={{ width: '100%' }}
             >
               <option value="">(none)</option>
               {productTypeCategories.map((c) => (
@@ -393,10 +387,10 @@ export default function AdminVariantBuilder() {
             </select>
           </label>
         </div>
-      </div>
+      </section>
 
-      <div className="admin-modal-card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-        <h2 style={{ marginTop: 0 }}>2. Axes</h2>
+      <section className="admin-modal-card admin-wipe-section">
+        <h2>2. Axes</h2>
         <AxisEditor
           label="Carcass / door finish"
           enabled={useFinishAxis}
@@ -424,10 +418,10 @@ export default function AdminVariantBuilder() {
           placeholder="Add range (must exist as a door_range category)"
           codeHint="3-letter code, e.g. DAW"
         />
-      </div>
+      </section>
 
-      <div className="admin-modal-card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-        <h2 style={{ marginTop: 0 }}>
+      <section className="admin-modal-card admin-wipe-section">
+        <h2>
           3. Preview ({validRows.length} SKU{validRows.length === 1 ? '' : 's'} — {newRowCount} new,{' '}
           {skipCount} already exist
           {blankRows > 0 ? `, ${blankRows} skipped (blank sku/name)` : ''})
@@ -436,8 +430,8 @@ export default function AdminVariantBuilder() {
           <p className="admin-muted">Toggle at least one axis on, then tick some values.</p>
         )}
         {previewRows.length > 0 && (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="admin-table" style={{ minWidth: '800px' }}>
+          <div className="admin-table-scroll">
+            <table className="admin-table">
               <thead>
                 <tr>
                   <th>Variant</th>
@@ -485,7 +479,7 @@ export default function AdminVariantBuilder() {
           </div>
         )}
 
-        <div className="admin-modal-actions" style={{ marginTop: '1rem' }}>
+        <div className="admin-page-actions-row" style={{ marginTop: '1rem' }}>
           <button
             type="button"
             className="btn"
@@ -508,7 +502,7 @@ export default function AdminVariantBuilder() {
             {resultError}
           </p>
         )}
-      </div>
+      </section>
     </div>
   )
 }
@@ -537,26 +531,18 @@ function AxisEditor({ label, enabled, onToggle, values, setValues, placeholder, 
   }
 
   return (
-    <div style={{ marginBottom: '0.85rem', paddingBottom: '0.85rem', borderBottom: '1px solid var(--lamtek-border, #eee)' }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
+    <div className="admin-axis-row">
+      <label className="admin-axis-row-toggle">
         <input type="checkbox" checked={enabled} onChange={(e) => onToggle(e.target.checked)} />
         <span>{label}</span>
       </label>
       {enabled && (
         <>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', margin: '0.5rem 0' }}>
+          <div className="admin-axis-chips">
             {values.map((v, i) => (
               <div
                 key={`${v.value}-${i}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.25rem 0.5rem',
-                  border: '1px solid var(--lamtek-border, #ddd)',
-                  borderRadius: '6px',
-                  background: v.active ? 'rgba(201, 169, 81, 0.08)' : 'transparent',
-                }}
+                className={`admin-axis-chip${v.active ? ' admin-axis-chip--active' : ''}`}
               >
                 <input
                   type="checkbox"
@@ -570,6 +556,7 @@ function AxisEditor({ label, enabled, onToggle, values, setValues, placeholder, 
                 <span>{v.value}</span>
                 <input
                   type="text"
+                  className="admin-input admin-axis-chip-code"
                   value={v.code}
                   onChange={(e) =>
                     setValues((prev) =>
@@ -577,7 +564,6 @@ function AxisEditor({ label, enabled, onToggle, values, setValues, placeholder, 
                     )
                   }
                   title={codeHint}
-                  style={{ width: '4rem', fontSize: '0.85rem', padding: '0.15rem 0.35rem' }}
                   aria-label={`Code for ${v.value}`}
                 />
                 <button
@@ -592,7 +578,7 @@ function AxisEditor({ label, enabled, onToggle, values, setValues, placeholder, 
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className="admin-axis-add-row">
             <input
               className="admin-input"
               value={draftValue}
@@ -604,7 +590,6 @@ function AxisEditor({ label, enabled, onToggle, values, setValues, placeholder, 
                 }
               }}
               placeholder={placeholder}
-              style={{ flex: 1, maxWidth: '20rem' }}
             />
             <button type="button" className="btn btn-outline btn-sm" onClick={addValue}>
               Add

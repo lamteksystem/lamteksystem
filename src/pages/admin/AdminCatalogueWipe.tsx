@@ -152,7 +152,7 @@ export default function AdminCatalogueWipe() {
   }
 
   return (
-    <div className="admin-page admin-settings-page">
+    <div className="admin-page">
       <div className="admin-page-header">
         <h1>Reset catalogue</h1>
         <p className="page-intro">
@@ -161,126 +161,112 @@ export default function AdminCatalogueWipe() {
         </p>
       </div>
 
-      <div className="admin-settings-layout card">
-        <div className="admin-settings-tab-panel admin-settings-panel--danger" style={{ padding: '1.25rem' }}>
-          <section style={{ marginBottom: '1.5rem' }}>
-            <h2 style={{ marginTop: 0 }}>What this will do</h2>
-            <p>
-              This action is <strong>destructive and irreversible</strong>. Download a backup first
-              (the toggle is on by default), or restore from the XLSX afterwards using Admin →
-              Catalogue.
-            </p>
-            <div className="admin-modal-card" style={{ padding: '1rem', marginBottom: '0.75rem' }}>
-              <h3 style={{ marginTop: 0 }}>Will be wiped</h3>
-              <ul style={{ marginBottom: 0 }}>
-                <li>Products ({counts?.products ?? '…'})</li>
-                <li>Assemblies ({counts?.assemblies ?? '…'})</li>
-                <li>Assembly lines ({counts?.assembly_lines ?? '…'})</li>
-                <li>Product → category links ({counts?.product_categories ?? '…'})</li>
-                <li>Per-location product stock ({counts?.product_stock ?? '…'})</li>
-                <li>
-                  Order lines ({counts?.order_lines ?? '…'}) — order headers stay, but their line
-                  items go because they reference products
-                </li>
-              </ul>
-            </div>
-            <div className="admin-modal-card" style={{ padding: '1rem' }}>
-              <h3 style={{ marginTop: 0 }}>Will be kept</h3>
-              <ul style={{ marginBottom: 0 }}>
-                <li>Categories ({counts?.categories ?? '…'}) — generic product types, ranges, and universal groups</li>
-                <li>Assembly part types ({counts?.assembly_part_types ?? '…'}) — door, hinge, plinth, etc.</li>
-                <li>Orders headers ({counts?.orders ?? '…'}) — customer and order metadata</li>
-                <li>Customers, staff, suppliers, locations, settings — everything not catalogue-shaped</li>
-              </ul>
-            </div>
-          </section>
-
-          {error && (
-            <p className="admin-error" style={{ marginBottom: '1rem' }}>
-              {error}
-            </p>
-          )}
-
-          {result && (
-            <div
-              className="admin-message-ok admin-modal-card"
-              style={{ padding: '1rem', marginBottom: '1rem' }}
-            >
-              <p style={{ marginTop: 0 }}>
-                <strong>Catalogue wiped.</strong>
-              </p>
-              <ul style={{ marginBottom: '0.75rem' }}>
-                <li>{result.wiped_products} products removed</li>
-                <li>{result.wiped_assemblies} assemblies removed</li>
-                <li>{result.wiped_assembly_lines} assembly lines removed</li>
-                <li>{result.wiped_product_categories} product → category links removed</li>
-                <li>{result.wiped_order_lines} order lines removed</li>
-              </ul>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <Link to="/admin/catalogue/components/import" className="btn">
-                  Import components from CSV
-                </Link>
-                <Link to="/admin/catalogue/components/variant-builder" className="btn btn-outline">
-                  Open variant matrix builder
-                </Link>
-                <button type="button" className="btn btn-ghost" onClick={() => navigate('/admin/catalogue')}>
-                  Back to catalogue
-                </button>
-              </div>
-            </div>
-          )}
-
-          {!result && (
-            <section className="admin-modal-card" style={{ padding: '1rem' }}>
-              <h3 style={{ marginTop: 0 }}>Confirm</h3>
-              <label
-                className="admin-reset-backup-option"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-              >
-                <input
-                  type="checkbox"
-                  checked={backupFirst}
-                  onChange={(e) => setBackupFirst(e.target.checked)}
-                  disabled={busy}
-                />
-                <span>Download full backup (XLSX) before wiping</span>
-              </label>
-              <p style={{ margin: '0.75rem 0 0.25rem' }}>
-                Type <code>{loadingCounts ? 'WIPE …' : expectedConfirm}</code> below to enable the
-                wipe button:
-              </p>
-              <input
-                type="text"
-                className="admin-input admin-input--full"
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                placeholder={expectedConfirm}
-                autoComplete="off"
-                disabled={busy || loadingCounts}
-                style={{ width: '100%' }}
-              />
-              <div className="admin-modal-actions" style={{ marginTop: '0.75rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={() => void handleWipe()}
-                  disabled={!confirmOk || busy || loadingCounts}
-                >
-                  {busy ? 'Wiping…' : backupFirst ? 'Back up and wipe catalogue' : 'Wipe catalogue'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => navigate('/admin/catalogue')}
-                  disabled={busy}
-                >
-                  Cancel
-                </button>
-              </div>
-            </section>
-          )}
+      <section className="admin-modal-card admin-wipe-section">
+        <h2>What this will do</h2>
+        <p>
+          This action is <strong>destructive and irreversible</strong>. Download a backup first
+          (the toggle is on by default), or restore from the XLSX afterwards using Admin → Catalogue.
+        </p>
+        <div className="admin-wipe-grid">
+          <div className="admin-modal-card admin-wipe-subcard">
+            <h3>Will be wiped</h3>
+            <ul>
+              <li>Products ({counts?.products ?? '…'})</li>
+              <li>Assemblies ({counts?.assemblies ?? '…'})</li>
+              <li>Assembly lines ({counts?.assembly_lines ?? '…'})</li>
+              <li>Product → category links ({counts?.product_categories ?? '…'})</li>
+              <li>Per-location product stock ({counts?.product_stock ?? '…'})</li>
+              <li>
+                Order lines ({counts?.order_lines ?? '…'}) — order headers stay, but their line
+                items go because they reference products
+              </li>
+            </ul>
+          </div>
+          <div className="admin-modal-card admin-wipe-subcard">
+            <h3>Will be kept</h3>
+            <ul>
+              <li>Categories ({counts?.categories ?? '…'}) — generic product types, ranges, and universal groups</li>
+              <li>Assembly part types ({counts?.assembly_part_types ?? '…'}) — door, hinge, plinth, etc.</li>
+              <li>Orders headers ({counts?.orders ?? '…'}) — customer and order metadata</li>
+              <li>Customers, staff, suppliers, locations, settings — everything not catalogue-shaped</li>
+            </ul>
+          </div>
         </div>
-      </div>
+      </section>
+
+      {error && <p className="admin-error admin-wipe-message">{error}</p>}
+
+      {result && (
+        <section className="admin-message-ok admin-modal-card admin-wipe-section">
+          <p>
+            <strong>Catalogue wiped.</strong>
+          </p>
+          <ul>
+            <li>{result.wiped_products} products removed</li>
+            <li>{result.wiped_assemblies} assemblies removed</li>
+            <li>{result.wiped_assembly_lines} assembly lines removed</li>
+            <li>{result.wiped_product_categories} product → category links removed</li>
+            <li>{result.wiped_order_lines} order lines removed</li>
+          </ul>
+          <div className="admin-wipe-actions">
+            <Link to="/admin/catalogue/components/import" className="btn">
+              Import components from CSV
+            </Link>
+            <Link to="/admin/catalogue/components/variant-builder" className="btn btn-outline">
+              Open variant matrix builder
+            </Link>
+            <button type="button" className="btn btn-ghost" onClick={() => navigate('/admin/catalogue')}>
+              Back to catalogue
+            </button>
+          </div>
+        </section>
+      )}
+
+      {!result && (
+        <section className="admin-modal-card admin-wipe-section">
+          <h2>Confirm</h2>
+          <label className="admin-wipe-backup-option">
+            <input
+              type="checkbox"
+              checked={backupFirst}
+              onChange={(e) => setBackupFirst(e.target.checked)}
+              disabled={busy}
+            />
+            <span>Download full backup (XLSX) before wiping</span>
+          </label>
+          <p className="admin-wipe-confirm-prompt">
+            Type <code>{loadingCounts ? 'WIPE …' : expectedConfirm}</code> below to enable the
+            wipe button:
+          </p>
+          <input
+            type="text"
+            className="admin-input admin-wipe-confirm-input"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={expectedConfirm}
+            autoComplete="off"
+            disabled={busy || loadingCounts}
+          />
+          <div className="admin-wipe-actions">
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => void handleWipe()}
+              disabled={!confirmOk || busy || loadingCounts}
+            >
+              {busy ? 'Wiping…' : backupFirst ? 'Back up and wipe catalogue' : 'Wipe catalogue'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => navigate('/admin/catalogue')}
+              disabled={busy}
+            >
+              Cancel
+            </button>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

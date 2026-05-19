@@ -6286,13 +6286,141 @@ button.ordering-wizard-card {
    long form reads as a stack of self-contained groups instead of a wall of
    labels. The inner sections (`.product-composition-panel` etc.) stay flat
    so we don't get nested-card visual noise. */
-.admin-modal-form-section.admin-modal-card {
+.admin-modal-card {
   background: var(--lamtek-surface, #fff);
   border: 1px solid var(--lamtek-border, var(--lamtek-gray-light));
   border-radius: var(--lamtek-radius-lg, 12px);
   box-shadow: var(--lamtek-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
-  padding: 1rem 1.15rem 1.15rem;
+  padding: 1.15rem 1.25rem 1.25rem;
   margin-bottom: 1rem;
+}
+.admin-modal-card h2:first-child,
+.admin-modal-card h3:first-child {
+  margin-top: 0;
+}
+.admin-modal-form-section.admin-modal-card {
+  padding: 1rem 1.15rem 1.15rem;
+}
+
+/* Wipe / import / variant builder layout helpers. */
+.admin-wipe-section {
+  margin-bottom: 1.25rem;
+}
+.admin-wipe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.85rem;
+  margin-top: 0.85rem;
+}
+.admin-wipe-subcard {
+  margin-bottom: 0;
+}
+.admin-wipe-subcard ul {
+  margin-bottom: 0;
+}
+.admin-wipe-message {
+  margin: 0 0 1rem;
+}
+.admin-wipe-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.admin-wipe-backup-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.5rem;
+}
+.admin-wipe-confirm-prompt {
+  margin: 0.75rem 0 0.4rem;
+}
+.admin-wipe-confirm-input {
+  width: 100%;
+}
+
+/* Generic full-width admin page layout (no settings tab nav). */
+.admin-page > .admin-page-header {
+  margin-bottom: 1rem;
+}
+.admin-page > .admin-page-header h1 {
+  margin: 0 0 0.35rem;
+}
+.admin-page > .admin-page-header p.page-intro {
+  margin: 0;
+}
+
+/* Form helpers used by component import / variant builder. */
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.85rem;
+}
+.admin-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.admin-form-grid--span-full {
+  grid-column: 1 / -1;
+}
+.admin-axis-row {
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--lamtek-border, var(--lamtek-gray-light));
+}
+.admin-axis-row:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.admin-axis-row-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+.admin-axis-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+.admin-axis-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--lamtek-border, var(--lamtek-gray-light));
+  border-radius: 6px;
+}
+.admin-axis-chip--active {
+  background: rgba(201, 169, 81, 0.08);
+}
+.admin-axis-chip-code {
+  width: 4rem;
+  font-size: 0.85rem;
+  padding: 0.15rem 0.35rem;
+}
+.admin-axis-add-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.admin-axis-add-row .admin-input {
+  flex: 1;
+  max-width: 20rem;
+}
+.admin-table-scroll {
+  overflow-x: auto;
+}
+.admin-table-scroll table.admin-table {
+  min-width: 800px;
+}
+.admin-page-actions-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 .admin-modal-form-section.admin-modal-card .admin-modal-form-section-title {
   margin-bottom: 0.85rem;

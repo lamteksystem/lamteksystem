@@ -7,6 +7,7 @@ import {
   type SmartCategorySuggestion,
 } from '@/lib/smartProductCategorize'
 import { rebucketTealburyAccessories } from '@/lib/tealburyAccessoryRebucket'
+import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 
 interface SmartCategorizePanelProps {
   products: ProductRow[]
@@ -24,13 +25,21 @@ interface ResultInfo {
 
 const PAGE_SIZE = 50
 
+type ConfidenceLevel = 'low' | 'medium' | 'high'
+
+const CONFIDENCE_LEVELS: ConfidenceLevel[] = ['high', 'medium', 'low']
+
 export default function SmartCategorizePanel({
   products,
   categories,
   onApplied,
   onClose,
 }: SmartCategorizePanelProps) {
-  const [minConfidence, setMinConfidence] = useState<'medium' | 'high'>('medium')
+  const [confidenceFilter, setConfidenceFilter] = useState<Record<ConfidenceLevel, boolean>>({
+    high: true,
+    medium: true,
+    low: false,
+  })
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [applying, setApplying] = useState(false)
   const [syncingKinds, setSyncingKinds] = useState(false)
@@ -44,11 +53,27 @@ export default function SmartCategorizePanel({
     modalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [])
 
+  const productById = useMemo(() => {
+    const map = new Map<string, ProductRow>()
+    for (const p of products) map.set(p.id, p)
+    return map
+  }, [products])
+
+  const categoryById = useMemo(() => {
+    const map = new Map<string, CategoryRow>()
+    for (const c of categories) map.set(c.id, c)
+    return map
+  }, [categories])
+
+  function toggleConfidence(level: ConfidenceLevel) {
+    setConfidenceFilter((prev) => ({ ...prev, [level]: !prev[level] }))
+    setPage(1)
+  }
+
   const suggestions = useMemo(() => {
     const all = buildSmartCategorizationSuggestions(products, categories)
-    if (minConfidence === 'high') return all.filter((s) => s.confidence === 'high')
-    return all.filter((s) => s.confidence === 'high' || s.confidence === 'medium')
-  }, [products, categories, minConfidence])
+    return all.filter((s) => confidenceFilter[s.confidence])
+  }, [products, categories, confidenceFilter])
 
   const totalPages = Math.max(1, Math.ceil(suggestions.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -187,20 +212,20 @@ export default function SmartCategorizePanel({
         </p>
 
         <div className="admin-smart-categorize-toolbar">
-          <label>
-            Minimum confidence
-            <select
-              value={minConfidence}
-              onChange={(e) => {
-                setMinConfidence(e.target.value as 'medium' | 'high')
-                setPage(1)
-              }}
-              disabled={applying}
-            >
-              <option value="medium">Medium and high</option>
-              <option value="high">High only</option>
-            </select>
-          </label>
+          <fieldset className="admin-smart-categorize-confidence">
+            <legend>Show confidence</legend>
+            {CONFIDENCE_LEVELS.map((level) => (
+              <label key={level} className={`admin-confidence-chip admin-confidence-chip--${level}`}>
+                <input
+                  type="checkbox"
+                  checked={confidenceFilter[level]}
+                  onChange={() => toggleConfidence(level)}
+                  disabled={applying}
+                />
+                <span className={`admin-badge admin-badge--${level}`}>{level}</span>
+              </label>
+            ))}
+          </fieldset>
           <button
             type="button"
             className="btn btn-outline btn-small"
@@ -261,26 +286,70 @@ export default function SmartCategorizePanel({
         <ul className="admin-smart-categorize-list">
           {pageSuggestions.length === 0 ? (
             <li className="admin-muted" style={{ padding: '0.75rem' }}>
-              No suggestions at this confidence level.
+              No suggestions match the selected confidence filters.
             </li>
           ) : (
-            pageSuggestions.map((s) => (
-              <li key={s.productId}>
-                <label className="admin-smart-categorize-row">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(s.productId)}
-                    onChange={() => toggleOne(s)}
-                  />
-                  <span className="admin-smart-categorize-product" title={s.productName}>
-                    {s.productName}
-                  </span>
-                  <span className="admin-smart-categorize-arrow">→</span>
-                  <span className="admin-smart-categorize-target">{s.suggestedCategoryName}</span>
-                  <span className={`admin-badge admin-badge--${s.confidence}`}>{s.confidence}</span>
-                </label>
-              </li>
-            ))
+            pageSuggestions.map((s) => {
+              const product = productById.get(s.productId)
+              const currentCategory = s.currentCategoryId
+                ? categoryById.get(s.currentCategoryId)
+                : null
+              const currentLabel = currentCategory ? currentCategory.name : 'Uncategorised'
+              const sku = product?.sku ?? ''
+              const program = product?.catalog_program
+              const isSameCategory = currentCategory?.id === s.suggestedCategoryId
+              return (
+                <li key={s.productId}>
+                  <label className="admin-smart-categorize-row">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(s.productId)}
+                      onChange={() => toggleOne(s)}
+                    />
+                    <div className="admin-smart-categorize-row-body">
+                      <div className="admin-smart-categorize-row-top">
+                        {program && (
+                          <span
+                            className={`admin-program-badge admin-program-badge--${
+                              program === CATALOG_PROGRAM.TEALBURY ? 'tealbury' : 'lamtek'
+                            }`}
+                          >
+                            {program === CATALOG_PROGRAM.TEALBURY ? 'Tealbury' : 'Lamtek'}
+                          </span>
+                        )}
+                        {sku && <span className="admin-smart-categorize-sku">{sku}</span>}
+                        <span className="admin-smart-categorize-product" title={s.productName}>
+                          {s.productName}
+                        </span>
+                      </div>
+                      <div className="admin-smart-categorize-change">
+                        <span
+                          className={`admin-smart-categorize-pill admin-smart-categorize-pill--current${
+                            !currentCategory ? ' admin-smart-categorize-pill--empty' : ''
+                          }`}
+                        >
+                          {currentLabel}
+                        </span>
+                        <span className="admin-smart-categorize-arrow" aria-hidden="true">
+                          →
+                        </span>
+                        <span
+                          className={`admin-smart-categorize-pill admin-smart-categorize-pill--target${
+                            isSameCategory ? ' admin-smart-categorize-pill--noop' : ''
+                          }`}
+                        >
+                          {s.suggestedCategoryName}
+                          {isSameCategory && (
+                            <span className="admin-smart-categorize-noop"> (no change)</span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                    <span className={`admin-badge admin-badge--${s.confidence}`}>{s.confidence}</span>
+                  </label>
+                </li>
+              )
+            })
           )}
         </ul>
 

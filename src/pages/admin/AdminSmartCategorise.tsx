@@ -45,20 +45,24 @@ export interface ResultInfo {
 export default function AdminSmartCategorise() {
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab') as Tab | null
-  const [tab, setTab] = useState<Tab>(tabParam ?? 'suggestions')
+  // Derive tab directly from the URL — no separate state + sync effect (would loop
+  // because `setSearchParams` from `useSearchParams` is a new reference every render).
+  const tab: Tab = tabParam === 'history' || tabParam === 'settings' ? tabParam : 'suggestions'
 
-  useEffect(() => {
-    if (tabParam !== tab) {
+  const setTab = useCallback(
+    (next: Tab) => {
       setSearchParams(
         (prev) => {
-          const next = new URLSearchParams(prev)
-          next.set('tab', tab)
-          return next
+          const params = new URLSearchParams(prev)
+          if (next === 'suggestions') params.delete('tab')
+          else params.set('tab', next)
+          return params
         },
         { replace: true },
       )
-    }
-  }, [tab, tabParam, setSearchParams])
+    },
+    [setSearchParams],
+  )
 
   const [products, setProducts] = useState<ProductRow[]>([])
   const [categories, setCategories] = useState<CategoryRow[]>([])

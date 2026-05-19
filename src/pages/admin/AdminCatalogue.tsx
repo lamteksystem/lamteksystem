@@ -1856,15 +1856,17 @@ export default function AdminCatalogue() {
         }}
       />
 
-      <SmartCategoriseModal
-        open={smartCategoriseOpen}
-        onClose={() => setSmartCategoriseOpen(false)}
-        products={products}
-        categories={categories}
-        onApplied={() => {
-          void load()
-        }}
-      />
+      {smartCategoriseOpen && (
+        <SmartCategoriseModal
+          open={smartCategoriseOpen}
+          onClose={() => setSmartCategoriseOpen(false)}
+          products={products}
+          categories={categories}
+          onApplied={() => {
+            void load()
+          }}
+        />
+      )}
       </>
       )}
     </div>

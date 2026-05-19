@@ -298,6 +298,12 @@ export interface OrderRow {
   courier_service_add_ons?: string[] | null
   courier_preferred_time_slot?: string | null
   courier_preferred_date?: string | null
+  /** Door range chosen by the order-start wizard (FK to a category with category_kind='door_range'). */
+  kitchen_range_id?: string | null
+  /** Selected door finish of the chosen range (e.g. "Soft Matte"). Free text, matches a finish key in product options. */
+  door_finish?: string | null
+  /** Selected carcass/cabinet finish (e.g. "White", "Light Oak", "Grey"). Free text for now. */
+  carcass_finish?: string | null
 }
 
 export const COURIER_OPTIONS = ['DPD', 'FedEx', 'Royal Mail', 'Yodel', 'Evri', 'Parcelforce', 'DX', 'Other'] as const

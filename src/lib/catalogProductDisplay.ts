@@ -87,6 +87,37 @@ export function buildCatalogFacets(products: ProductRow[]): CatalogFacets {
   }
 }
 
+/**
+ * Collect every door/range finish label that appears on any of these products.
+ *
+ * Finishes live inside `products.options.tealbury_finish_prices_gbp` and
+ * `products.options.lamtek_finish_prices_gbp` — each is an object keyed by the
+ * finish label (e.g. "Oakham Soft Matte", "Painted Colour", "Gloss White"),
+ * with the £ price as the value. This helper unions the keys across both
+ * shapes and returns a sorted, de-duplicated list of label strings.
+ *
+ * Used by the order-start wizard to populate Step 2 ("which finish of this
+ * range?") after the user has picked a kitchen range. Filter `products` to the
+ * range first; this helper does not know which range a product belongs to.
+ */
+export function getProductFinishLabels(products: ProductRow[]): string[] {
+  const finishes = new Set<string>()
+  for (const p of products) {
+    const opts = getProductOpts(p)
+    const t = opts.tealbury_finish_prices_gbp
+    const l = opts.lamtek_finish_prices_gbp
+    for (const src of [t, l]) {
+      if (src && typeof src === 'object' && !Array.isArray(src)) {
+        for (const key of Object.keys(src)) {
+          const trimmed = key.trim()
+          if (trimmed) finishes.add(trimmed)
+        }
+      }
+    }
+  }
+  return [...finishes].sort((a, b) => a.localeCompare(b))
+}
+
 export function getSpecificationBullets(product: ProductRow): string[] {
   const bullets: string[] = []
   if (product.description) {

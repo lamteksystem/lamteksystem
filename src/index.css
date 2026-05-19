@@ -2386,6 +2386,55 @@ a.ordering-wizard-card--link:hover {
 .ordering-wizard-card--range .ordering-wizard-card-title {
   font-size: 1.05rem;
 }
+/* Selected state for the wizard cards: gold border + subtle tint + ring shadow so
+   it's unmistakable which step value the user has picked. Buttons (not links)
+   retain their default text-align: left set above so the icon + title align with
+   the description. */
+.ordering-wizard-card--selected,
+.ordering-wizard-card--selected:hover {
+  border-color: var(--lamtek-gold, #c9a951);
+  background: rgba(201, 169, 81, 0.08);
+  box-shadow: 0 0 0 2px rgba(201, 169, 81, 0.4) inset;
+}
+.ordering-wizard-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* Plain <button> elements default to centred content; the wizard cards need the
+   same left-aligned column layout as the <a> links. */
+button.ordering-wizard-card {
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  text-align: left;
+}
+
+/* Kitchen context banner above the workbench: shows the range/door-finish/carcass
+   the user chose in the wizard so they have one-glance confirmation that the
+   workbench is pre-scoped to their kitchen. The "Change kitchen" button takes
+   them back to /ordering/start. */
+.ordering-kitchen-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  margin-top: 0.75rem;
+  border-radius: 10px;
+  background: rgba(201, 169, 81, 0.08);
+  border: 1px solid rgba(201, 169, 81, 0.4);
+}
+.ordering-kitchen-banner-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.85rem;
+  font-size: 0.88rem;
+}
+.ordering-kitchen-chip strong {
+  font-weight: 600;
+  color: var(--lamtek-text, inherit);
+}
 .ordering-wizard-back {
   display: flex;
   flex-wrap: wrap;

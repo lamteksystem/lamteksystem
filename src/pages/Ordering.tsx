@@ -386,6 +386,31 @@ export default function Ordering() {
             ? `Range: ${displayCategories.find((c) => c.id === rangeId)?.name}. Search the catalogue, stage lines in the basket, then review in the cart.`
             : 'Search the catalogue, stage lines in the basket, then review in the cart.'}
         </p>
+        {draftOrder && (draftOrder.kitchen_range_id || draftOrder.door_finish || draftOrder.carcass_finish) && (
+          <div className="ordering-kitchen-banner">
+            <div className="ordering-kitchen-banner-chips">
+              {draftOrder.kitchen_range_id && (
+                <span className="ordering-kitchen-chip">
+                  <strong>Range:</strong>{' '}
+                  {displayCategories.find((c) => c.id === draftOrder.kitchen_range_id)?.name ?? '—'}
+                </span>
+              )}
+              {draftOrder.door_finish && (
+                <span className="ordering-kitchen-chip">
+                  <strong>Door finish:</strong> {draftOrder.door_finish}
+                </span>
+              )}
+              {draftOrder.carcass_finish && (
+                <span className="ordering-kitchen-chip">
+                  <strong>Carcass:</strong> {draftOrder.carcass_finish}
+                </span>
+              )}
+            </div>
+            <Link to="/ordering/start" className="btn btn-small btn-outline">
+              Change kitchen
+            </Link>
+          </div>
+        )}
         {guidanceActive && (
           <div className="ordering-guidance-banner">
             <span>

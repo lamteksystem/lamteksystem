@@ -39,7 +39,50 @@ export async function resetSmartCategoryLearning(): Promise<{ deleted: number; e
   return { deleted: count ?? 0, error: null }
 }
 
-const STOP_WORDS = new Set([
+/** Remove a single learned (token, category) pair. */
+export async function deleteSmartCategoryToken(
+  token: string,
+  categoryId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('smart_category_learning')
+    .delete()
+    .eq('token', token)
+    .eq('category_id', categoryId)
+  return { error: error?.message ?? null }
+}
+
+/** Delete every learned row for a token, across all categories. Used by "Ignore everywhere". */
+export async function deleteSmartCategoryTokenEverywhere(
+  token: string,
+): Promise<{ deleted: number; error: string | null }> {
+  const { error, count } = await supabase
+    .from('smart_category_learning')
+    .delete({ count: 'exact' })
+    .eq('token', token)
+  if (error) return { deleted: 0, error: error.message }
+  return { deleted: count ?? 0, error: null }
+}
+
+/** Set (or insert) the weight for a learned token. weight <= 0 deletes the row instead. */
+export async function setSmartCategoryWeight(
+  token: string,
+  categoryId: string,
+  weight: number,
+): Promise<{ error: string | null }> {
+  if (weight <= 0) return deleteSmartCategoryToken(token, categoryId)
+  const now = new Date().toISOString()
+  // Upsert by (token, category_id) — table has a unique index on that pair.
+  const { error } = await supabase
+    .from('smart_category_learning')
+    .upsert(
+      { token, category_id: categoryId, weight, last_learned_at: now },
+      { onConflict: 'token,category_id' },
+    )
+  return { error: error?.message ?? null }
+}
+
+const BUILT_IN_STOP_WORDS = [
   'the',
   'and',
   'for',
@@ -53,17 +96,75 @@ const STOP_WORDS = new Set([
   'item',
   'qty',
   'size',
-])
+]
+
+export const BUILT_IN_STOP_WORD_SET: ReadonlySet<string> = new Set(BUILT_IN_STOP_WORDS)
+export function listBuiltInStopWords(): string[] {
+  return [...BUILT_IN_STOP_WORDS]
+}
+
+/** In-memory cache of user-managed stop words, refreshed on demand. */
+let userStopWordCache: Set<string> | null = null
+
+export async function loadUserSmartStopWords(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('smart_category_stop_words')
+    .select('token')
+    .order('token')
+  if (error || !data) {
+    userStopWordCache = userStopWordCache ?? new Set()
+    return []
+  }
+  const list = (data as { token: string }[]).map((r) => r.token).filter(Boolean)
+  userStopWordCache = new Set(list)
+  return list
+}
+
+export function getCachedUserSmartStopWords(): Set<string> {
+  return userStopWordCache ?? new Set()
+}
+
+export async function addUserSmartStopWord(rawToken: string): Promise<{ error: string | null }> {
+  const token = rawToken.trim().toLowerCase()
+  if (!token) return { error: 'Empty token' }
+  const { error } = await supabase
+    .from('smart_category_stop_words')
+    .upsert({ token }, { onConflict: 'token' })
+  if (!error) {
+    if (!userStopWordCache) userStopWordCache = new Set()
+    userStopWordCache.add(token)
+  }
+  return { error: error?.message ?? null }
+}
+
+export async function removeUserSmartStopWord(rawToken: string): Promise<{ error: string | null }> {
+  const token = rawToken.trim().toLowerCase()
+  if (!token) return { error: 'Empty token' }
+  const { error } = await supabase
+    .from('smart_category_stop_words')
+    .delete()
+    .eq('token', token)
+  if (!error && userStopWordCache) userStopWordCache.delete(token)
+  return { error: error?.message ?? null }
+}
+
+/** Combined effective stop-word set (built-in + cached user-managed). */
+function effectiveStopWordSet(): Set<string> {
+  const merged = new Set<string>(BUILT_IN_STOP_WORD_SET)
+  for (const t of getCachedUserSmartStopWords()) merged.add(t)
+  return merged
+}
 
 /** Tokenise a product name/description for learning + matching. Same shape as the heuristic. */
 export function learningTokens(text: string): string[] {
+  const stopWords = effectiveStopWordSet()
   return Array.from(
     new Set(
       text
         .toLowerCase()
         .replace(/[^a-z0-9\s]/g, ' ')
         .split(/\s+/)
-        .filter((t) => t.length > 2 && !STOP_WORDS.has(t)),
+        .filter((t) => t.length > 2 && !stopWords.has(t)),
     ),
   )
 }

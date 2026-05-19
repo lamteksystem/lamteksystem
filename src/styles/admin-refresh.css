@@ -851,6 +851,219 @@
   color: var(--lamtek-text-muted);
 }
 
+/* History tab: per-chip editing controls.
+   Each chip combines the token, weight nudgers (− / +), a delete, and an
+   "Ignore everywhere" escape-hatch. Ambiguous chips (token learned for 2+
+   categories) are tinted amber so the user can spot polluting tokens fast. */
+.admin-smart-categorise-token-chip {
+  font-size: 0.83rem;
+}
+
+.admin-smart-categorise-token-chip--ambig {
+  background: rgba(234, 179, 8, 0.16);
+  outline: 1px dashed rgba(202, 138, 4, 0.7);
+}
+
+.admin-smart-categorise-token-nudge,
+.admin-smart-categorise-token-del {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: var(--lamtek-text-muted);
+  cursor: pointer;
+  padding: 0 0.2rem;
+  border-radius: 4px;
+}
+
+.admin-smart-categorise-token-nudge:hover,
+.admin-smart-categorise-token-del:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--lamtek-text);
+}
+
+.admin-smart-categorise-token-del {
+  color: #b91c1c;
+}
+
+.admin-smart-categorise-token-del:hover {
+  background: rgba(185, 28, 28, 0.1);
+}
+
+.admin-smart-categorise-token-ignore {
+  margin-left: 0.25rem;
+  background: transparent;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  color: var(--lamtek-text-muted);
+  font-size: 0.7rem;
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  cursor: pointer;
+}
+
+.admin-smart-categorise-token-ignore:hover {
+  color: var(--lamtek-text);
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.admin-smart-categorise-token-ignore:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.admin-smart-categorise-ambig-pill {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  background: rgba(202, 138, 4, 0.18);
+  color: #92400e;
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
+.admin-smart-categorise-ambig-pill--inline {
+  margin: 0 0.1rem;
+}
+
+/* Top-of-history "Ambiguous tokens" panel. */
+.admin-smart-categorise-ambig-panel {
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-left: 4px solid #ca8a04;
+}
+
+.admin-smart-categorise-ambig-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.admin-smart-categorise-ambig-header p {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+}
+
+.admin-smart-categorise-ambig-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.admin-smart-categorise-ambig-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* History toolbar (filter + ambiguous-only toggle + reset). */
+.admin-smart-categorise-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.admin-smart-categorise-history-actions .admin-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.admin-smart-categorise-history-actions .admin-inline-field input[type='search'] {
+  padding: 0.25rem 0.45rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  min-width: 160px;
+}
+
+.admin-smart-categorise-card-hint {
+  margin: 0.15rem 0 0.5rem;
+  font-size: 0.82rem;
+}
+
+/* Ignore-list editor card at the bottom of the history tab. */
+.admin-smart-categorise-stop-panel {
+  margin-top: 1.25rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-smart-categorise-stop-panel h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.admin-smart-categorise-stop-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin-smart-categorise-stop-form input {
+  flex: 0 1 320px;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.admin-smart-categorise-stop-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.admin-smart-categorise-stop-groups h4 {
+  margin: 0 0 0.3rem;
+  font-size: 0.9rem;
+}
+
+.admin-smart-categorise-stop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.admin-smart-categorise-stop-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  background: rgba(15, 23, 42, 0.05);
+  border-radius: 999px;
+  font-size: 0.82rem;
+}
+
+.admin-smart-categorise-stop-list--readonly li {
+  opacity: 0.8;
+}
+
+.btn.btn-xsmall {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.1;
+  border-radius: 999px;
+}
+
 .admin-smart-categorise-settings-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

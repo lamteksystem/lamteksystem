@@ -23,9 +23,16 @@ import {
   type SmartCategorySuggestion,
 } from '@/lib/smartProductCategorize'
 import {
+  addUserSmartStopWord,
+  deleteSmartCategoryToken,
+  deleteSmartCategoryTokenEverywhere,
+  listBuiltInStopWords,
   loadSmartCategoryHistory,
-  resetSmartCategoryLearning,
+  loadUserSmartStopWords,
   recordSmartCategoryLearning,
+  removeUserSmartStopWord,
+  resetSmartCategoryLearning,
+  setSmartCategoryWeight,
   type LearningIndex,
   type LearningRow,
 } from '@/lib/smartCategoryLearning'
@@ -98,13 +105,19 @@ export default function AdminSmartCategorise() {
   const [productCategoryMap, setProductCategoryMap] = useState<ProductCategoryMap>(new Map())
   const [learning, setLearning] = useState<LearningIndex>(new Map())
   const [history, setHistory] = useState<LearningRow[]>([])
+  const [userStopWords, setUserStopWords] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [result, setResult] = useState<ResultInfo | null>(null)
 
   const refreshLearning = useCallback(async () => {
-    const [idx, hist] = await Promise.all([loadSmartCategoryLearning(), loadSmartCategoryHistory()])
+    const [idx, hist, stops] = await Promise.all([
+      loadSmartCategoryLearning(),
+      loadSmartCategoryHistory(),
+      loadUserSmartStopWords(),
+    ])
     setLearning(idx)
     setHistory(hist)
+    setUserStopWords(stops)
   }, [])
 
   const loadAll = useCallback(async () => {
@@ -188,6 +201,7 @@ export default function AdminSmartCategorise() {
             tab={tab}
             setTab={setTab}
             history={history}
+            userStopWords={userStopWords}
             products={products}
             categories={categories}
             categoryById={categoryById}
@@ -212,6 +226,7 @@ interface SmartSectionProps {
   tab: Tab
   setTab: (next: Tab) => void
   history: LearningRow[]
+  userStopWords: string[]
   products: ProductRow[]
   categories: CategoryRow[]
   categoryById: Map<string, CategoryRow>
@@ -225,6 +240,7 @@ function SmartSection({
   tab,
   setTab,
   history,
+  userStopWords,
   products,
   categories,
   categoryById,
@@ -278,6 +294,7 @@ function SmartSection({
           <HistoryTab
             history={history}
             categoryById={categoryById}
+            userStopWords={userStopWords}
             onChange={refreshLearning}
             setResult={setResult}
           />
@@ -1037,19 +1054,57 @@ export function SuggestionsTab({
 function HistoryTab({
   history,
   categoryById,
+  userStopWords,
   onChange,
   setResult,
 }: {
   history: LearningRow[]
   categoryById: Map<string, CategoryRow>
+  userStopWords: string[]
   onChange: () => Promise<void>
   setResult: (r: ResultInfo) => void
 }) {
   const [resetting, setResetting] = useState(false)
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [filter, setFilter] = useState('')
+  const [showAmbiguousOnly, setShowAmbiguousOnly] = useState(false)
+  const [newStopWord, setNewStopWord] = useState('')
+
+  const builtInStopWords = useMemo(() => listBuiltInStopWords(), [])
+
+  // How many distinct categories has each token been learned against?
+  // Tokens with 2+ categories are "ambiguous" (likely too generic, e.g. "18mm").
+  const tokenCategoryCount = useMemo(() => {
+    const counts = new Map<string, number>()
+    const seen = new Map<string, Set<string>>()
+    for (const row of history) {
+      const set = seen.get(row.token) ?? new Set<string>()
+      set.add(row.category_id)
+      seen.set(row.token, set)
+    }
+    for (const [token, set] of seen) counts.set(token, set.size)
+    return counts
+  }, [history])
+
+  const ambiguousTokens = useMemo(() => {
+    const list: { token: string; categories: number; totalWeight: number }[] = []
+    const totalsByToken = new Map<string, number>()
+    for (const row of history) {
+      totalsByToken.set(row.token, (totalsByToken.get(row.token) ?? 0) + (row.weight ?? 0))
+    }
+    for (const [token, categories] of tokenCategoryCount) {
+      if (categories >= 2) list.push({ token, categories, totalWeight: totalsByToken.get(token) ?? 0 })
+    }
+    return list.sort(
+      (a, b) => b.categories - a.categories || b.totalWeight - a.totalWeight || a.token.localeCompare(b.token),
+    )
+  }, [history, tokenCategoryCount])
 
   const byCategory = useMemo(() => {
     const map = new Map<string, LearningRow[]>()
     for (const row of history) {
+      if (filter && !row.token.toLowerCase().includes(filter.trim().toLowerCase())) continue
+      if (showAmbiguousOnly && (tokenCategoryCount.get(row.token) ?? 0) < 2) continue
       const bucket = map.get(row.category_id) ?? []
       bucket.push(row)
       map.set(row.category_id, bucket)
@@ -1061,7 +1116,7 @@ function HistoryTab({
         totalWeight: rows.reduce((acc, r) => acc + (r.weight ?? 0), 0),
       }))
       .sort((a, b) => b.totalWeight - a.totalWeight)
-  }, [history])
+  }, [history, filter, showAmbiguousOnly, tokenCategoryCount])
 
   async function reset() {
     if (
@@ -1091,15 +1146,169 @@ function HistoryTab({
     }
   }
 
+  async function nudgeWeight(row: LearningRow, delta: number) {
+    const key = `weight:${row.token}:${row.category_id}`
+    setBusyKey(key)
+    try {
+      const next = Math.max(0, (row.weight ?? 0) + delta)
+      const { error } = await setSmartCategoryWeight(row.token, row.category_id, next)
+      if (error) {
+        setResult({ tone: 'error', title: 'Could not update weight', lines: [], errors: [error] })
+      }
+      await onChange()
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  async function deleteToken(row: LearningRow) {
+    const key = `delete:${row.token}:${row.category_id}`
+    setBusyKey(key)
+    try {
+      const { error } = await deleteSmartCategoryToken(row.token, row.category_id)
+      if (error) {
+        setResult({ tone: 'error', title: 'Could not delete token', lines: [], errors: [error] })
+      }
+      await onChange()
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  async function ignoreEverywhere(token: string) {
+    if (
+      !window.confirm(
+        `Ignore "${token}" everywhere? This removes every learned row for this token AND adds it to the ignore list so it won't be learned again. You can remove it from the ignore list later.`,
+      )
+    )
+      return
+    const key = `ignore:${token}`
+    setBusyKey(key)
+    try {
+      const [{ deleted, error: delError }, { error: stopError }] = await Promise.all([
+        deleteSmartCategoryTokenEverywhere(token),
+        addUserSmartStopWord(token),
+      ])
+      const errors = [delError, stopError].filter((e): e is string => Boolean(e))
+      setResult({
+        tone: errors.length ? 'error' : 'success',
+        title: errors.length ? 'Could not ignore everywhere' : `Ignoring "${token}"`,
+        lines: errors.length
+          ? []
+          : [
+              `Removed ${deleted} learned row${deleted === 1 ? '' : 's'} for "${token}".`,
+              `Added "${token}" to the ignore list — future training will skip it.`,
+            ],
+        errors,
+      })
+      await onChange()
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  async function addStopWordSubmit() {
+    const raw = newStopWord.trim().toLowerCase()
+    if (!raw) return
+    const key = `add-stop:${raw}`
+    setBusyKey(key)
+    try {
+      const { error } = await addUserSmartStopWord(raw)
+      if (error) {
+        setResult({ tone: 'error', title: 'Could not add ignore word', lines: [], errors: [error] })
+      } else {
+        setNewStopWord('')
+      }
+      await onChange()
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  async function removeStopWord(token: string) {
+    const key = `rm-stop:${token}`
+    setBusyKey(key)
+    try {
+      const { error } = await removeUserSmartStopWord(token)
+      if (error) {
+        setResult({ tone: 'error', title: 'Could not remove ignore word', lines: [], errors: [error] })
+      }
+      await onChange()
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
   return (
     <div className="admin-smart-categorise-history">
       <p className="admin-callout admin-callout--info">
-        Every time you apply a smart categorisation — or override one — the system records which
-        words (tokens) from the product name correlate with which category. Stronger weights mean
-        the system is more confident. Below is a snapshot of everything it has learnt so far.
+        <strong>How to read these cards:</strong> each card lists one category and the tokens that
+        have been learned for it. Each token says <em>"when the product name or description contains
+        this token, add this weight to the category's score."</em> Use the controls on a chip to fine-tune
+        what the system has learnt:
+        {' '}<kbd>−</kbd>/<kbd>+</kbd> nudges the weight, <kbd>×</kbd> deletes just that mapping,
+        and <strong>Ignore everywhere</strong> removes the token from <em>all</em> categories and adds
+        it to the ignore list so it can&apos;t be learned again. Tokens flagged{' '}
+        <span className="admin-smart-categorise-ambig-pill admin-smart-categorise-ambig-pill--inline">ambiguous</span>{' '}
+        have been learned against 2+ categories — they&apos;re probably too generic (e.g.{' '}
+        <code>18mm</code>, <code>oak</code>) and worth cleaning up.
       </p>
 
+      {ambiguousTokens.length > 0 && (
+        <section className="card admin-smart-categorise-ambig-panel">
+          <header className="admin-smart-categorise-ambig-header">
+            <h3>
+              <span className="admin-smart-categorise-ambig-pill">ambiguous</span> tokens (
+              {ambiguousTokens.length})
+            </h3>
+            <p className="admin-muted">
+              These tokens were learned for 2+ different categories. They probably shouldn&apos;t
+              influence scoring — clean them up with <strong>Ignore everywhere</strong>.
+            </p>
+          </header>
+          <ul className="admin-smart-categorise-ambig-list">
+            {ambiguousTokens.slice(0, 30).map((a) => (
+              <li key={a.token}>
+                <span className="admin-smart-categorise-token">{a.token}</span>
+                <span className="admin-muted">
+                  · learned in {a.categories} categories · total weight {a.totalWeight}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-xsmall"
+                  disabled={busyKey === `ignore:${a.token}`}
+                  onClick={() => void ignoreEverywhere(a.token)}
+                  title={`Remove "${a.token}" from every category's learning AND add it to the ignore list`}
+                >
+                  {busyKey === `ignore:${a.token}` ? 'Ignoring…' : 'Ignore everywhere'}
+                </button>
+              </li>
+            ))}
+            {ambiguousTokens.length > 30 && (
+              <li className="admin-muted">…and {ambiguousTokens.length - 30} more</li>
+            )}
+          </ul>
+        </section>
+      )}
+
       <div className="admin-smart-categorise-history-actions">
+        <label className="admin-inline-field">
+          <span>Filter tokens</span>
+          <input
+            type="search"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="e.g. 18mm, oak…"
+          />
+        </label>
+        <label className="admin-check-row">
+          <input
+            type="checkbox"
+            checked={showAmbiguousOnly}
+            onChange={(e) => setShowAmbiguousOnly(e.target.checked)}
+          />
+          Show ambiguous only
+        </label>
         <button
           type="button"
           className="btn btn-outline btn-small"
@@ -1113,8 +1322,9 @@ function HistoryTab({
 
       {byCategory.length === 0 ? (
         <p className="admin-muted">
-          No learning recorded yet. Apply some suggestions on the <strong>Suggestions</strong> tab and
-          the system will start remembering which words map to which category.
+          {history.length === 0
+            ? 'No learning recorded yet. Apply some suggestions on the Suggestions tab and the system will start remembering which words map to which category.'
+            : 'No tokens match your filter.'}
         </p>
       ) : (
         <ul className="admin-smart-categorise-history-list">
@@ -1129,30 +1339,160 @@ function HistoryTab({
                       {' '}· {group.rows.length} token{group.rows.length === 1 ? '' : 's'} · total weight {group.totalWeight}
                     </span>
                   </h3>
+                  <p className="admin-muted admin-smart-categorise-card-hint">
+                    When a product&apos;s name/description contains any of these tokens, the system
+                    adds the chip&apos;s weight to <strong>{category?.name ?? 'this category'}</strong>&apos;s
+                    score during ranking.
+                  </p>
                 </header>
                 <ul className="admin-smart-categorise-history-tokens">
-                  {group.rows.slice(0, 30).map((row) => (
-                    <li
-                      key={`${row.token}-${row.category_id}`}
-                      title={
-                        row.last_learned_at
-                          ? `Last reinforced ${new Date(row.last_learned_at).toLocaleString()}`
-                          : 'Learned'
-                      }
-                    >
-                      <span className="admin-smart-categorise-token">{row.token}</span>
-                      <span className="admin-smart-categorise-token-weight">×{row.weight}</span>
-                    </li>
-                  ))}
-                  {group.rows.length > 30 && (
-                    <li className="admin-muted">…and {group.rows.length - 30} more</li>
-                  )}
+                  {group.rows.map((row) => {
+                    const ambiguous = (tokenCategoryCount.get(row.token) ?? 0) >= 2
+                    return (
+                      <li
+                        key={`${row.token}-${row.category_id}`}
+                        className={`admin-smart-categorise-token-chip${
+                          ambiguous ? ' admin-smart-categorise-token-chip--ambig' : ''
+                        }`}
+                        title={
+                          row.last_learned_at
+                            ? `Last reinforced ${new Date(row.last_learned_at).toLocaleString()}${
+                                ambiguous
+                                  ? `\n\nAmbiguous: this token has been learned for ${tokenCategoryCount.get(row.token)} categories.`
+                                  : ''
+                              }`
+                            : 'Learned'
+                        }
+                      >
+                        <span className="admin-smart-categorise-token">{row.token}</span>
+                        {ambiguous && (
+                          <span className="admin-smart-categorise-ambig-pill" aria-label="Ambiguous token">
+                            ambig.
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          className="admin-smart-categorise-token-nudge"
+                          aria-label={`Decrease weight of ${row.token}`}
+                          title="Lower the weight (−1)"
+                          disabled={busyKey === `weight:${row.token}:${row.category_id}`}
+                          onClick={() => void nudgeWeight(row, -1)}
+                        >
+                          −
+                        </button>
+                        <span className="admin-smart-categorise-token-weight">×{row.weight}</span>
+                        <button
+                          type="button"
+                          className="admin-smart-categorise-token-nudge"
+                          aria-label={`Increase weight of ${row.token}`}
+                          title="Raise the weight (+1)"
+                          disabled={busyKey === `weight:${row.token}:${row.category_id}`}
+                          onClick={() => void nudgeWeight(row, +1)}
+                        >
+                          +
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-smart-categorise-token-del"
+                          aria-label={`Delete learned mapping ${row.token} → ${category?.name ?? row.category_id}`}
+                          title="Delete just this token from this category"
+                          disabled={busyKey === `delete:${row.token}:${row.category_id}`}
+                          onClick={() => void deleteToken(row)}
+                        >
+                          ×
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-smart-categorise-token-ignore"
+                          title={`Remove "${row.token}" from every category and add it to the ignore list`}
+                          disabled={busyKey === `ignore:${row.token}`}
+                          onClick={() => void ignoreEverywhere(row.token)}
+                        >
+                          Ignore everywhere
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               </li>
             )
           })}
         </ul>
       )}
+
+      <section className="card admin-smart-categorise-stop-panel">
+        <header>
+          <h3>Ignore list</h3>
+          <p className="admin-muted">
+            Tokens in this list are skipped by the smart categoriser when scoring AND when learning.
+            The system ships with a built-in list of very generic words. Add your own (e.g. <code>18mm</code>,
+            common dimensions, finishes) to keep learning focused on tokens that actually identify a
+            category.
+          </p>
+        </header>
+
+        <form
+          className="admin-smart-categorise-stop-form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void addStopWordSubmit()
+          }}
+        >
+          <input
+            type="text"
+            value={newStopWord}
+            onChange={(e) => setNewStopWord(e.target.value)}
+            placeholder="Add a token to ignore (lowercase)"
+            maxLength={64}
+            aria-label="New ignore token"
+          />
+          <button type="submit" className="btn btn-small" disabled={!newStopWord.trim()}>
+            Add to ignore list
+          </button>
+        </form>
+
+        <div className="admin-smart-categorise-stop-groups">
+          <div>
+            <h4>Your ignore words ({userStopWords.length})</h4>
+            {userStopWords.length === 0 ? (
+              <p className="admin-muted">None yet. Add one above or use <strong>Ignore everywhere</strong> on any chip.</p>
+            ) : (
+              <ul className="admin-smart-categorise-stop-list">
+                {userStopWords.map((token) => (
+                  <li key={token}>
+                    <span className="admin-smart-categorise-token">{token}</span>
+                    <button
+                      type="button"
+                      className="admin-smart-categorise-token-del"
+                      aria-label={`Remove ${token} from ignore list`}
+                      title={`Remove "${token}" from the ignore list — it will be learnable again`}
+                      disabled={busyKey === `rm-stop:${token}`}
+                      onClick={() => void removeStopWord(token)}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <h4>Built-in ignore words ({builtInStopWords.length})</h4>
+            <p className="admin-muted">
+              Always skipped. To override (i.e. <em>start</em> learning one of these), edit{' '}
+              <code>BUILT_IN_STOP_WORD_SET</code> in <code>src/lib/smartCategoryLearning.ts</code>.
+            </p>
+            <ul className="admin-smart-categorise-stop-list admin-smart-categorise-stop-list--readonly">
+              {builtInStopWords.map((token) => (
+                <li key={token}>
+                  <span className="admin-smart-categorise-token">{token}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

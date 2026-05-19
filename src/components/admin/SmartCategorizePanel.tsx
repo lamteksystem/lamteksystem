@@ -3,11 +3,14 @@ import type { CategoryRow, ProductRow } from '@/types/database'
 import {
   applySmartCategorySuggestions,
   buildSmartCategorizationSuggestions,
+  loadSmartCategoryLearning,
   syncInferredCategoryKinds,
   type SmartCategorySuggestion,
 } from '@/lib/smartProductCategorize'
 import { rebucketTealburyAccessories } from '@/lib/tealburyAccessoryRebucket'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
+import { getCategoryKind } from '@/lib/categoryTaxonomy'
+import type { LearningIndex } from '@/lib/smartCategoryLearning'
 
 interface SmartCategorizePanelProps {
   products: ProductRow[]
@@ -23,7 +26,8 @@ interface ResultInfo {
   errors: string[]
 }
 
-const PAGE_SIZE = 50
+const PAGE_SIZE_OPTIONS = [20, 50, 100, 250, 500] as const
+type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
 
 type ConfidenceLevel = 'low' | 'medium' | 'high'
 
@@ -41,16 +45,29 @@ export default function SmartCategorizePanel({
     low: false,
   })
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [overrides, setOverrides] = useState<Map<string, string>>(new Map())
   const [applying, setApplying] = useState(false)
   const [syncingKinds, setSyncingKinds] = useState(false)
   const [rebucketing, setRebucketing] = useState(false)
+  const [pageSize, setPageSize] = useState<PageSize>(20)
   const [page, setPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
   const [result, setResult] = useState<ResultInfo | null>(null)
+  const [learning, setLearning] = useState<LearningIndex>(new Map())
   const modalRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     modalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    loadSmartCategoryLearning().then((index) => {
+      if (!cancelled) setLearning(index)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const productById = useMemo(() => {
@@ -65,26 +82,35 @@ export default function SmartCategorizePanel({
     return map
   }, [categories])
 
+  /** Categories the user can pick as an override target. We exclude door_range from the override
+   *  picker because product↔range is handled via product.options.tealbury_door_range, not the
+   *  primary category. */
+  const overrideCategoryOptions = useMemo(() => {
+    return [...categories]
+      .filter((c) => getCategoryKind(c) !== 'door_range')
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [categories])
+
   function toggleConfidence(level: ConfidenceLevel) {
     setConfidenceFilter((prev) => ({ ...prev, [level]: !prev[level] }))
     setPage(1)
   }
 
   const suggestions = useMemo(() => {
-    const all = buildSmartCategorizationSuggestions(products, categories)
+    const all = buildSmartCategorizationSuggestions(products, categories, learning)
     return all.filter((s) => confidenceFilter[s.confidence])
-  }, [products, categories, confidenceFilter])
+  }, [products, categories, confidenceFilter, learning])
 
-  const totalPages = Math.max(1, Math.ceil(suggestions.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(suggestions.length / pageSize))
   const currentPage = Math.min(page, totalPages)
   useEffect(() => {
     setPageInput(String(currentPage))
   }, [currentPage])
 
   const pageSuggestions = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE
-    return suggestions.slice(start, start + PAGE_SIZE)
-  }, [suggestions, currentPage])
+    const start = (currentPage - 1) * pageSize
+    return suggestions.slice(start, start + pageSize)
+  }, [suggestions, currentPage, pageSize])
 
   const selectedSuggestions = useMemo(
     () => suggestions.filter((s) => selected.has(s.productId)),
@@ -131,11 +157,17 @@ export default function SmartCategorizePanel({
     if (selectedSuggestions.length === 0) return
     setApplying(true)
     try {
-      const { applied, errors } = await applySmartCategorySuggestions(selectedSuggestions)
+      const overriddenCount = selectedSuggestions.filter((s) => overrides.has(s.productId)).length
+      const { applied, errors } = await applySmartCategorySuggestions(selectedSuggestions, overrides)
       const lines = [
         `Re-categorised ${applied} product${applied === 1 ? '' : 's'}.`,
         `${selectedSuggestions.length - applied} skipped.`,
       ]
+      if (overriddenCount > 0) {
+        lines.push(
+          `${overriddenCount} used your manual override${overriddenCount === 1 ? '' : 's'} — the system learnt from those for next time.`,
+        )
+      }
       setResult({
         tone: errors.length === 0 ? 'success' : applied > 0 ? 'mixed' : 'error',
         title: errors.length === 0 ? 'Categorisation applied' : 'Applied with some errors',
@@ -143,10 +175,30 @@ export default function SmartCategorizePanel({
         errors,
       })
       setSelected(new Set())
+      setOverrides(new Map())
+      // Refresh learning so subsequent suggestions in this session reflect the new corrections.
+      loadSmartCategoryLearning().then(setLearning)
       onApplied()
     } finally {
       setApplying(false)
     }
+  }
+
+  function setOverride(productId: string, categoryId: string) {
+    setOverrides((prev) => {
+      const next = new Map(prev)
+      next.set(productId, categoryId)
+      return next
+    })
+  }
+
+  function clearOverride(productId: string) {
+    setOverrides((prev) => {
+      if (!prev.has(productId)) return prev
+      const next = new Map(prev)
+      next.delete(productId)
+      return next
+    })
   }
 
   async function syncKinds() {
@@ -243,6 +295,23 @@ export default function SmartCategorizePanel({
           >
             {rebucketing ? 'Splitting Tealbury accessories…' : 'Split Tealbury accessories'}
           </button>
+          <label className="admin-smart-categorize-pagesize">
+            Per page
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value) as PageSize)
+                setPage(1)
+              }}
+              disabled={applying}
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <div className="admin-smart-categorize-stats">
@@ -297,14 +366,21 @@ export default function SmartCategorizePanel({
               const currentLabel = currentCategory ? currentCategory.name : 'Uncategorised'
               const sku = product?.sku ?? ''
               const program = product?.catalog_program
-              const isSameCategory = currentCategory?.id === s.suggestedCategoryId
+              const targetId = overrides.get(s.productId) ?? s.suggestedCategoryId
+              const isOverridden = overrides.has(s.productId)
+              const isSameCategory = currentCategory?.id === targetId
+              const isLearned = s.learningBoost >= 0.04
               return (
-                <li key={s.productId}>
-                  <label className="admin-smart-categorize-row">
+                <li
+                  key={s.productId}
+                  className={isOverridden ? 'admin-smart-categorize-list-item--overridden' : ''}
+                >
+                  <div className="admin-smart-categorize-row">
                     <input
                       type="checkbox"
                       checked={selected.has(s.productId)}
                       onChange={() => toggleOne(s)}
+                      aria-label={`Select ${s.productName}`}
                     />
                     <div className="admin-smart-categorize-row-body">
                       <div className="admin-smart-categorize-row-top">
@@ -321,6 +397,14 @@ export default function SmartCategorizePanel({
                         <span className="admin-smart-categorize-product" title={s.productName}>
                           {s.productName}
                         </span>
+                        {isLearned && (
+                          <span
+                            className="admin-program-badge admin-program-badge--learned"
+                            title="Suggestion boosted by prior corrections"
+                          >
+                            Learnt
+                          </span>
+                        )}
                       </div>
                       <div className="admin-smart-categorize-change">
                         <span
@@ -334,26 +418,58 @@ export default function SmartCategorizePanel({
                           →
                         </span>
                         <span
-                          className={`admin-smart-categorize-pill admin-smart-categorize-pill--target${
-                            isSameCategory ? ' admin-smart-categorize-pill--noop' : ''
-                          }`}
+                          className={`admin-smart-categorize-target-wrap${
+                            isOverridden ? ' admin-smart-categorize-target-wrap--overridden' : ''
+                          }${isSameCategory ? ' admin-smart-categorize-target-wrap--noop' : ''}`}
                         >
-                          {s.suggestedCategoryName}
+                          <select
+                            className="admin-smart-categorize-target-select"
+                            value={targetId}
+                            onChange={(e) => {
+                              const next = e.target.value
+                              if (next === s.suggestedCategoryId) clearOverride(s.productId)
+                              else setOverride(s.productId, next)
+                            }}
+                            aria-label="Change suggested category"
+                          >
+                            {/* Always include the suggested category as the first option so users
+                                see it labelled even if the dropdown is searched. */}
+                            {!overrideCategoryOptions.some((c) => c.id === s.suggestedCategoryId) && (
+                              <option value={s.suggestedCategoryId}>
+                                {s.suggestedCategoryName} (suggested)
+                              </option>
+                            )}
+                            {overrideCategoryOptions.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.id === s.suggestedCategoryId ? `${c.name} (suggested)` : c.name}
+                              </option>
+                            ))}
+                          </select>
+                          {isOverridden && (
+                            <button
+                              type="button"
+                              className="admin-link-button"
+                              onClick={() => clearOverride(s.productId)}
+                              title="Reset to suggested category"
+                            >
+                              Reset
+                            </button>
+                          )}
                           {isSameCategory && (
-                            <span className="admin-smart-categorize-noop"> (no change)</span>
+                            <span className="admin-smart-categorize-noop">(no change)</span>
                           )}
                         </span>
                       </div>
                     </div>
                     <span className={`admin-badge admin-badge--${s.confidence}`}>{s.confidence}</span>
-                  </label>
+                  </div>
                 </li>
               )
             })
           )}
         </ul>
 
-        {suggestions.length > PAGE_SIZE && (
+        {suggestions.length > pageSize && (
           <div className="admin-smart-categorize-pager" role="navigation" aria-label="Suggestion pages">
             <button
               type="button"
@@ -411,8 +527,8 @@ export default function SmartCategorizePanel({
               »
             </button>
             <span className="admin-muted admin-smart-categorize-page-range">
-              Showing {(currentPage - 1) * PAGE_SIZE + 1}–
-              {Math.min(currentPage * PAGE_SIZE, suggestions.length)} of {suggestions.length}
+              Showing {(currentPage - 1) * pageSize + 1}–
+              {Math.min(currentPage * pageSize, suggestions.length)} of {suggestions.length}
             </span>
           </div>
         )}

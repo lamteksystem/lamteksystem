@@ -6,15 +6,23 @@ import {
   type CategoryKind,
 } from '@/lib/categoryTaxonomy'
 import { saveProductCategories } from '@/lib/productCategories'
+import {
+  learningBoosts,
+  loadSmartCategoryLearning,
+  recordSmartCategoryLearning,
+  type LearningIndex,
+} from '@/lib/smartCategoryLearning'
 
 export interface SmartCategorySuggestion {
   productId: string
   productName: string
+  productText: string
   currentCategoryId: string | null
   suggestedCategoryId: string
   suggestedCategoryName: string
   score: number
   confidence: 'high' | 'medium' | 'low'
+  learningBoost: number
 }
 
 const STOP_WORDS = new Set([
@@ -79,10 +87,15 @@ function scoreNameMatch(productName: string, categoryName: string): number {
   return ratio
 }
 
+export interface SuggestOptions {
+  browseMode?: 'category' | 'range'
+  learning?: LearningIndex
+}
+
 export function suggestCategoryForProduct(
   product: Pick<ProductRow, 'id' | 'name' | 'description' | 'sku' | 'category_id'>,
   categories: CategoryRow[],
-  options?: { browseMode?: 'category' | 'range' },
+  options?: SuggestOptions,
 ): SmartCategorySuggestion | null {
   const mode = options?.browseMode ?? 'category'
   const pool = categories.filter((c) => {
@@ -93,11 +106,18 @@ export function suggestCategoryForProduct(
   if (pool.length === 0) return null
 
   const haystack = [product.name, product.description, product.sku].filter(Boolean).join(' ')
-  let best: { category: CategoryRow; score: number } | null = null
+
+  const boosts = options?.learning ? learningBoosts(options.learning, haystack) : null
+  let best: { category: CategoryRow; score: number; boost: number } | null = null
 
   for (const category of pool) {
-    const score = scoreNameMatch(haystack, category.name)
-    if (!best || score > best.score) best = { category, score }
+    const baseScore = scoreNameMatch(haystack, category.name)
+    const learnWeight = boosts?.get(category.id) ?? 0
+    // Cap the learning boost so a single accidental confirmation can't dominate, but it can still
+    // promote a category from "medium" to "high" with consistent corrections (~5+ confirmations).
+    const learnBoost = Math.min(0.4, learnWeight * 0.04)
+    const score = Math.min(1, baseScore + learnBoost)
+    if (!best || score > best.score) best = { category, score, boost: learnBoost }
   }
 
   if (!best || best.score < 0.35) return null
@@ -109,41 +129,57 @@ export function suggestCategoryForProduct(
   return {
     productId: product.id,
     productName: product.name,
+    productText: haystack,
     currentCategoryId: product.category_id,
     suggestedCategoryId: best.category.id,
     suggestedCategoryName: best.category.name,
     score: best.score,
     confidence,
+    learningBoost: best.boost,
   }
 }
 
 export function buildSmartCategorizationSuggestions(
   products: ProductRow[],
   categories: CategoryRow[],
+  learning?: LearningIndex,
 ): SmartCategorySuggestion[] {
   return products
-    .map((p) => suggestCategoryForProduct(p, categories))
+    .map((p) => suggestCategoryForProduct(p, categories, { learning }))
     .filter((s): s is SmartCategorySuggestion => s != null)
     .sort((a, b) => b.score - a.score)
 }
 
+/**
+ * Apply per-row category overrides. The caller passes the override map (productId -> categoryId)
+ * so each row can target a different category than the heuristic's first suggestion.
+ *
+ * Every successful apply also feeds the learning store so future suggestions are improved.
+ */
 export async function applySmartCategorySuggestions(
   suggestions: SmartCategorySuggestion[],
+  overrides?: Map<string, string>,
 ): Promise<{ applied: number; errors: string[] }> {
   let applied = 0
   const errors: string[] = []
 
   for (const s of suggestions) {
-    const result = await saveProductCategories(s.productId, [s.suggestedCategoryId], s.suggestedCategoryId)
+    const targetId = overrides?.get(s.productId) ?? s.suggestedCategoryId
+    if (!targetId) continue
+    const result = await saveProductCategories(s.productId, [targetId], targetId)
     if (result.error) {
       errors.push(`${s.productName}: ${result.error}`)
       continue
     }
+    // Fire-and-forget — don't block the loop on learning writes.
+    void recordSmartCategoryLearning(s.productText, targetId)
     applied += 1
   }
 
   return { applied, errors }
 }
+
+export { loadSmartCategoryLearning }
 
 /** Infer category_kind for categories missing explicit kind (admin batch). */
 export function suggestCategoryKind(category: CategoryRow): CategoryKind {

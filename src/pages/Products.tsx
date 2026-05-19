@@ -144,253 +144,47 @@ function ProductCard({
 
 function ProductTableRow({
   product,
-  index,
   onOpenDetail,
 }: {
   product: ProductRow
-  index: number
   onOpenDetail: (product: ProductRow) => void
 }) {
   const availability = getProductAvailabilityMeta(product)
-  // Derive a tone from the availability label so the table can colour-code stock status
-  // without changing the lib's public shape (the lib is used elsewhere too).
-  const availabilityTone: 'good' | 'warn' | 'bad' | 'neutral' = availability.label.startsWith(
-    'In stock',
-  )
-    ? 'good'
-    : availability.label.startsWith('Low stock')
-      ? 'warn'
-      : availability.label.startsWith('Out of stock')
-        ? 'bad'
-        : 'neutral'
   const openDetail = () => onOpenDetail(product)
-  const opts = product.options as Record<string, unknown> | null
-  const optionEntries =
-    opts && typeof opts === 'object'
-      ? (Object.entries(opts).filter(
-          ([, v]) => v != null && String(v).trim() !== '',
-        ) as [string, string][])
-      : []
   return (
-    <tr
-      className="product-table-row"
-      onClick={openDetail}
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          openDetail()
-        }
-      }}
-    >
-      <td className="product-table-cell product-table-rownum">{index + 1}</td>
+    <tr className="product-table-row" onClick={openDetail}>
       <td className="product-table-cell product-table-image">
         {product.image_url ? (
-          <img
-            src={product.image_url}
-            alt={product.image_alt ?? product.name ?? ''}
-            loading="lazy"
-          />
+          <img src={product.image_url} alt={product.image_alt ?? product.name ?? ''} />
         ) : (
-          <div className="product-table-placeholder">No image</div>
+          <div className="product-table-placeholder">—</div>
         )}
       </td>
       <td className="product-table-cell product-table-name">
         <button type="button" onClick={openDetail} className="product-table-name-btn">
           {product.name}
         </button>
-        {optionEntries.length > 0 && (
-          <div className="product-table-row-badges" aria-hidden>
-            {optionEntries.slice(0, 4).map(([key, value]) => (
-              <span
-                key={key}
-                className="product-badge"
-                title={`${OPTION_LABELS[key] ?? key}: ${value}`}
-              >
-                {String(value)}
-              </span>
-            ))}
-            {optionEntries.length > 4 && (
-              <span className="product-badge product-badge--more" title="More options available">
-                +{optionEntries.length - 4}
-              </span>
-            )}
-          </div>
-        )}
       </td>
       <td className="product-table-cell product-table-sku">{product.sku ?? '—'}</td>
-      <td className="product-table-cell product-table-availability">
-        <span
-          className={`product-availability product-availability--${availabilityTone}`}
-          title={availability.detail ?? availability.label}
-        >
-          {availability.label}
-        </span>
+      <td className="product-table-cell">{availability.label}</td>
+      <td className="product-table-cell product-table-desc">
+        {product.description ? (
+          <span title={product.description}>{product.description.slice(0, 80)}{product.description.length > 80 ? '…' : ''}</span>
+        ) : (
+          '—'
+        )}
       </td>
       <td className="product-table-cell product-table-price">
         <button type="button" onClick={openDetail} className="product-table-price-btn">
           £{Number(product.unit_price).toFixed(2)}
         </button>
       </td>
-      <td
-        className="product-table-cell product-table-action"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button type="button" className="btn btn-outline btn-small" onClick={openDetail}>
-          View
-        </button>
+      <td className="product-table-cell product-table-action" onClick={(e) => e.stopPropagation()}>
         <Link to="/ordering/start" className="btn btn-small">
-          Add
+          Add to order
         </Link>
       </td>
     </tr>
-  )
-}
-
-/**
- * Page navigation: first/prev/numbered/next/last buttons, "Showing X–Y of Z", jump-to-page input,
- * and a page-size selector. Self-contained so the same UI could later be mounted both above and
- * below the list if needed.
- */
-function ProductsPagination({
-  page,
-  setPage,
-  pageSize,
-  setPageSize,
-  total,
-  scrollTopRef,
-}: {
-  page: number
-  setPage: (next: number) => void
-  pageSize: PageSize
-  setPageSize: (n: PageSize) => void
-  total: number
-  scrollTopRef: React.RefObject<HTMLDivElement>
-}) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const safePage = Math.min(Math.max(1, page), totalPages)
-  const startIdx = total === 0 ? 0 : (safePage - 1) * pageSize + 1
-  const endIdx = Math.min(total, safePage * pageSize)
-  const [jump, setJump] = useState<string>('')
-
-  function goto(next: number) {
-    const clamped = Math.min(Math.max(1, next), totalPages)
-    setPage(clamped)
-    requestAnimationFrame(() => {
-      scrollTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }
-
-  // Window of visible page numbers: always show first + last, current ±2 in the middle.
-  const pageWindow = useMemo<(number | 'gap')[]>(() => {
-    const out: (number | 'gap')[] = []
-    const add = (n: number) => {
-      if (!out.includes(n) && n >= 1 && n <= totalPages) out.push(n)
-    }
-    add(1)
-    if (safePage - 2 > 2) out.push('gap')
-    for (let n = Math.max(2, safePage - 2); n <= Math.min(totalPages - 1, safePage + 2); n++) add(n)
-    if (safePage + 2 < totalPages - 1) out.push('gap')
-    if (totalPages > 1) add(totalPages)
-    return out
-  }, [safePage, totalPages])
-
-  return (
-    <div className="products-pagination" role="navigation" aria-label="Products pagination">
-      <div className="products-pagination-info">
-        Showing <strong>{startIdx}</strong>–<strong>{endIdx}</strong> of <strong>{total}</strong>
-      </div>
-      <div className="products-pagination-nav">
-        <button
-          type="button"
-          className="products-pagination-btn"
-          disabled={safePage === 1}
-          onClick={() => goto(1)}
-          aria-label="First page"
-          title="First page"
-        >
-          «
-        </button>
-        <button
-          type="button"
-          className="products-pagination-btn"
-          disabled={safePage === 1}
-          onClick={() => goto(safePage - 1)}
-          aria-label="Previous page"
-          title="Previous page"
-        >
-          ‹ Prev
-        </button>
-        {pageWindow.map((n, i) =>
-          n === 'gap' ? (
-            <span key={`gap-${i}`} className="products-pagination-gap" aria-hidden>
-              …
-            </span>
-          ) : (
-            <button
-              key={n}
-              type="button"
-              className={`products-pagination-btn${n === safePage ? ' is-current' : ''}`}
-              onClick={() => goto(n)}
-              aria-current={n === safePage ? 'page' : undefined}
-              aria-label={`Page ${n}`}
-            >
-              {n}
-            </button>
-          ),
-        )}
-        <button
-          type="button"
-          className="products-pagination-btn"
-          disabled={safePage === totalPages}
-          onClick={() => goto(safePage + 1)}
-          aria-label="Next page"
-          title="Next page"
-        >
-          Next ›
-        </button>
-        <button
-          type="button"
-          className="products-pagination-btn"
-          disabled={safePage === totalPages}
-          onClick={() => goto(totalPages)}
-          aria-label="Last page"
-          title="Last page"
-        >
-          »
-        </button>
-      </div>
-      <div className="products-pagination-extras">
-        <label className="products-pagination-jump">
-          <span>Jump to</span>
-          <input
-            type="number"
-            min={1}
-            max={totalPages}
-            value={jump}
-            onChange={(e) => setJump(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const n = Number(jump)
-                if (Number.isFinite(n) && n >= 1) goto(n)
-                setJump('')
-              }
-            }}
-            placeholder={`1–${totalPages}`}
-          />
-        </label>
-        <label className="products-pagination-pagesize">
-          <span>Per page</span>
-          <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value) as PageSize)}>
-            {PAGE_SIZE_OPTIONS.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-    </div>
   )
 }
 
@@ -400,19 +194,13 @@ export default function Products() {
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  // Default to TABLE view — denser, easier to scan a long catalogue. Hydrated from
-  // user_preferences on mount (no localStorage allowed per workspace rules).
-  const [viewType, setViewType] = useState<ViewType>('table')
+  const [viewType, setViewType] = useState<ViewType>('grid')
   const [sortBy, setSortBy] = useState<SortOption>('name_asc')
   const [priceMin, setPriceMin] = useState<string>('')
   const [priceMax, setPriceMax] = useState<string>('')
   const [optionFilters, setOptionFilters] = useState<Record<string, string>>({})
   const [showFilters, setShowFilters] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_PAGE_SIZE)
-  const [prefsLoaded, setPrefsLoaded] = useState(false)
-  const listTopRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
   const stateCategoryId = (location.state as { categoryId?: string } | null)?.categoryId
 
@@ -440,50 +228,6 @@ export default function Products() {
     }
     load()
   }, [])
-
-  // Hydrate persisted prefs (view, page size, sort). Gate the auto-save effects on prefsLoaded so
-  // the initial defaults don't immediately overwrite the stored values.
-  useEffect(() => {
-    let cancelled = false
-    async function loadPrefs() {
-      const [v, ps, s] = await Promise.all([
-        getUserPreference(PREF_VIEW),
-        getUserPreference(PREF_PAGE_SIZE),
-        getUserPreference(PREF_SORT),
-      ])
-      if (cancelled) return
-      if (v && ['grid', 'list', 'compact', 'large', 'table'].includes(v)) {
-        setViewType(v as ViewType)
-      }
-      if (ps) {
-        const n = Number(ps) as PageSize
-        if ((PAGE_SIZE_OPTIONS as readonly number[]).includes(n)) setPageSize(n)
-      }
-      if (s && SORT_OPTIONS.some((o) => o.value === s)) {
-        setSortBy(s as SortOption)
-      }
-      setPrefsLoaded(true)
-    }
-    void loadPrefs()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!prefsLoaded) return
-    void setUserPreference(PREF_VIEW, viewType)
-  }, [prefsLoaded, viewType])
-
-  useEffect(() => {
-    if (!prefsLoaded) return
-    void setUserPreference(PREF_PAGE_SIZE, String(pageSize))
-  }, [prefsLoaded, pageSize])
-
-  useEffect(() => {
-    if (!prefsLoaded) return
-    void setUserPreference(PREF_SORT, sortBy)
-  }, [prefsLoaded, sortBy])
 
   const displayCategories = useMemo(() => {
     const withProduct = new Set(products.map((p) => p.category_id))
@@ -530,32 +274,6 @@ export default function Products() {
     }
     return [...list].sort(cmp)
   }, [products, selectedCategory, search, priceMin, priceMax, optionFilters, sortBy])
-
-  // Reset to page 1 whenever any filter or sort changes so the user doesn't land on an
-  // empty page after narrowing the result set.
-  useEffect(() => {
-    setPage(1)
-  }, [selectedCategory, search, priceMin, priceMax, optionFilters, sortBy])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const safePage = Math.min(page, totalPages)
-  const pageStart = (safePage - 1) * pageSize
-  const pageEnd = pageStart + pageSize
-  const visible = useMemo(
-    () => filtered.slice(pageStart, pageEnd),
-    [filtered, pageStart, pageEnd],
-  )
-
-  const sortKeyDir = keyFromSortOption(sortBy)
-  const requestSort = useCallback(
-    (key: SortKey) => {
-      if (key === 'availability') return
-      const current = keyFromSortOption(sortBy)
-      const nextDir: SortDir = current.key === key && current.dir === 'asc' ? 'desc' : 'asc'
-      setSortBy(sortOptionFromKey(key, nextDir))
-    },
-    [sortBy],
-  )
 
   const optionFacets = useMemo(() => {
     const list = products.filter((p) => {

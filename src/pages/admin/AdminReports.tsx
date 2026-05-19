@@ -377,6 +377,10 @@ export default function AdminReports() {
     return { totalInc, totalEx, cogs, marginEx, marginPct, byStatus, revenueByStatus, topCustomers, topProducts, revenueTrend, marginTrend }
   }, [orders, lines, productsById, trendDays])
 
+  const statusChartData = useMemo(() => statusBreakdown(orders.map((o) => ({ status: o.status }))), [orders])
+  const revenueChartData = useMemo(() => trendToChartPoints(metrics.revenueTrend, 'rev'), [metrics.revenueTrend])
+  const marginChartData = useMemo(() => trendToChartPoints(metrics.marginTrend, 'margin'), [metrics.marginTrend])
+
   const stockMetrics = useMemo(() => {
     const qtyByProduct = new Map<string, number>()
     for (const r of stockRows) qtyByProduct.set(r.product_id, Number(r.quantity || 0))
@@ -575,7 +579,12 @@ export default function AdminReports() {
       <div className="admin-detail-grid">
         <div className="card admin-card admin-card--interactive" role="button" tabIndex={0} onClick={() => onCardClick('status')}>
           <h2>Orders by status</h2>
-          <ul className="admin-report-list">
+          {statusChartData.length > 0 ? (
+            <DonutChart data={statusChartData} height={200} ariaLabel="Orders by status" />
+          ) : (
+            <p className="admin-muted">No data.</p>
+          )}
+          <ul className="admin-report-list" style={{ marginTop: '0.75rem' }}>
             {Object.entries(metrics.byStatus).map(([s, n]) => (
               <li key={s} className="admin-report-list-item">
                 <span className="admin-report-list-label">{s}</span>

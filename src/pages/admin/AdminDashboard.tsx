@@ -16,7 +16,6 @@ import {
   Package,
   ScanBarcode,
   PlusCircle,
-  PoundSterling,
   ShoppingCart,
   Users,
   Zap,
@@ -24,6 +23,12 @@ import {
 import { supabase } from '@/lib/supabase'
 import { withBasePath } from '@/lib/basePath'
 import { useStaff } from '@/hooks/useStaff'
+import { AreaTrendChart } from '@/components/charts/AreaTrendChart'
+import { BarTrendChart } from '@/components/charts/BarTrendChart'
+import { DonutChart } from '@/components/charts/DonutChart'
+import { AnimatedChartIllustration, DashboardHeroRibbon, StatOrdersGlyph, StatRevenueGlyph } from '@/components/dashboard/DashboardDecorSvgs'
+import { VisualStatCard } from '@/components/dashboard/VisualStatCard'
+import { buildDailyCounts, buildDailyRevenue, formatDashboardCurrency, sparklineFromPoints, statusBreakdown } from '@/lib/dashboardAnalytics'
 
 type RecentOrder = {
   id: string
@@ -32,6 +37,8 @@ type RecentOrder = {
   status: string
   total_inc_vat: number
 }
+
+type TrendOrder = { created_at: string; status: string; total_inc_vat: number }
 
 const WORKFLOW_ACTIONS: { heading: string; items: { to: string; label: string; Icon: LucideIcon }[] }[] = [
   {
@@ -95,6 +102,7 @@ export default function AdminDashboard() {
     revenuePaid: 0,
     recentOrders: [] as RecentOrder[],
   })
+  const [trendOrders, setTrendOrders] = useState<TrendOrder[]>([])
 
   useEffect(() => {
     async function load() {
@@ -113,6 +121,7 @@ export default function AdminDashboard() {
         assembliesRes,
         revenueRes,
         recentRes,
+        trendRes,
       ] = await Promise.all([
         supabase.from('orders').select('id', { count: 'exact', head: true }).neq('status', 'cancelled').eq('is_archived', false),
         supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'placed').eq('is_archived', false),
@@ -122,6 +131,7 @@ export default function AdminDashboard() {
         supabase.from('assemblies').select('id', { count: 'exact', head: true }).eq('active', true),
         supabase.from('orders').select('total_inc_vat').in('status', ['paid', 'invoiced']).eq('is_archived', false),
         supabase.from('orders').select('id, reference, created_at, status, total_inc_vat').eq('is_archived', false).order('created_at', { ascending: false }).limit(10),
+        supabase.from('orders').select('created_at, status, total_inc_vat').gte('created_at', thirtyDaysAgo.toISOString()).eq('is_archived', false).neq('status', 'cancelled'),
       ])
 
       const revenuePaid = (revenueRes.data ?? []).reduce((sum, r) => sum + Number(r.total_inc_vat || 0), 0)
@@ -136,10 +146,20 @@ export default function AdminDashboard() {
         revenuePaid,
         recentOrders: (recentRes.data ?? []) as RecentOrder[],
       })
+      setTrendOrders((trendRes.data ?? []) as TrendOrder[])
       setLoading(false)
     }
     load()
   }, [])
+
+  const orderVolumeTrend = useMemo(() => buildDailyCounts(trendOrders, 30), [trendOrders])
+  const revenueTrend = useMemo(
+    () => buildDailyRevenue(trendOrders.filter((o) => ['paid', 'invoiced', 'placed'].includes(o.status)), 30),
+    [trendOrders],
+  )
+  const statusChart = useMemo(() => statusBreakdown(trendOrders), [trendOrders])
+  const orderSpark = useMemo(() => sparklineFromPoints(orderVolumeTrend), [orderVolumeTrend])
+  const revenueSpark = useMemo(() => sparklineFromPoints(revenueTrend), [revenueTrend])
 
   const greeting = (() => {
     const hour = new Date().getHours()
@@ -188,6 +208,7 @@ export default function AdminDashboard() {
             </Link>
           </div>
         </div>
+        <DashboardHeroRibbon className="admin-dashboard-hero-ribbon" />
       </header>
 
       {stats.ordersPlaced > 0 && (

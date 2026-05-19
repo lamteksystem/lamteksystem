@@ -621,7 +621,7 @@ export default function AdminProductModal({
               </dl>
             </div>
             <div className="admin-modal-form-section admin-modal-card">
-              <h3 className="admin-modal-form-section-title">Commercial</h3>
+              <h3 className="admin-modal-form-section-title">Product details</h3>
               <dl className="admin-product-modal-meta">
                 <dt>SKU</dt>
                 <dd {...editableMetaProps('sku')}>

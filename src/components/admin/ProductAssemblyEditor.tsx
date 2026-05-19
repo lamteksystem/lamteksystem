@@ -130,26 +130,9 @@ export default function ProductAssemblyEditor({
     onPartTypesChange?.()
   }
 
-  async function handleCreateBom() {
-    setBusy(true)
-    setMessage(null)
-    const { assemblyId, error } = await ensureAssemblyForProduct(product)
-    setBusy(false)
-    if (error || !assemblyId) {
-      setMessage({ type: 'err', text: error ?? 'Could not create breakdown.' })
-      return
-    }
-    setMessage({ type: 'ok', text: 'Breakdown created — add component lines below.' })
-    await refresh()
-  }
-
   async function handleAddLine() {
-    if (!bom) {
-      setMessage({ type: 'err', text: 'Create the breakdown first.' })
-      return
-    }
     if (!addProductId) {
-      setMessage({ type: 'err', text: 'Pick a component SKU from the search list first.' })
+      setMessage({ type: 'err', text: 'Pick a component product (SKU) from the search list first.' })
       return
     }
     const qty = parseInt(addQty, 10)
@@ -158,16 +141,48 @@ export default function ProductAssemblyEditor({
       return
     }
     setBusy(true)
+    setMessage(null)
+
+    // Auto-create the assembly if it doesn't exist yet so users don't have a
+    // 2-step gotcha (Define breakdown → Add line). One click = it just works.
+    let assemblyId = bom?.id ?? null
+    let currentLineCount = bom?.assembly_lines.length ?? 0
+    if (!assemblyId) {
+      const created = await ensureAssemblyForProduct(product)
+      if (created.error || !created.assemblyId) {
+        setBusy(false)
+        console.error('[assembly] auto-create on add failed:', created.error)
+        setMessage({
+          type: 'err',
+          text: created.error ?? 'Could not create the component breakdown.',
+        })
+        return
+      }
+      assemblyId = created.assemblyId
+      currentLineCount = 0
+    }
+
     const { error } = await addAssemblyLine({
-      assemblyId: bom.id,
+      assemblyId,
       productId: addProductId,
       quantity: qty,
       componentRole: addRole,
-      sortOrder: bom.assembly_lines.length + 1,
+      sortOrder: currentLineCount + 1,
     })
     setBusy(false)
     if (error) {
-      setMessage({ type: 'err', text: error })
+      console.error('[assembly] addAssemblyLine failed:', error, {
+        assemblyId,
+        productId: addProductId,
+        componentRole: addRole,
+        quantity: qty,
+      })
+      setMessage({
+        type: 'err',
+        text: error.includes('duplicate key')
+          ? 'That component is already on this breakdown — increase its quantity or remove it first.'
+          : `Could not add component: ${error}`,
+      })
       return
     }
     setAddProductId('')
@@ -235,24 +250,17 @@ export default function ProductAssemblyEditor({
         </div>
       )}
 
-      {!bom ? (
-        canEdit ? (
-          <div className="product-assembly-editor-create">
-            <p className="admin-muted">
-              When you are ready, create the breakdown, then pick a component SKU and quantity below.
-            </p>
-            <button type="button" className="btn btn-outline" disabled={busy} onClick={() => void handleCreateBom()}>
-              {busy ? 'Creating…' : 'Define component breakdown'}
-            </button>
-          </div>
-        ) : (
-          <ProductAssemblyBreakdown productId={product.id} roleLabels={labels} />
-        )
+      {!canEdit ? (
+        <ProductAssemblyBreakdown productId={product.id} roleLabels={labels} />
       ) : (
         <>
-          {!canEdit && <ProductAssemblyBreakdown productId={product.id} roleLabels={labels} />}
-          {canEdit && (
-            <div className="product-assembly-editor-add card admin-card">
+          {!bom && (
+            <p className="admin-muted product-assembly-editor-hint">
+              No breakdown for this product yet. Pick a component SKU and quantity below — we will
+              create the breakdown automatically on your first add.
+            </p>
+          )}
+          <div className="product-assembly-editor-add card admin-card">
               <h4 className="product-assembly-editor-add-title">Add component line</h4>
               <div className="product-assembly-editor-add-form">
                 <div className="product-assembly-editor-field product-assembly-editor-field--full">
@@ -333,23 +341,36 @@ export default function ProductAssemblyEditor({
                     />
                   </label>
                 </div>
+                {message && (
+                  <p
+                    className={message.type === 'ok' ? 'admin-message-ok' : 'admin-error'}
+                    role="status"
+                    style={{ marginTop: 0 }}
+                  >
+                    {message.text}
+                  </p>
+                )}
                 <div className="product-assembly-editor-add-actions">
                   <button
                     type="button"
                     className="btn"
-                    disabled={busy || !addProductId}
+                    disabled={busy}
                     onClick={() => void handleAddLine()}
-                    title={!addProductId ? 'Pick a component from the search list first' : undefined}
                   >
                     {busy ? 'Adding…' : 'Add to breakdown'}
                   </button>
+                  {!addProductId && (
+                    <span className="admin-muted product-assembly-editor-add-hint">
+                      Pick a component above first.
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="product-assembly-editor-lines-wrap">
                 <p className="product-assembly-editor-lines-heading">
-                  Lines in this breakdown ({bom.assembly_lines.length})
+                  Lines in this breakdown ({bom?.assembly_lines.length ?? 0})
                 </p>
-                {bom.assembly_lines.length === 0 ? (
+                {!bom || bom.assembly_lines.length === 0 ? (
                   <p className="admin-muted">
                     No components yet. Pick a SKU above, set the quantity and part type, then click
                     <em> Add to breakdown</em>.
@@ -378,14 +399,7 @@ export default function ProductAssemblyEditor({
                 )}
               </div>
             </div>
-          )}
         </>
-      )}
-
-      {message && (
-        <p className={message.type === 'ok' ? 'admin-message-ok' : 'admin-error'} role="status">
-          {message.text}
-        </p>
       )}
     </div>
   )

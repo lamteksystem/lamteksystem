@@ -8,13 +8,15 @@ export function useAuth() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
+      const next = session?.user ?? null
+      setUser((prev) => (prev?.id === next?.id ? prev : next))
       setLoading(false)
     })
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      const next = session?.user ?? null
+      setUser((prev) => (prev?.id === next?.id ? prev : next))
     })
     return () => subscription.unsubscribe()
   }, [])

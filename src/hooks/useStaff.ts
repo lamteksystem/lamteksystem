@@ -50,8 +50,8 @@ export function useStaff() {
       return
     }
     setLoading(true)
-    refresh()
-  }, [user, refresh])
+    void refresh()
+  }, [user?.id, refresh])
 
   return {
     isStaff: !!staffProfile,

@@ -3508,9 +3508,16 @@ button.ordering-wizard-card {
 }
 .product-assembly-editor-add-actions {
   padding-top: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
 }
 .product-assembly-editor-add-actions .btn {
   min-width: 10rem;
+}
+.product-assembly-editor-add-hint {
+  font-size: 0.85rem;
 }
 .product-assembly-editor-lines-wrap {
   margin-top: 1.35rem;

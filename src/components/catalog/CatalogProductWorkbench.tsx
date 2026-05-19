@@ -33,6 +33,12 @@ import CatalogProductStagingBasket, {
 } from '@/components/catalog/CatalogProductStagingBasket'
 import { useWorkbenchOrderLines } from '@/hooks/useWorkbenchOrderLines'
 import type { CatalogPickerCommitPayload } from '@/components/catalog/CatalogProductPickerModal'
+import { usePermission } from '@/hooks/usePermission'
+import { useAssemblyPartTypes } from '@/hooks/useAssemblyPartTypes'
+import { supabase } from '@/lib/supabase'
+import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productCategories'
+import AdminProductModal from '@/components/admin/AdminProductModal'
+import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 
 type MainTab = 'products' | 'assemblies'
 export type CatalogLinePersistence = 'staged' | 'immediate'
@@ -98,26 +104,87 @@ export default function CatalogProductWorkbench({
   const { lines: orderLines, loading: orderLinesLoading, reload: reloadOrderLines } =
     useWorkbenchOrderLines(immediate ? orderId : null, orderLinesRefreshToken)
 
+  // Admin inline editing — gated on catalogue.edit permission. When admin saves a
+  // product or edits categories from inside the workbench we refetch products and
+  // categories from supabase and store them in the override state below, so the
+  // ordering screen reflects the change immediately without the parent reloading.
+  const { allowed: canEditCatalogue } = usePermission('admin.catalogue', 'edit')
+  const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null)
+  const [managingCategories, setManagingCategories] = useState(false)
+  const [productsOverride, setProductsOverride] = useState<ProductRow[] | null>(null)
+  const [categoriesOverride, setCategoriesOverride] = useState<CategoryRow[] | null>(null)
+  const [productCategoryMap, setProductCategoryMap] = useState<ProductCategoryMap>(new Map())
+  const {
+    types: assemblyPartTypes,
+    labels: assemblyPartTypeLabels,
+    reload: reloadAssemblyPartTypes,
+  } = useAssemblyPartTypes(canEditCatalogue)
+
+  // When the parent passes new products/categories (e.g. the user navigates to a
+  // different range or program) drop any local override so we read the fresh data.
+  useEffect(() => {
+    setProductsOverride(null)
+  }, [products])
+  useEffect(() => {
+    setCategoriesOverride(null)
+  }, [categories])
+
+  // Lazy-load the multi-category map only once admin can edit. Used by AdminProductModal.
+  useEffect(() => {
+    if (!canEditCatalogue) return
+    let cancelled = false
+    void fetchProductCategoryMap().then((map) => {
+      if (!cancelled) setProductCategoryMap(map)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [canEditCatalogue])
+
+  // Esc closes the manage-categories modal. (AdminProductModal handles its own keys.)
+  useEffect(() => {
+    if (!managingCategories) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setManagingCategories(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [managingCategories])
+
+  const effectiveProducts = productsOverride ?? products
+  const effectiveCategories = categoriesOverride ?? categories
+
+  const refreshCatalogueFromDb = useCallback(async () => {
+    const [{ data: prodData }, { data: catData }, pcMap] = await Promise.all([
+      supabase.from('products').select('*').order('name'),
+      supabase.from('categories').select('*').order('sort_order').order('name'),
+      fetchProductCategoryMap(),
+    ])
+    setProductsOverride((prodData ?? []) as ProductRow[])
+    setCategoriesOverride((catData ?? []) as CategoryRow[])
+    setProductCategoryMap(pcMap)
+  }, [])
+
   const favouriteSet = useMemo(() => new Set(favouriteIds), [favouriteIds])
 
   const scopeProducts = useMemo(() => {
     const allowed = new Set(allowedCatalogPrograms)
-    return products.filter((p) => !p.catalog_program || allowed.has(p.catalog_program))
-  }, [products, allowedCatalogPrograms])
+    return effectiveProducts.filter((p) => !p.catalog_program || allowed.has(p.catalog_program))
+  }, [effectiveProducts, allowedCatalogPrograms])
 
   const facets = useMemo(() => buildCatalogFacets(scopeProducts), [scopeProducts])
-  const catMap = useMemo(() => categoryNameById(categories), [categories])
+  const catMap = useMemo(() => categoryNameById(effectiveCategories), [effectiveCategories])
   const filtered = useMemo(
-    () => filterCatalogProducts(scopeProducts, filters, favouriteSet, categories),
-    [scopeProducts, filters, favouriteSet, categories],
+    () => filterCatalogProducts(scopeProducts, filters, favouriteSet, effectiveCategories),
+    [scopeProducts, filters, favouriteSet, effectiveCategories],
   )
   const browseOptions = useMemo(
-    () => buildCategoryTreeOptions(categories, filters.browseMode),
-    [categories, filters.browseMode],
+    () => buildCategoryTreeOptions(effectiveCategories, filters.browseMode),
+    [effectiveCategories, filters.browseMode],
   )
   const selectedProduct = useMemo(
-    () => products.find((p) => p.id === selectedProductId) ?? null,
-    [products, selectedProductId],
+    () => effectiveProducts.find((p) => p.id === selectedProductId) ?? null,
+    [effectiveProducts, selectedProductId],
   )
 
   const categoryCounts = useMemo(() => {
@@ -125,11 +192,11 @@ export default function CatalogProductWorkbench({
     for (const opt of browseOptions) {
       counts.set(
         opt.id,
-        countProductsForBrowseOption(scopeProducts, categories, filters.browseMode, opt.id),
+        countProductsForBrowseOption(scopeProducts, effectiveCategories, filters.browseMode, opt.id),
       )
     }
     return counts
-  }, [browseOptions, scopeProducts, categories, filters.browseMode])
+  }, [browseOptions, scopeProducts, effectiveCategories, filters.browseMode])
 
   const updateFilter = useCallback((patch: Partial<WorkbenchFilterState>) => {
     setFilters((prev) => ({ ...prev, ...patch }))
@@ -423,7 +490,19 @@ export default function CatalogProductWorkbench({
         </fieldset>
 
         <label className="tb-filter-field">
-          <span>{filters.browseMode === 'range' ? 'Kitchen range' : 'Category'}</span>
+          <span className="tb-filter-field-label">
+            {filters.browseMode === 'range' ? 'Kitchen range' : 'Category'}
+            {canEditCatalogue && (
+              <button
+                type="button"
+                className="tb-admin-inline-action"
+                title="Admin · add, rename, delete or re-type categories"
+                onClick={() => setManagingCategories(true)}
+              >
+                Manage…
+              </button>
+            )}
+          </span>
           <select
             value={filters.categoryId ?? ''}
             onChange={(e) => updateFilter({ categoryId: e.target.value || null })}
@@ -775,13 +854,26 @@ export default function CatalogProductWorkbench({
                         </div>
                       </td>
                       <td className="tb-col-action" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          className="btn btn-small"
-                          onClick={() => addProductToBasket(product, qty)}
-                        >
-                          Add
-                        </button>
+                        <div className="tb-row-actions">
+                          <button
+                            type="button"
+                            className="btn btn-small"
+                            onClick={() => addProductToBasket(product, qty)}
+                          >
+                            Add
+                          </button>
+                          {canEditCatalogue && (
+                            <button
+                              type="button"
+                              className="tb-admin-row-edit"
+                              title={`Edit "${product.name}" (admin)`}
+                              aria-label={`Edit ${product.name}`}
+                              onClick={() => setEditingProduct(product)}
+                            >
+                              ✎
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -892,7 +984,7 @@ export default function CatalogProductWorkbench({
         {selectedProduct && mainTab === 'products' ? (
             <CatalogProductDetailPanel
               product={selectedProduct}
-              categories={categories}
+              categories={effectiveCategories}
               customerUserId={customerUserId}
               isFavourite={favouriteSet.has(selectedProduct.id)}
               onToggleFavourite={() => toggleFavourite(selectedProduct.id)}
@@ -900,6 +992,7 @@ export default function CatalogProductWorkbench({
               onAddToBasket={addProductToBasket}
               addButtonLabel={addButtonLabel}
               adding={committing}
+              onAdminEdit={canEditCatalogue ? () => setEditingProduct(selectedProduct) : undefined}
             />
           ) : (
             <section className="tb-detail tb-detail--placeholder">
@@ -930,6 +1023,78 @@ export default function CatalogProductWorkbench({
           />
         )}
       </aside>
+      )}
+
+      {canEditCatalogue && editingProduct && (
+        <AdminProductModal
+          key={editingProduct.id}
+          product={editingProduct}
+          categories={effectiveCategories}
+          productCategoryMap={productCategoryMap}
+          canEditCatalogue
+          partTypes={assemblyPartTypes}
+          partTypeLabels={assemblyPartTypeLabels}
+          allProducts={effectiveProducts}
+          onClose={() => setEditingProduct(null)}
+          onSaved={() => void refreshCatalogueFromDb()}
+          onCategoriesChange={(next) => setCategoriesOverride(next)}
+          onPartTypesChange={() => void reloadAssemblyPartTypes()}
+          onProductSaved={(productId, categoryIds, primary) => {
+            setProductCategoryMap((prev) => {
+              const next = new Map(prev)
+              next.set(productId, categoryIds)
+              return next
+            })
+            setProductsOverride((prev) => {
+              const base = prev ?? products
+              return base.map((p) => (p.id === productId ? { ...p, category_id: primary } : p))
+            })
+            setEditingProduct((prev) =>
+              prev && prev.id === productId ? { ...prev, category_id: primary } : prev,
+            )
+          }}
+        />
+      )}
+
+      {canEditCatalogue && managingCategories && (
+        <div
+          className="admin-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="workbench-categories-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setManagingCategories(false)
+          }}
+        >
+          <div className="admin-modal card tb-categories-modal">
+            <header className="tb-categories-modal-header">
+              <div>
+                <h2 id="workbench-categories-modal-title">Manage categories</h2>
+                <p className="admin-muted tb-categories-modal-sub">
+                  Add, rename, re-parent, or delete categories. Changes apply to the ordering
+                  screen immediately.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="admin-modal-close"
+                onClick={() => setManagingCategories(false)}
+                aria-label="Close manage categories"
+              >
+                ×
+              </button>
+            </header>
+            <div className="tb-categories-modal-body">
+              <CatalogueCategoriesManager
+                categories={effectiveCategories}
+                products={effectiveProducts}
+                productCategoryMap={productCategoryMap}
+                onChanged={() => void refreshCatalogueFromDb()}
+                variant="embedded"
+              />
+            </div>
+          </div>
+        </div>
       )}
     </article>
   )

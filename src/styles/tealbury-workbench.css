@@ -1011,3 +1011,106 @@
     display: none;
   }
 }
+
+/* Admin inline-edit affordances on the order/create-order workbench.
+   These are gated to staff with admin.catalogue.edit; they let an admin fix a
+   product or category without leaving the ordering screen. */
+.tb-filter-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.tb-admin-inline-action {
+  margin-left: auto;
+  background: transparent;
+  border: 1px dashed var(--lamtek-gray-light);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  color: var(--lamtek-text-muted);
+  padding: 0.05rem 0.45rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tb-admin-inline-action:hover {
+  color: var(--lamtek-text);
+  border-color: var(--lamtek-text-muted);
+}
+
+.tb-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tb-admin-row-edit {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--lamtek-text-muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+}
+
+.tb-admin-row-edit:hover {
+  color: var(--lamtek-text);
+  background: rgba(15, 23, 42, 0.06);
+  border-color: var(--lamtek-gray-light);
+}
+
+.tb-admin-detail-edit {
+  background: transparent;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 4px;
+  color: var(--lamtek-text);
+  font-size: 0.78rem;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+  margin-right: 0.25rem;
+}
+
+.tb-admin-detail-edit:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+/* Manage-categories modal opened from the workbench filters. Wraps the embedded
+   CatalogueCategoriesManager so admins can do quick CRUD without leaving the
+   ordering screen. */
+.admin-modal.card.tb-categories-modal {
+  max-width: min(94vw, 1100px);
+  width: min(94vw, 1100px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.tb-categories-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+}
+
+.tb-categories-modal-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.tb-categories-modal-sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.86rem;
+}
+
+.tb-categories-modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0.9rem 1.1rem 1.25rem;
+}

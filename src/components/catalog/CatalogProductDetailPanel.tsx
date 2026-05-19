@@ -23,6 +23,8 @@ interface CatalogProductDetailPanelProps {
   onAddToBasket: (product: ProductRow, quantity: number) => void
   addButtonLabel?: string
   adding?: boolean
+  /** When the viewer has catalogue.edit, show an inline "Edit" button. */
+  onAdminEdit?: () => void
 }
 
 export default function CatalogProductDetailPanel({
@@ -35,6 +37,7 @@ export default function CatalogProductDetailPanel({
   onAddToBasket,
   addButtonLabel = 'Add to order',
   adding = false,
+  onAdminEdit,
 }: CatalogProductDetailPanelProps) {
   const [quantity, setQuantity] = useState(1)
   const [pricing, setPricing] = useState<ProductPriceBreakdown | null>(null)
@@ -68,6 +71,17 @@ export default function CatalogProductDetailPanel({
       <header className="tb-detail-header">
         <h3>Product details</h3>
         <div className="tb-detail-header-actions">
+          {onAdminEdit && (
+            <button
+              type="button"
+              className="tb-admin-detail-edit"
+              onClick={onAdminEdit}
+              title="Edit this product (admin)"
+              aria-label="Edit this product"
+            >
+              ✎ Edit
+            </button>
+          )}
           <button
             type="button"
             className={`tb-fav-btn${isFavourite ? ' tb-fav-btn--on' : ''}`}

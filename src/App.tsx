@@ -67,6 +67,9 @@ import AdminCrmPipeline from '@/pages/admin/AdminCrmPipeline'
 import AdminCrmDirectory from '@/pages/admin/AdminCrmDirectory'
 import AdminNotifications from '@/pages/admin/AdminNotifications'
 import AdminCatalogue from '@/pages/admin/AdminCatalogue'
+import AdminCatalogueWipe from '@/pages/admin/AdminCatalogueWipe'
+import AdminComponentImport from '@/pages/admin/AdminComponentImport'
+import AdminVariantBuilder from '@/pages/admin/AdminVariantBuilder'
 import AdminDocumentUploads from '@/pages/admin/AdminDocumentUploads'
 import AdminCreateUser from '@/pages/admin/AdminCreateUser'
 import AdminUsers from '@/pages/admin/AdminUsers'
@@ -196,6 +199,9 @@ export default function App() {
         <Route path="catalogue" element={<AdminCatalogue />} />
         <Route path="catalogue/tealbury" element={<AdminTealburyPricelist />} />
         <Route path="catalogue/categories" element={<AdminSmartCategorise />} />
+        <Route path="catalogue/wipe" element={<AdminCatalogueWipe />} />
+        <Route path="catalogue/components/import" element={<AdminComponentImport />} />
+        <Route path="catalogue/components/variant-builder" element={<AdminVariantBuilder />} />
         <Route
           path="catalogue/smart-categorise"
           element={<Navigate to="/admin/catalogue/categories?section=smart" replace />}

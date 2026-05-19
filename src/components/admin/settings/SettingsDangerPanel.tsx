@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { downloadFullBackupXlsx } from '@/lib/catalogue-import-export'
 import type { CategoryRow, ProductRow } from '@/types/database'
@@ -91,6 +92,9 @@ export default function SettingsDangerPanel() {
         <button type="button" className="btn btn-outline" onClick={() => void doBackup()} disabled={resetLoading}>
           Download full backup (XLSX)
         </button>
+        <Link to="/admin/catalogue/wipe" className="btn btn-danger-outline">
+          Reset catalogue (rebuild component-first)
+        </Link>
         <button
           type="button"
           className="btn btn-danger-outline"

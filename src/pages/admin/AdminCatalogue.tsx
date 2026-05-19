@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 import CatalogueTealburyImportBlock from '@/components/admin/CatalogueTealburyImportBlock'
 import SmartCategoriseModal from '@/components/admin/SmartCategoriseModal'
@@ -710,6 +710,20 @@ export default function AdminCatalogue() {
       <p className="page-intro">
         Browse Lamtek and Tealbury products in one place. Use <strong>Import &amp; export</strong> for Lamtek CSV/XLSX and the Tealbury customer workbook; <strong>Audit</strong> and <strong>Images</strong> for tools that are used less often.
       </p>
+
+      {canEditCatalogue && (
+        <div className="admin-catalogue-quick-tools" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <Link to="/admin/catalogue/components/import" className="btn btn-small">
+            Component import / export
+          </Link>
+          <Link to="/admin/catalogue/components/variant-builder" className="btn btn-small btn-outline">
+            Variant matrix builder
+          </Link>
+          <Link to="/admin/catalogue/wipe" className="btn btn-small btn-danger-outline">
+            Reset catalogue
+          </Link>
+        </div>
+      )}
 
       <div className="admin-catalogue-tabs" role="tablist" aria-label="Catalogue sections">
         <button

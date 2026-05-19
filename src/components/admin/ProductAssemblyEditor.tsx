@@ -68,6 +68,7 @@ export default function ProductAssemblyEditor({
   const [addRole, setAddRole] = useState('other')
   const [componentSearch, setComponentSearch] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerFilterByRole, setPickerFilterByRole] = useState(true)
   const pickerRef = useRef<HTMLDivElement | null>(null)
 
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
@@ -83,15 +84,22 @@ export default function ProductAssemblyEditor({
 
   const filteredPickerProducts = useMemo(() => {
     const q = componentSearch.trim().toLowerCase()
-    if (!q) return pickerProducts.slice(0, 100)
-    return pickerProducts
+    let base = pickerProducts
+    if (pickerFilterByRole && addRole && addRole !== 'other') {
+      const matchByPartType = base.filter((p) => p.part_type === addRole)
+      // Only narrow if filtering actually has matches; otherwise show everything so
+      // the user isn't stuck with an empty list because nothing is tagged yet.
+      if (matchByPartType.length > 0) base = matchByPartType
+    }
+    if (!q) return base.slice(0, 100)
+    return base
       .filter((p) => {
         const sku = (p.sku ?? '').toLowerCase()
         const name = p.name.toLowerCase()
         return sku.includes(q) || name.includes(q)
       })
       .slice(0, 100)
-  }, [pickerProducts, componentSearch])
+  }, [pickerProducts, componentSearch, pickerFilterByRole, addRole])
 
   const selectedProduct = addProductId ? productMap.get(addProductId) ?? null : null
 
@@ -207,6 +215,93 @@ export default function ProductAssemblyEditor({
     setPickerOpen(true)
   }
 
+  async function handleAutoSuggest() {
+    if (!canEdit) return
+    setBusy(true)
+    setMessage(null)
+    try {
+      // Make sure we have an assembly to attach to.
+      let assemblyId = bom?.id ?? null
+      let nextSort = bom?.assembly_lines.length ?? 0
+      if (!assemblyId) {
+        const created = await ensureAssemblyForProduct(product)
+        if (created.error || !created.assemblyId) {
+          setMessage({ type: 'err', text: created.error ?? 'Could not create breakdown.' })
+          return
+        }
+        assemblyId = created.assemblyId
+        nextSort = 0
+      }
+
+      // Pick one product per part_type that this complete unit doesn't already have a
+      // line for. We bias to the product whose category set overlaps with the host's,
+      // falling back to the cheapest active match. This is a heuristic shortcut, not a
+      // committed default — the user can immediately remove / change anything.
+      const existingProductIds = new Set((bom?.assembly_lines ?? []).map((l) => l.product_id))
+      const hostCategoryId = product.category_id
+      const suggestionsByRole = new Map<string, ProductRow>()
+      for (const role of partTypes) {
+        if (suggestionsByRole.has(role.code)) continue
+        const candidates = allProducts.filter(
+          (p) =>
+            p.id !== product.id &&
+            p.active &&
+            p.part_type === role.code &&
+            !existingProductIds.has(p.id)
+        )
+        if (candidates.length === 0) continue
+        const scored = candidates
+          .map((p) => ({
+            p,
+            score: p.category_id && p.category_id === hostCategoryId ? 1 : 0,
+            price: Number(p.unit_price ?? Infinity),
+          }))
+          .sort((a, b) => b.score - a.score || a.price - b.price)
+        suggestionsByRole.set(role.code, scored[0].p)
+      }
+
+      if (suggestionsByRole.size === 0) {
+        setMessage({
+          type: 'err',
+          text:
+            'No components have a part_type set yet. Tag components in the Variant Builder or via CSV import, then try again.',
+        })
+        return
+      }
+
+      const lines = Array.from(suggestionsByRole.entries()).map(([role, candidate], i) => ({
+        role,
+        productId: candidate.id,
+        sortOrder: nextSort + i + 1,
+      }))
+
+      let failed = 0
+      for (const line of lines) {
+        const { error } = await addAssemblyLine({
+          assemblyId,
+          productId: line.productId,
+          quantity: 1,
+          componentRole: line.role,
+          sortOrder: line.sortOrder,
+        })
+        if (error) {
+          failed += 1
+          console.error('[assembly] auto-suggest add failed:', error)
+        }
+      }
+      setMessage({
+        type: failed > 0 ? 'err' : 'ok',
+        text:
+          failed > 0
+            ? `Added ${lines.length - failed} of ${lines.length} suggested components (${failed} failed — check console).`
+            : `Added ${lines.length} suggested component${lines.length === 1 ? '' : 's'}. Adjust quantities and swaps as needed.`,
+      })
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleRemoveLine(lineId: string) {
     setBusy(true)
     const { error } = await removeAssemblyLine(lineId)
@@ -261,7 +356,18 @@ export default function ProductAssemblyEditor({
             </p>
           )}
           <div className="product-assembly-editor-add card admin-card">
-              <h4 className="product-assembly-editor-add-title">Add component line</h4>
+              <div className="product-assembly-editor-add-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <h4 className="product-assembly-editor-add-title" style={{ margin: 0 }}>Add component line</h4>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => void handleAutoSuggest()}
+                  disabled={busy}
+                  title="Add one component per part type, picked from products tagged with that part_type."
+                >
+                  {busy ? 'Working…' : 'Auto-suggest standard components'}
+                </button>
+              </div>
               <div className="product-assembly-editor-add-form">
                 <div className="product-assembly-editor-field product-assembly-editor-field--full">
                   <span className="product-assembly-editor-field-label">Component product (SKU)</span>
@@ -294,6 +400,19 @@ export default function ProductAssemblyEditor({
                         aria-label="Search component product"
                         autoComplete="off"
                       />
+                      <label
+                        className="admin-muted product-assembly-picker-filter"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.35rem', fontSize: '0.85rem' }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={pickerFilterByRole}
+                          onChange={(e) => setPickerFilterByRole(e.target.checked)}
+                        />
+                        <span>
+                          Only show components tagged as <code>{roleLabel(addRole)}</code>
+                        </span>
+                      </label>
                       {pickerOpen && (
                         <ul className="product-assembly-picker-list" role="listbox">
                           {filteredPickerProducts.length === 0 ? (

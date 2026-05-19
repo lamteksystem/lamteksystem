@@ -1750,6 +1750,242 @@
   }
 }
 
+/* Per-band confidence editor.
+   The Settings tab renders the three confidence bands as a vertical list of
+   "band rows". Each row shows the band swatch, threshold slider+number,
+   label/description/auto-apply controls and a live distribution preview at the
+   bottom of the card. */
+.admin-smart-bands-card .admin-smart-bands-minscore {
+  margin-bottom: 0.5rem;
+}
+
+.admin-smart-bands-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.admin-smart-band-row {
+  border: 1px solid var(--lamtek-gray-light, #d1d5db);
+  border-radius: 6px;
+  padding: 0.7rem 0.85rem;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.admin-smart-band-row--high {
+  border-left: 4px solid #16a34a;
+}
+.admin-smart-band-row--medium {
+  border-left: 4px solid #ca8a04;
+}
+.admin-smart-band-row--low {
+  border-left: 4px solid #6b7280;
+}
+
+.admin-smart-band-row-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.admin-smart-band-row-title {
+  font-size: 0.95rem;
+}
+
+.admin-smart-band-row-range {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+.admin-smart-band-row-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem 0.85rem;
+  align-items: start;
+}
+
+.admin-smart-band-row-desc {
+  grid-column: span 2;
+}
+
+.admin-smart-band-row-desc textarea {
+  width: 100%;
+  border: 1px solid var(--lamtek-gray-light, #d1d5db);
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  resize: vertical;
+}
+
+.admin-smart-band-row-auto {
+  grid-column: span 2;
+}
+
+.admin-smart-band-row-rangefixed .admin-smart-band-row-rangenote {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+}
+
+.admin-smart-band-row .admin-smart-settings-field input[type='text'] {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--lamtek-gray-light, #d1d5db);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.admin-smart-settings-num {
+  width: 4.5rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--lamtek-gray-light, #d1d5db);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 720px) {
+  .admin-smart-band-row-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-smart-band-row-desc,
+  .admin-smart-band-row-auto {
+    grid-column: auto;
+  }
+}
+
+/* Live distribution preview — segmented bar + legend. */
+.admin-smart-bands-dist {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--lamtek-gray-light, #d1d5db);
+}
+
+.admin-smart-bands-dist-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.55rem;
+}
+
+.admin-smart-bands-dist-head h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.admin-smart-bands-dist-bar {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--lamtek-gray-light, #d1d5db);
+}
+
+.admin-smart-bands-seg {
+  height: 100%;
+  transition: width 120ms ease-out;
+}
+
+.admin-smart-bands-seg--high {
+  background: #16a34a;
+}
+.admin-smart-bands-seg--medium {
+  background: #ca8a04;
+}
+.admin-smart-bands-seg--low {
+  background: #6b7280;
+}
+.admin-smart-bands-seg--below {
+  background: #ef4444;
+}
+.admin-smart-bands-seg--noop {
+  background: #cbd5e1;
+}
+
+.admin-smart-bands-dist-legend {
+  list-style: none;
+  padding: 0;
+  margin: 0.55rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+}
+
+.admin-smart-bands-dist-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.admin-smart-bands-seg-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.admin-smart-bands-dist-legend .admin-smart-bands-seg--high .admin-smart-bands-seg-swatch {
+  background: #16a34a;
+}
+.admin-smart-bands-dist-legend .admin-smart-bands-seg--medium .admin-smart-bands-seg-swatch {
+  background: #ca8a04;
+}
+.admin-smart-bands-dist-legend .admin-smart-bands-seg--low .admin-smart-bands-seg-swatch {
+  background: #6b7280;
+}
+.admin-smart-bands-dist-legend .admin-smart-bands-seg--below .admin-smart-bands-seg-swatch {
+  background: #ef4444;
+}
+.admin-smart-bands-dist-legend .admin-smart-bands-seg--noop .admin-smart-bands-seg-swatch {
+  background: #cbd5e1;
+}
+
+.admin-smart-bands-seg-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sticky Apply bar — keeps the primary action reachable while the user scrolls
+   through paginated suggestions. The "armed" modifier kicks in as soon as
+   anything is selected, giving the bar a stronger background. */
+.admin-smart-categorise-actions--sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(6px);
+  padding: 0.65rem 0.85rem;
+  margin-top: 0.6rem;
+  border-top: 1px solid var(--lamtek-gray-light, #d1d5db);
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  box-shadow: 0 -3px 8px rgba(0, 0, 0, 0.04);
+}
+
+.admin-smart-categorise-actions--sticky.admin-smart-categorise-actions--armed {
+  background: rgba(29, 78, 216, 0.06);
+  border-top-color: rgba(29, 78, 216, 0.25);
+}
+
+.admin-smart-categorise-actions-summary {
+  flex: 1 1 auto;
+  font-size: 0.92rem;
+}
+
+/* Result modal anchored to top of viewport (was centred, which often put it
+   below the fold on long Suggestions screens). */
+.admin-modal-overlay--top {
+  align-items: flex-start;
+  padding-top: 6vh;
+}
+
 .admin-smart-categorize-product {
   min-width: 0;
   overflow: hidden;

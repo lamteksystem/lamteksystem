@@ -20,6 +20,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         basename={import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}
         future={{
           v7_relativeSplatPath: true,
+          v7_startTransition: true,
         }}
       >
         <ImpersonationProvider>

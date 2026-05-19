@@ -96,6 +96,10 @@ export default function AdminDashboard() {
     ordersCount: 0,
     ordersPlaced: 0,
     ordersToday: 0,
+    quotationsCount: 0,
+    ticketsOpenCount: 0,
+    pickListsOpenCount: 0,
+    locationsCount: 0,
     customersCount: 0,
     productsCount: 0,
     assembliesCount: 0,
@@ -112,10 +116,15 @@ export default function AdminDashboard() {
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
+      const thirtyIso = thirtyDaysAgo.toISOString()
       const [
         ordersRes,
         placedRes,
         todayRes,
+        quotationsRes,
+        ticketsRes,
+        pickListsRes,
+        locationsRes,
         customersRes,
         productsRes,
         assembliesRes,
@@ -123,15 +132,19 @@ export default function AdminDashboard() {
         recentRes,
         trendRes,
       ] = await Promise.all([
-        supabase.from('orders').select('id', { count: 'exact', head: true }).neq('status', 'cancelled').eq('is_archived', false),
+        supabase.from('orders').select('id', { count: 'exact', head: true }).gte('created_at', thirtyIso).neq('status', 'cancelled').eq('is_archived', false),
         supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'placed').eq('is_archived', false),
         supabase.from('orders').select('id', { count: 'exact', head: true }).gte('created_at', todayIso).neq('status', 'cancelled').eq('is_archived', false),
+        supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'quotation').eq('is_archived', false),
+        supabase.from('tickets').select('id', { count: 'exact', head: true }).neq('status', 'resolved'),
+        supabase.from('pick_lists').select('id', { count: 'exact', head: true }).in('status', ['generated', 'picking']),
+        supabase.from('locations').select('id', { count: 'exact', head: true }).eq('active', true),
         supabase.from('customer_profiles').select('id', { count: 'exact', head: true }),
         supabase.from('products').select('id', { count: 'exact', head: true }).eq('active', true),
         supabase.from('assemblies').select('id', { count: 'exact', head: true }).eq('active', true),
         supabase.from('orders').select('total_inc_vat').in('status', ['paid', 'invoiced']).eq('is_archived', false),
         supabase.from('orders').select('id, reference, created_at, status, total_inc_vat').eq('is_archived', false).order('created_at', { ascending: false }).limit(10),
-        supabase.from('orders').select('created_at, status, total_inc_vat').gte('created_at', thirtyDaysAgo.toISOString()).eq('is_archived', false).neq('status', 'cancelled'),
+        supabase.from('orders').select('created_at, status, total_inc_vat').gte('created_at', thirtyIso).eq('is_archived', false).neq('status', 'cancelled'),
       ])
 
       const revenuePaid = (revenueRes.data ?? []).reduce((sum, r) => sum + Number(r.total_inc_vat || 0), 0)
@@ -140,6 +153,10 @@ export default function AdminDashboard() {
         ordersCount: ordersRes.count ?? 0,
         ordersPlaced: placedRes.count ?? 0,
         ordersToday: todayRes.count ?? 0,
+        quotationsCount: quotationsRes.count ?? 0,
+        ticketsOpenCount: ticketsRes.count ?? 0,
+        pickListsOpenCount: pickListsRes.count ?? 0,
+        locationsCount: locationsRes.count ?? 0,
         customersCount: customersRes.count ?? 0,
         productsCount: productsRes.count ?? 0,
         assembliesCount: assembliesRes.count ?? 0,
@@ -178,7 +195,7 @@ export default function AdminDashboard() {
           <div className="admin-dashboard-hero-meta-skeleton" />
         </div>
         <div className="admin-dashboard-metrics admin-dashboard-metrics--skeleton">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => (
             <div key={i} className="admin-stat-card admin-stat-card--skeleton" />
           ))}
         </div>
@@ -225,14 +242,18 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <section className="dashboard-visual-metrics" aria-label="Key metrics">
-        <VisualStatCard value={stats.ordersCount} label="Total orders (30d)" icon={<StatOrdersGlyph />} sparkline={orderSpark} to="/admin/orders" hint="View all →" />
+      <section className="dashboard-visual-metrics dashboard-visual-metrics--staff" aria-label="Key metrics">
+        <VisualStatCard value={stats.ordersCount} label="Orders (30 days)" icon={<StatOrdersGlyph />} sparkline={orderSpark} to="/admin/orders" hint="View all →" />
         <VisualStatCard value={stats.ordersPlaced} label="Awaiting process" icon={<Zap size={22} strokeWidth={2} />} to="/admin/orders/processing" hint="Process →" />
         <VisualStatCard value={stats.ordersToday} label="Orders today" icon={<Calendar size={22} strokeWidth={2} />} />
+        <VisualStatCard value={stats.quotationsCount} label="Quotations open" icon={<FileText size={22} strokeWidth={2} />} to="/admin/orders" hint="Quotes →" />
         <VisualStatCard value={formatDashboardCurrency(stats.revenuePaid)} label="Paid / invoiced" icon={<StatRevenueGlyph />} sparkline={revenueSpark} accent="success" />
+        <VisualStatCard value={stats.ticketsOpenCount} label="Open tickets" icon={<Bell size={22} strokeWidth={2} />} to="/admin/tickets" hint="Support →" />
+        <VisualStatCard value={stats.pickListsOpenCount} label="Pick lists active" icon={<ScanBarcode size={22} strokeWidth={2} />} to="/admin/pick-lists" hint="Warehouse →" />
         <VisualStatCard value={stats.customersCount} label="Customers" icon={<Users size={22} strokeWidth={2} />} to="/admin/customers" />
         <VisualStatCard value={stats.productsCount} label="Products" icon={<Package size={22} strokeWidth={2} />} to="/admin/catalogue" />
         <VisualStatCard value={stats.assembliesCount} label="Assemblies" icon={<BookOpen size={22} strokeWidth={2} />} to="/admin/catalogue" />
+        <VisualStatCard value={stats.locationsCount} label="Depot locations" icon={<MapPin size={22} strokeWidth={2} />} to="/admin/locations" />
       </section>
       <section className="admin-dashboard-charts-section" aria-label="Analytics">
         <h2><BarChart3 size={20} strokeWidth={2} style={{ verticalAlign: 'middle', marginRight: 6 }} aria-hidden /> Last 30 days</h2>

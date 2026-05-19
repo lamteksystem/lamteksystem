@@ -15,19 +15,21 @@ type Props = {
 
 export function VisualStatCard({ value, label, icon, hint, to, sparkline, accent = 'gold', className = '' }: Props) {
   const inner = (
-    <>
-      {icon && <span className="visual-stat-icon">{icon}</span>}
-      <span className="visual-stat-body">
-        <span className={`visual-stat-value visual-stat-value--${accent}`}>{value}</span>
-        <span className="visual-stat-label">{label}</span>
-        {hint && <span className="visual-stat-hint">{hint}</span>}
-      </span>
-      {sparkline && sparkline.length > 1 && (
-        <span className="visual-stat-spark">
-          <SparklineSvg values={sparkline} className="visual-stat-sparkline" />
+    <div className="visual-stat-card-inner">
+      <div className="visual-stat-main">
+        {icon && <span className="visual-stat-icon">{icon}</span>}
+        <span className="visual-stat-body">
+          <span className={`visual-stat-value visual-stat-value--${accent}`}>{value}</span>
+          <span className="visual-stat-label">{label}</span>
+          {hint && <span className="visual-stat-hint">{hint}</span>}
         </span>
+      </div>
+      {sparkline && sparkline.length > 1 && (
+        <div className="visual-stat-spark-row" aria-hidden>
+          <SparklineSvg values={sparkline} className="visual-stat-sparkline" />
+        </div>
       )}
-    </>
+    </div>
   )
   const cls = `visual-stat-card visual-stat-card--${accent} ${className}`.trim()
   if (to) {

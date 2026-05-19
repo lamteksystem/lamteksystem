@@ -80,14 +80,28 @@ export function AnimatedChartIllustration({ className }: { className?: string })
 
 export function SparklineSvg({ values, className }: { values: number[]; className?: string }) {
   if (values.length < 2) return null
-  const max = Math.max(...values, 1)
-  const w = 80
-  const h = 28
-  const step = w / (values.length - 1)
-  const points = values.map((v, i) => `${i * step},${h - (v / max) * (h - 4) - 2}`).join(' ')
+  const w = 120
+  const h = 32
+  const padX = 4
+  const padY = 5
+  const max = Math.max(...values)
+  const min = Math.min(...values)
+  const range = max - min || (max > 0 ? max : 1)
+  const innerW = w - padX * 2
+  const innerH = h - padY * 2
+  const step = innerW / (values.length - 1)
+  const coords = values.map((v, i) => {
+    const x = padX + i * step
+    const norm = max === min ? 0.5 : (v - min) / range
+    const y = padY + innerH * (1 - norm)
+    return { x, y }
+  })
+  const line = coords.map((p) => `${p.x},${p.y}`).join(' ')
+  const area = `${coords[0].x},${h - padY} ${line} ${coords[coords.length - 1].x},${h - padY}`
   return (
-    <svg className={className} width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden focusable="false">
-      <polyline points={points} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
+    <svg className={className} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden focusable="false">
+      <polygon points={area} fill="currentColor" opacity={0.14} />
+      <polyline points={line} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
     </svg>
   )
 }

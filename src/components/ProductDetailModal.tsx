@@ -65,6 +65,13 @@ export default function ProductDetailModal({
   onCloseRef.current = onClose
   /** Ignore backdrop dismiss briefly so stray pointer events cannot close immediately after mount. */
   const backdropDismissReadyAtRef = useRef(0)
+  /**
+   * True only when the user pressed mousedown DIRECTLY on the backdrop (not on the modal card).
+   * Without this, the opening click — which dispatches mousedown/mouseup/click on the original
+   * product trigger — can have its trailing events (or synthetic touch follow-ups) interpreted as
+   * a backdrop click, dismissing the modal milliseconds after it opens.
+   */
+  const backdropPrimedRef = useRef(false)
   const [assemblies, setAssemblies] = useState<AssemblyWithName[]>([])
   const [hasBom, setHasBom] = useState(false)
   const [technicalDocs, setTechnicalDocs] = useState<DocumentRow[]>([])
@@ -219,11 +226,41 @@ export default function ProductDetailModal({
     return performance.now() < backdropDismissReadyAtRef.current
   }
 
+  function handleBackdropMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+    // Only prime dismiss when the press lands directly on the backdrop and not on the card.
+    // The opening click's mousedown is on the product card (outside the backdrop entirely),
+    // so it will never prime — which means the trailing click on this same gesture can never
+    // dismiss the modal.
+    if (e.button !== 0) {
+      backdropPrimedRef.current = false
+      return
+    }
+    backdropPrimedRef.current = e.target === e.currentTarget
+  }
+
   function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
     if (e.target !== e.currentTarget) return
+    if (!backdropPrimedRef.current) {
+      // Click whose mousedown wasn't on the backdrop (e.g. mouse-down on modal, drag out, release).
+      // Ignore — do not dismiss. Reset for next gesture.
+      backdropPrimedRef.current = false
+      return
+    }
+    backdropPrimedRef.current = false
     if (shouldIgnoreBackdropDismiss()) return
     onCloseRef.current()
   }
+
+  // Defensive: if pointer is released anywhere that is NOT the backdrop, abandon the primed state.
+  // Otherwise a drag inside the card that ends outside the backdrop could leave the ref true.
+  useEffect(() => {
+    function handleDocPointerUp(ev: PointerEvent) {
+      if (!backdropPrimedRef.current) return
+      if (ev.target !== backdropElRef.current) backdropPrimedRef.current = false
+    }
+    document.addEventListener('pointerup', handleDocPointerUp, true)
+    return () => document.removeEventListener('pointerup', handleDocPointerUp, true)
+  }, [])
 
   const modalTree = (
     <div
@@ -232,6 +269,7 @@ export default function ProductDetailModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={modalTitleId}
+      onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
     >
       <div className="product-modal card" ref={modalRef}>

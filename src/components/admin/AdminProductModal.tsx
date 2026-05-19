@@ -12,7 +12,7 @@ import {
 } from '@/lib/productCategories'
 import ProductCategoriesAssignModal from '@/components/admin/ProductCategoriesAssignModal'
 import { ProductCategoryMultiSelect } from '@/components/admin/ProductCategoryMultiSelect'
-import ProductAssemblyEditor from '@/components/admin/ProductAssemblyEditor'
+import ProductCompositionPanel from '@/components/admin/ProductCompositionPanel'
 import { usePermission } from '@/hooks/usePermission'
 import type { AssemblyPartTypeRow, CategoryRow, ProductRow } from '@/types/database'
 
@@ -460,23 +460,27 @@ export default function AdminProductModal({
                 Assign categories…
               </button>
             </div>
-            <div className="admin-modal-form-section">
-              <h3 className="admin-modal-form-section-title">Complete unit make-up</h3>
+            <div className="admin-modal-form-section admin-modal-card">
+              <h3 className="admin-modal-form-section-title">Composition</h3>
               {showAssemblyEditor ? (
-                <ProductAssemblyEditor
-                  product={product}
+                <ProductCompositionPanel
+                  product={liveProduct}
                   categories={categoriesList}
                   allProducts={allProducts}
                   canEdit={canEditCatalogue}
                   partTypes={partTypes}
                   partTypeLabels={partTypeLabels}
                   onPartTypesChange={onPartTypesChange}
+                  onProductUpdated={(patch) => {
+                    setLiveProduct((prev) => ({ ...prev, ...patch }))
+                    onSaved()
+                  }}
                 />
               ) : (
-                <p className="admin-muted admin-product-modal-section-loading">Loading make-up…</p>
+                <p className="admin-muted admin-product-modal-section-loading">Loading composition…</p>
               )}
             </div>
-            <div className="admin-modal-form-section">
+            <div className="admin-modal-form-section admin-modal-card">
               <h3 className="admin-modal-form-section-title">Pricing & stock</h3>
               <div className="admin-modal-form-row admin-modal-form-row--equal">
                 <label>
@@ -580,11 +584,9 @@ export default function AdminProductModal({
                 Double-click any value to edit inline, or use <strong>Edit</strong> for all fields at once.
               </p>
             )}
-            <div className="admin-modal-form-section">
+            <div className="admin-modal-form-section admin-modal-card">
               <h3 className="admin-modal-form-section-title">Product record</h3>
               <dl className="admin-product-modal-meta">
-                <dt>Database ID</dt>
-                <dd><code>{liveProduct.id}</code></dd>
                 <dt>Catalogue programme</dt>
                 <dd>{catalogProgramLabel(liveProduct.catalog_program)}</dd>
                 <dt>Sort order</dt>
@@ -618,7 +620,7 @@ export default function AdminProductModal({
                 <dd>{new Date(liveProduct.created_at).toLocaleString()}</dd>
               </dl>
             </div>
-            <div className="admin-modal-form-section">
+            <div className="admin-modal-form-section admin-modal-card">
               <h3 className="admin-modal-form-section-title">Commercial</h3>
               <dl className="admin-product-modal-meta">
                 <dt>SKU</dt>
@@ -829,7 +831,7 @@ export default function AdminProductModal({
                 </dd>
               </dl>
             </div>
-            <div className="admin-modal-form-section">
+            <div className="admin-modal-form-section admin-modal-card">
               <h3 className="admin-modal-form-section-title">Image</h3>
               <dl className="admin-product-modal-meta">
                 <dt>Image URL</dt>
@@ -875,10 +877,10 @@ export default function AdminProductModal({
                 </dd>
               </dl>
             </div>
-            <div className="admin-modal-form-section">
-              <h3 className="admin-modal-form-section-title">Complete unit make-up</h3>
+            <div className="admin-modal-form-section admin-modal-card">
+              <h3 className="admin-modal-form-section-title">Composition</h3>
               {showAssemblyEditor ? (
-                <ProductAssemblyEditor
+                <ProductCompositionPanel
                   product={liveProduct}
                   categories={categoriesList}
                   allProducts={allProducts}
@@ -886,13 +888,17 @@ export default function AdminProductModal({
                   partTypes={partTypes}
                   partTypeLabels={partTypeLabels}
                   onPartTypesChange={onPartTypesChange}
+                  onProductUpdated={(patch) => {
+                    setLiveProduct((prev) => ({ ...prev, ...patch }))
+                    onSaved()
+                  }}
                 />
               ) : (
-                <p className="admin-muted admin-product-modal-section-loading">Loading make-up…</p>
+                <p className="admin-muted admin-product-modal-section-loading">Loading composition…</p>
               )}
             </div>
             {(liveProduct.description || canEditCatalogue) && (
-              <div className="admin-modal-form-section">
+              <div className="admin-modal-form-section admin-modal-card">
                 <h3 className="admin-modal-form-section-title">Description</h3>
                 {editingField === 'description' ? (
                   <textarea

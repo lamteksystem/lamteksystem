@@ -5647,6 +5647,89 @@ a.ordering-wizard-card--link:hover {
   display: inline-flex;
   margin: 0;
 }
+
+/* --- Product composition panel ------------------------------------------------
+   Three-way mode selector (Single part / Multi-part assembly / Loose) shown as
+   tactile pill-shaped buttons stacked vertically on narrow screens, side-by-side
+   on wider ones. Selected mode gets the brand colour border + tinted background.
+*/
+.product-composition-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.product-composition-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+.product-composition-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: left;
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--lamtek-gray-light);
+  background: var(--lamtek-surface, #fff);
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease, transform 0.14s ease;
+  font: inherit;
+  color: inherit;
+}
+.product-composition-mode:hover:not(:disabled) {
+  border-color: var(--lamtek-primary-300, var(--lamtek-primary, #1e6dd8));
+  transform: translateY(-1px);
+}
+.product-composition-mode:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.product-composition-mode--selected,
+.product-composition-mode--selected:hover {
+  border-color: var(--lamtek-primary, #1e6dd8);
+  background: var(--lamtek-primary-50, rgba(30, 109, 216, 0.08));
+  box-shadow: inset 0 0 0 1px var(--lamtek-primary, #1e6dd8);
+}
+.product-composition-mode-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.product-composition-mode-body {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--lamtek-text-muted, var(--lamtek-gray));
+}
+.product-composition-single,
+.product-composition-assembly {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.product-composition-single-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.product-composition-inline-link {
+  font-weight: 600;
+  color: var(--lamtek-primary, #1e6dd8);
+}
+.product-composition-clear,
+.product-composition-back {
+  align-self: flex-start;
+}
+.product-composition-loose {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.product-composition-assembly-hint {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.product-composition-status {
+  margin: 0;
+}
 .admin-modal-close {
   position: absolute;
   top: 0.75rem;
@@ -6141,6 +6224,25 @@ a.ordering-wizard-card--link:hover {
 .admin-modal-form-section { margin-bottom: 1.25rem; }
 .admin-modal-form-section:last-of-type { margin-bottom: 0; }
 .admin-modal-form-section-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--lamtek-gray); margin: 0 0 0.6rem; }
+
+/* Sections rendered as proper rounded cards inside the product modal.
+   Pairs the section divs with the visual treatment of `.admin-card` so the
+   long form reads as a stack of self-contained groups instead of a wall of
+   labels. The inner sections (`.product-composition-panel` etc.) stay flat
+   so we don't get nested-card visual noise. */
+.admin-modal-form-section.admin-modal-card {
+  background: var(--lamtek-surface, #fff);
+  border: 1px solid var(--lamtek-border, var(--lamtek-gray-light));
+  border-radius: var(--lamtek-radius-lg, 12px);
+  box-shadow: var(--lamtek-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
+  padding: 1rem 1.15rem 1.15rem;
+  margin-bottom: 1rem;
+}
+.admin-modal-form-section.admin-modal-card .admin-modal-form-section-title {
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+}
 .admin-modal-form label { display: block; margin-top: 0.75rem; font-weight: 500; font-size: 0.9rem; }
 .admin-modal-form label:first-child { margin-top: 0; }
 .admin-modal-form-section label:first-child { margin-top: 0; }

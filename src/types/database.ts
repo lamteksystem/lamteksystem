@@ -52,6 +52,12 @@ export interface ProductRow {
   sort_order: number
   created_at: string
   is_stock?: boolean
+  /**
+   * When set, the product itself IS a single part of this type (panel, plinth, hinge, etc.).
+   * NULL means the product is either a complete unit (with an `assemblies` row exploding into
+   * component parts) or unclassified. See `supabase/migrations/080_products_part_type.sql`.
+   */
+  part_type?: string | null
   /** `lamtek` = component catalogue; `tealbury` = curated packaged kitchens programme. */
   catalog_program?: 'lamtek' | 'tealbury'
 }

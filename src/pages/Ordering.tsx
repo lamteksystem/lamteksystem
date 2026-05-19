@@ -11,7 +11,8 @@ import { useEffectiveUserId } from '@/contexts/ImpersonationContext'
 import { getOrderProject, type OrderProject } from '@/lib/orderProject'
 import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
 import { resolveChecklistAssemblyFilters, resolveChecklistCategoryId, type ChecklistHint } from '@/lib/checklistRouting'
-import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
+import BasketSelect from '@/components/BasketSelect'
+import { sanitizeBasketReferenceForDisplay } from '@/lib/orderDisplayName'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { loadWorkbenchFilters, saveWorkbenchFilters } from '@/lib/productWorkbenchPrefs'
 import type { CategoryRow, ProductRow, AssemblyWithLines } from '@/types/database'
@@ -38,6 +39,7 @@ export default function Ordering() {
   const {
     draftOrder,
     draftOrders,
+    basketActivityByOrderId,
     setActiveDraftOrder,
     createDraftOrder,
     duplicateDraftOrder,
@@ -445,25 +447,19 @@ export default function Ordering() {
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <label style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
             <span className="admin-muted" style={{ fontSize: '0.9rem' }}>Basket</span>
-            <select
+            <BasketSelect
+              draftOrders={draftOrders}
               value={draftOrder?.id ?? ''}
-              onChange={(e) => setActiveDraftOrder(e.target.value || null)}
-              aria-label="Select basket"
-            >
-              {draftOrders.length === 0 ? <option value="">(none)</option> : null}
-              {draftOrders.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {formatOrderReferenceOrFallback(o)} · updated {new Date(o.updated_at).toLocaleDateString()}
-                </option>
-              ))}
-            </select>
+              onChange={setActiveDraftOrder}
+              activityByOrderId={basketActivityByOrderId}
+            />
           </label>
           {draftOrder?.id && !renamingBasket && (
             <button
               type="button"
               className="btn btn-outline btn-small"
               onClick={() => {
-                setBasketNameDraft((draftOrder.reference ?? '').trim())
+                setBasketNameDraft(sanitizeBasketReferenceForDisplay(draftOrder.reference) ?? '')
                 setRenamingBasket(true)
               }}
               title="Give this basket a friendly name (e.g. Mrs Smith — Kitchen A)"

@@ -30,7 +30,8 @@ import {
   londonYmd,
   validateDeliverySelection,
 } from '@/lib/deliveryWindows'
-import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
+import BasketSelect from '@/components/BasketSelect'
+import { sanitizeBasketReferenceForDisplay } from '@/lib/orderDisplayName'
 import { lamtekPortalLocations } from '@/lib/lamtekLocations'
 import { preserveLineOrder } from '@/lib/orderLineOrder'
 import { recalcOrderTotals } from '@/lib/orders'
@@ -51,6 +52,7 @@ export default function OrderCart() {
   const {
     draftOrder,
     draftOrders,
+    basketActivityByOrderId,
     setActiveDraftOrder,
     createDraftOrder,
     duplicateDraftOrder,
@@ -596,25 +598,19 @@ export default function OrderCart() {
           </Link>
           <label style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
             <span className="admin-muted" style={{ fontSize: '0.9rem' }}>Basket</span>
-            <select
+            <BasketSelect
+              draftOrders={draftOrders}
               value={draftOrder?.id ?? ''}
-              onChange={(e) => setActiveDraftOrder(e.target.value || null)}
-              aria-label="Select basket"
-            >
-              {draftOrders.length === 0 ? <option value="">(none)</option> : null}
-              {draftOrders.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {formatOrderReferenceOrFallback(o)} · updated {new Date(o.updated_at).toLocaleDateString()}
-                </option>
-              ))}
-            </select>
+              onChange={setActiveDraftOrder}
+              activityByOrderId={basketActivityByOrderId}
+            />
           </label>
           {draftOrder?.id && !renamingBasket && (
             <button
               type="button"
               className="btn btn-outline btn-small"
               onClick={() => {
-                setBasketNameDraft((draftOrder.reference ?? '').trim())
+                setBasketNameDraft(sanitizeBasketReferenceForDisplay(draftOrder.reference) ?? '')
                 setRenamingBasket(true)
               }}
             >

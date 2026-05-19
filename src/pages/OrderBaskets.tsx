@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PageNav } from '@/components/PageNav'
-import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
+import { getBasketDisplayLabel, sanitizeBasketReferenceForDisplay } from '@/lib/orderDisplayName'
+import {
+  formatBasketActivityLine,
+  formatBasketActivityShort,
+  getLatestBasketActivity,
+  logBasketActivity,
+} from '@/lib/basketActivity'
 import { useDraftOrder } from '@/hooks/useDraftOrder'
 import { supabase } from '@/lib/supabase'
 
@@ -10,6 +16,8 @@ export default function OrderBaskets() {
   const {
     draftOrders,
     draftOrder,
+    basketDisplayLabels,
+    basketActivityByOrderId,
     setActiveDraftOrder,
     createDraftOrder,
     renameDraftOrder,
@@ -20,6 +28,7 @@ export default function OrderBaskets() {
 
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [historyId, setHistoryId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,7 +45,8 @@ export default function OrderBaskets() {
   async function startRename(id: string) {
     const current = draftOrders.find((o) => o.id === id)
     setRenamingId(id)
-    setRenameValue((current?.reference ?? '').trim())
+    setRenameValue(sanitizeBasketReferenceForDisplay(current?.reference) ?? '')
+    setHistoryId(null)
   }
 
   async function saveRename() {
@@ -60,12 +70,18 @@ export default function OrderBaskets() {
     setBusyId(id)
     setError(null)
     try {
+      const row = draftOrders.find((o) => o.id === id)
+      const label = row
+        ? getBasketDisplayLabel(row, basketDisplayLabels)
+        : 'Basket'
+      await logBasketActivity({ orderId: id, eventType: 'basket_deleted', note: label })
       const { error: delErr } = await supabase.from('orders').delete().eq('id', id)
       if (delErr) throw delErr
       await refresh()
       if (draftOrder?.id === id) {
         await setActiveDraftOrder(null)
       }
+      if (historyId === id) setHistoryId(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete basket.')
     } finally {
@@ -101,7 +117,8 @@ export default function OrderBaskets() {
       <div className="ordering-header">
         <h1>Baskets</h1>
         <p className="page-intro">
-          Manage multiple draft baskets. Your active basket is remembered automatically.
+          Give each basket a simple name (for example <strong>Mrs Smith — Kitchen A</strong>). Duplicates, renames,
+          and other changes are recorded in the activity log — dates stay here, not in the basket name.
         </p>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button type="button" className="btn" onClick={() => createDraftOrder()}>
@@ -122,15 +139,20 @@ export default function OrderBaskets() {
               <thead>
                 <tr>
                   <th>Basket</th>
+                  <th>Last activity</th>
                   <th>Updated</th>
                   <th className="admin-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((o) => {
-                  const label = formatOrderReferenceOrFallback(o)
+                  const label = getBasketDisplayLabel(o, basketDisplayLabels)
+                  const events = basketActivityByOrderId.get(o.id) ?? []
+                  const latest = getLatestBasketActivity(events)
+                  const lastActivity = latest ? formatBasketActivityShort(latest.event_type) : null
                   const isActive = draftOrder?.id === o.id
                   const busy = busyId === o.id
+                  const showHistory = historyId === o.id
                   return (
                     <tr key={o.id}>
                       <td>
@@ -143,19 +165,53 @@ export default function OrderBaskets() {
                             <input
                               value={renameValue}
                               onChange={(e) => setRenameValue(e.target.value)}
-                              placeholder="Basket name (optional)"
+                              placeholder="e.g. Mrs Smith — Kitchen A"
                               style={{ minWidth: 280 }}
+                              aria-label="Basket name"
                             />
                             <button type="button" className="btn btn-small" onClick={saveRename} disabled={busy}>
                               Save
                             </button>
-                            <button type="button" className="btn btn-small btn-outline" onClick={() => setRenamingId(null)} disabled={busy}>
+                            <button
+                              type="button"
+                              className="btn btn-small btn-outline"
+                              onClick={() => setRenamingId(null)}
+                              disabled={busy}
+                            >
                               Cancel
                             </button>
                           </div>
                         )}
+                        {showHistory && events.length > 0 && (
+                          <ul
+                            className="admin-muted"
+                            style={{ marginTop: '0.5rem', paddingLeft: '1.1rem', fontSize: '0.9rem' }}
+                          >
+                            {events.map((ev) => (
+                              <li key={ev.id}>{formatBasketActivityLine(ev)}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {showHistory && events.length === 0 && (
+                          <p className="admin-muted" style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                            No activity recorded yet for this basket.
+                          </p>
+                        )}
                       </td>
-                      <td>{new Date(o.updated_at).toLocaleString()}</td>
+                      <td>
+                        {lastActivity ?? '—'}
+                        <div style={{ marginTop: '0.25rem' }}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-small"
+                            style={{ padding: 0, minHeight: 0 }}
+                            onClick={() => setHistoryId(showHistory ? null : o.id)}
+                          >
+                            {showHistory ? 'Hide log' : events.length > 0 ? 'View log' : 'Activity log'}
+                          </button>
+                        </div>
+                      </td>
+                      <td>{new Date(o.updated_at).toLocaleString('en-GB')}</td>
                       <td className="admin-right">
                         <div style={{ display: 'inline-flex', gap: '0.35rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           <button
@@ -225,4 +281,3 @@ export default function OrderBaskets() {
     </div>
   )
 }
-

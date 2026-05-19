@@ -20,6 +20,13 @@ interface CatalogueCategoriesManagerProps {
   products: ProductRow[]
   productCategoryMap: ProductCategoryMap
   onChanged: () => void | Promise<void>
+  /**
+   * `inline` (default) renders the manager as a collapsible `<details>` card — used
+   * when embedded under the catalogue browse table as a quick-edit panel.
+   * `embedded` renders the full editor open by default with no card chrome — used
+   * on the dedicated Categories hub page's General tab.
+   */
+  variant?: 'inline' | 'embedded'
 }
 
 interface Message {
@@ -32,6 +39,7 @@ export default function CatalogueCategoriesManager({
   products,
   productCategoryMap,
   onChanged,
+  variant = 'inline',
 }: CatalogueCategoriesManagerProps) {
   const [search, setSearch] = useState('')
   const [newName, setNewName] = useState('')
@@ -141,25 +149,24 @@ export default function CatalogueCategoriesManager({
     await onChanged()
   }
 
-  return (
-    <details className="card admin-card admin-catalogue-categories-manager">
-      <summary className="admin-catalogue-categories-summary">
-        <span className="admin-catalogue-categories-summary-title">
-          Categories
-          <span className="admin-muted"> · {categories.length} total</span>
-        </span>
-        <span className="admin-muted admin-catalogue-categories-summary-meta">
-          {totalProductsWithCategory} of {products.length} products categorised · click to manage
-        </span>
-      </summary>
-
+  const body = (
       <div className="admin-catalogue-categories-body">
         <p className="admin-callout admin-callout--info">
           Categories group products in the catalogue, ordering flow and the customer site. Use
           <strong> sub-categories</strong> under a parent (e.g. <em>Handles → Knobs</em>). Set
           <strong> Type</strong> so the catalogue toggle can switch between product categories,
-          kitchen ranges, and cross-range items. Need bulk assignment? Use{' '}
-          <Link to="/admin/catalogue/smart-categorise">Smart categorise</Link>.
+          kitchen ranges, and cross-range items.{' '}
+          {variant === 'inline' ? (
+            <>
+              Need bulk assignment?{' '}
+              <Link to="/admin/catalogue/categories?section=smart">Smart categorise</Link>.
+            </>
+          ) : (
+            <>
+              {totalProductsWithCategory} of {products.length} products are currently
+              categorised.
+            </>
+          )}
         </p>
 
         {message && (
@@ -363,6 +370,24 @@ export default function CatalogueCategoriesManager({
           </table>
         )}
       </div>
+  )
+
+  if (variant === 'embedded') {
+    return <div className="admin-catalogue-categories-manager admin-catalogue-categories-manager--embedded">{body}</div>
+  }
+
+  return (
+    <details className="card admin-card admin-catalogue-categories-manager">
+      <summary className="admin-catalogue-categories-summary">
+        <span className="admin-catalogue-categories-summary-title">
+          Categories
+          <span className="admin-muted"> · {categories.length} total</span>
+        </span>
+        <span className="admin-muted admin-catalogue-categories-summary-meta">
+          {totalProductsWithCategory} of {products.length} products categorised · click to manage
+        </span>
+      </summary>
+      {body}
     </details>
   )
 }

@@ -151,28 +151,48 @@ export function buildSmartCategorizationSuggestions(
 }
 
 /**
- * Apply per-row category overrides. The caller passes the override map (productId -> categoryId)
- * so each row can target a different category than the heuristic's first suggestion.
+ * A per-row override: either a single category (legacy) or a primary + extras for
+ * products that should sit in multiple categories at once.
+ */
+export type SmartCategoryOverride =
+  | string
+  | { primary: string; additional?: string[] }
+
+/**
+ * Apply per-row category overrides. The caller passes the override map
+ * (productId -> override) so each row can:
+ *   - target a different primary category than the heuristic's suggestion, AND/OR
+ *   - assign additional categories on top of the primary one.
  *
  * Every successful apply also feeds the learning store so future suggestions are improved.
  */
 export async function applySmartCategorySuggestions(
   suggestions: SmartCategorySuggestion[],
-  overrides?: Map<string, string>,
+  overrides?: Map<string, SmartCategoryOverride>,
 ): Promise<{ applied: number; errors: string[] }> {
   let applied = 0
   const errors: string[] = []
 
   for (const s of suggestions) {
-    const targetId = overrides?.get(s.productId) ?? s.suggestedCategoryId
-    if (!targetId) continue
-    const result = await saveProductCategories(s.productId, [targetId], targetId)
+    const override = overrides?.get(s.productId)
+    const primaryId =
+      typeof override === 'string'
+        ? override
+        : override?.primary ?? s.suggestedCategoryId
+    const additional =
+      typeof override === 'object' && override !== null
+        ? override.additional ?? []
+        : []
+    if (!primaryId) continue
+    const allIds = [primaryId, ...additional.filter((id) => id && id !== primaryId)]
+    const result = await saveProductCategories(s.productId, allIds, primaryId)
     if (result.error) {
       errors.push(`${s.productName}: ${result.error}`)
       continue
     }
     // Fire-and-forget — don't block the loop on learning writes.
-    void recordSmartCategoryLearning(s.productText, targetId)
+    // Learning is recorded against the primary only — the chosen "best" bucket.
+    void recordSmartCategoryLearning(s.productText, primaryId)
     applied += 1
   }
 

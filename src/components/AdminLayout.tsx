@@ -19,6 +19,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   FileText,
+  FolderTree,
   Landmark,
   LayoutDashboard,
   Lock,
@@ -29,7 +30,6 @@ import {
   PoundSterling,
   BookOpen,
   Settings,
-  Sparkles,
   Ticket,
   Users,
   Zap,
@@ -164,13 +164,16 @@ export default function AdminLayout() {
     if (location.pathname === '/admin/create-order') return { pageTitle: 'Create order', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Create order' }] }
     if (location.pathname === '/admin/create-quote') return { pageTitle: 'Create quote', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Create quote' }] }
     if (location.pathname === '/admin/catalogue') return { pageTitle: 'Catalogue', breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Catalogue' }] }
-    if (location.pathname === '/admin/catalogue/smart-categorise') {
+    if (
+      location.pathname === '/admin/catalogue/categories' ||
+      location.pathname === '/admin/catalogue/smart-categorise'
+    ) {
       return {
-        pageTitle: 'Smart categorise',
+        pageTitle: 'Categories',
         breadcrumb: [
           { to: '/admin', label: 'Today' },
           { to: '/admin/catalogue', label: 'Catalogue' },
-          { label: 'Smart categorise' },
+          { label: 'Categories' },
         ],
       }
     }
@@ -523,14 +526,14 @@ export default function AdminLayout() {
                   )}
                   {canViewCatalogue && (
                     <NavLink
-                      to="/admin/catalogue/smart-categorise"
+                      to="/admin/catalogue/categories"
                       className={({ isActive }) => `admin-nav-item admin-nav-item--sub ${isActive ? 'active' : ''}`}
-                      title="AI-assisted category suggestions, learning history, and settings"
+                      title="Manage categories, run smart categorisation, and configure parts"
                     >
                       <span className="admin-nav-icon">
-                        <Sparkles size={16} strokeWidth={2} aria-hidden />
+                        <FolderTree size={16} strokeWidth={2} aria-hidden />
                       </span>
-                      {!sidebarCollapsed && <span>Smart categorise</span>}
+                      {!sidebarCollapsed && <span>Categories</span>}
                     </NavLink>
                   )}
                   {canViewStock && (
@@ -742,7 +745,7 @@ export default function AdminLayout() {
                 {canViewCustomers && <option value="/admin/customers">Customers</option>}
                 {canViewCustomers && <option value="/admin/crm/open-orders">CRM open orders</option>}
                 {canViewCatalogue && <option value="/admin/catalogue">Catalogue</option>}
-                {canViewCatalogue && <option value="/admin/catalogue/smart-categorise">Smart categorise</option>}
+                {canViewCatalogue && <option value="/admin/catalogue/categories">Categories</option>}
                 {canViewStock && <option value="/admin/stock">Stock take</option>}
                 {canViewReports && <option value="/admin/reports">Reports</option>}
                 {canViewTickets && <option value="/admin/tickets">Support tickets</option>}

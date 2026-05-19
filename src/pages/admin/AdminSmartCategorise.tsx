@@ -1,10 +1,13 @@
 /**
- * Dedicated full-page Smart Categorisation tool.
+ * Categories admin hub.
  *
- * Three tabs:
- *   1. Suggestions — review & apply heuristic suggestions, with per-row category override.
- *   2. History — what the system has learnt from previous corrections.
- *   3. Settings — confidence thresholds, default page size, reset learning, retrain.
+ * Top-level sections (URL: ?section=general|smart|parts, default `general`):
+ *   - General categories  → add / rename / delete / move / re-type
+ *   - Smart categorise    → suggestions · learning history · settings
+ *   - Parts               → complete-unit part type registry
+ *
+ * The legacy URL `/admin/catalogue/smart-categorise` redirects to this hub with
+ * `?section=smart` for backward compatibility.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -16,6 +19,7 @@ import {
   buildSmartCategorizationSuggestions,
   loadSmartCategoryLearning,
   syncInferredCategoryKinds,
+  type SmartCategoryOverride,
   type SmartCategorySuggestion,
 } from '@/lib/smartProductCategorize'
 import {
@@ -26,8 +30,12 @@ import {
   type LearningRow,
 } from '@/lib/smartCategoryLearning'
 import { rebucketTealburyAccessories } from '@/lib/tealburyAccessoryRebucket'
+import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productCategories'
+import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
+import AdminAssemblyPartTypesSettings from '@/components/admin/AdminAssemblyPartTypesSettings'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
+type Section = 'general' | 'smart' | 'parts'
 type Tab = 'suggestions' | 'history' | 'settings'
 export type ConfidenceLevel = 'low' | 'medium' | 'high'
 
@@ -44,16 +52,37 @@ export interface ResultInfo {
 
 export default function AdminSmartCategorise() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const sectionParam = searchParams.get('section') as Section | null
   const tabParam = searchParams.get('tab') as Tab | null
-  // Derive tab directly from the URL — no separate state + sync effect (would loop
+  // Derive section/tab directly from the URL — no separate state + sync effect (would loop
   // because `setSearchParams` from `useSearchParams` is a new reference every render).
+  const section: Section =
+    sectionParam === 'smart' || sectionParam === 'parts' ? sectionParam : 'general'
   const tab: Tab = tabParam === 'history' || tabParam === 'settings' ? tabParam : 'suggestions'
+
+  const setSection = useCallback(
+    (next: Section) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev)
+          if (next === 'general') params.delete('section')
+          else params.set('section', next)
+          // Clear sub-tab unless we're moving into smart.
+          if (next !== 'smart') params.delete('tab')
+          return params
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
 
   const setTab = useCallback(
     (next: Tab) => {
       setSearchParams(
         (prev) => {
           const params = new URLSearchParams(prev)
+          params.set('section', 'smart')
           if (next === 'suggestions') params.delete('tab')
           else params.set('tab', next)
           return params
@@ -66,6 +95,7 @@ export default function AdminSmartCategorise() {
 
   const [products, setProducts] = useState<ProductRow[]>([])
   const [categories, setCategories] = useState<CategoryRow[]>([])
+  const [productCategoryMap, setProductCategoryMap] = useState<ProductCategoryMap>(new Map())
   const [learning, setLearning] = useState<LearningIndex>(new Map())
   const [history, setHistory] = useState<LearningRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -79,12 +109,14 @@ export default function AdminSmartCategorise() {
 
   const loadAll = useCallback(async () => {
     setLoading(true)
-    const [{ data: prodData }, { data: catData }] = await Promise.all([
+    const [{ data: prodData }, { data: catData }, pcMap] = await Promise.all([
       supabase.from('products').select('*').order('name'),
       supabase.from('categories').select('*').order('sort_order').order('name'),
+      fetchProductCategoryMap(),
     ])
     setProducts((prodData ?? []) as ProductRow[])
     setCategories((catData ?? []) as CategoryRow[])
+    setProductCategoryMap(pcMap)
     await refreshLearning()
     setLoading(false)
   }, [refreshLearning])
@@ -94,9 +126,9 @@ export default function AdminSmartCategorise() {
   }, [loadAll])
 
   useEffect(() => {
-    // Scroll to top whenever tabs change so the relevant section is in view.
+    // Scroll to top whenever the section/tab changes so the relevant content is in view.
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [tab])
+  }, [section, tab])
 
   const categoryById = useMemo(() => {
     const map = new Map<string, CategoryRow>()
@@ -105,19 +137,108 @@ export default function AdminSmartCategorise() {
   }, [categories])
 
   return (
-    <section className="admin-page admin-smart-categorise-page">
+    <section className="admin-page admin-smart-categorise-page admin-categories-hub">
       <header className="admin-page-header admin-smart-categorise-header">
         <div>
-          <h1>Smart categorisation</h1>
+          <h1>Categories</h1>
           <p className="admin-muted">
-            Review heuristic suggestions, teach the system the right answers, and track what it has
-            learnt over time.{' '}
+            Manage product categories, run smart bulk categorisation, and configure the parts
+            registry — all in one place.{' '}
             <Link to="/admin/catalogue">← Back to catalogue</Link>
           </p>
         </div>
       </header>
 
-      <nav className="admin-tabs admin-smart-categorise-tabs" aria-label="Smart categorisation sections">
+      <nav className="admin-tabs admin-categories-hub-tabs" aria-label="Categories sections">
+        {(
+          [
+            ['general', 'General categories', categories.length],
+            ['smart', 'Smart categorise', history.length],
+            ['parts', 'Parts', null],
+          ] as [Section, string, number | null][]
+        ).map(([key, label, badge]) => (
+          <button
+            key={key}
+            type="button"
+            className={`admin-tab admin-tab--top${section === key ? ' admin-tab--active' : ''}`}
+            onClick={() => setSection(key)}
+            aria-current={section === key ? 'page' : undefined}
+          >
+            {label}
+            {badge && badge > 0 ? <span className="admin-tab-badge">{badge}</span> : null}
+          </button>
+        ))}
+      </nav>
+
+      <div className="admin-smart-categorise-body">
+        {loading ? (
+          <p className="admin-muted">Loading catalogue…</p>
+        ) : section === 'general' ? (
+          <CatalogueCategoriesManager
+            categories={categories}
+            products={products}
+            productCategoryMap={productCategoryMap}
+            onChanged={loadAll}
+            variant="embedded"
+          />
+        ) : section === 'parts' ? (
+          <AdminAssemblyPartTypesSettings embedded />
+        ) : (
+          <SmartSection
+            tab={tab}
+            setTab={setTab}
+            history={history}
+            products={products}
+            categories={categories}
+            categoryById={categoryById}
+            learning={learning}
+            refreshLearning={refreshLearning}
+            loadAll={loadAll}
+            setResult={setResult}
+          />
+        )}
+      </div>
+
+      {result && <SmartCategoriseResultModal info={result} onClose={() => setResult(null)} />}
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Smart section (suggestions / history / settings sub-tabs)
+// ---------------------------------------------------------------------------
+
+interface SmartSectionProps {
+  tab: Tab
+  setTab: (next: Tab) => void
+  history: LearningRow[]
+  products: ProductRow[]
+  categories: CategoryRow[]
+  categoryById: Map<string, CategoryRow>
+  learning: LearningIndex
+  refreshLearning: () => Promise<void>
+  loadAll: () => Promise<void>
+  setResult: (r: ResultInfo) => void
+}
+
+function SmartSection({
+  tab,
+  setTab,
+  history,
+  products,
+  categories,
+  categoryById,
+  learning,
+  refreshLearning,
+  loadAll,
+  setResult,
+}: SmartSectionProps) {
+  return (
+    <div className="admin-smart-categorise-section">
+      <nav
+        className="admin-tabs admin-smart-categorise-tabs admin-tabs--nested"
+        aria-label="Smart categorisation sub-sections"
+      >
         {(
           [
             ['suggestions', 'Suggestions'],
@@ -141,9 +262,7 @@ export default function AdminSmartCategorise() {
       </nav>
 
       <div className="admin-smart-categorise-body">
-        {loading ? (
-          <p className="admin-muted">Loading catalogue…</p>
-        ) : tab === 'suggestions' ? (
+        {tab === 'suggestions' ? (
           <SuggestionsTab
             products={products}
             categories={categories}
@@ -156,7 +275,12 @@ export default function AdminSmartCategorise() {
             setResult={setResult}
           />
         ) : tab === 'history' ? (
-          <HistoryTab history={history} categoryById={categoryById} onChange={refreshLearning} setResult={setResult} />
+          <HistoryTab
+            history={history}
+            categoryById={categoryById}
+            onChange={refreshLearning}
+            setResult={setResult}
+          />
         ) : (
           <SettingsTab
             categories={categories}
@@ -168,9 +292,7 @@ export default function AdminSmartCategorise() {
           />
         )}
       </div>
-
-      {result && <SmartCategoriseResultModal info={result} onClose={() => setResult(null)} />}
-    </section>
+    </div>
   )
 }
 
@@ -202,7 +324,12 @@ export function SuggestionsTab({
   })
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [overrides, setOverrides] = useState<Map<string, string>>(new Map())
+  // Per-row overrides. The `primary` is the main category for the product (overrides
+  // the heuristic suggestion when present), and `additional` holds extra categories
+  // the product should also appear in.
+  const [overrides, setOverrides] = useState<
+    Map<string, { primary?: string; additional: string[] }>
+  >(new Map())
   const [pageSize, setPageSize] = useState<PageSize>(20)
   const [page, setPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
@@ -280,19 +407,60 @@ export function SuggestionsTab({
     })
   }
 
-  function setOverride(productId: string, categoryId: string) {
+  function setPrimaryOverride(productId: string, categoryId: string) {
     setOverrides((prev) => {
       const next = new Map(prev)
-      next.set(productId, categoryId)
+      const current = next.get(productId) ?? { additional: [] }
+      next.set(productId, {
+        primary: categoryId,
+        // Drop the new primary from `additional` if it was there.
+        additional: current.additional.filter((id) => id !== categoryId),
+      })
       return next
     })
   }
 
-  function clearOverride(productId: string) {
+  function clearPrimaryOverride(productId: string) {
     setOverrides((prev) => {
-      if (!prev.has(productId)) return prev
+      const current = prev.get(productId)
+      if (!current) return prev
       const next = new Map(prev)
-      next.delete(productId)
+      if (current.additional.length === 0) {
+        next.delete(productId)
+      } else {
+        next.set(productId, { primary: undefined, additional: current.additional })
+      }
+      return next
+    })
+  }
+
+  function addAdditionalCategory(productId: string, categoryId: string, suggestedId: string) {
+    if (!categoryId) return
+    setOverrides((prev) => {
+      const next = new Map(prev)
+      const current = next.get(productId) ?? { additional: [] }
+      const effectivePrimary = current.primary ?? suggestedId
+      // Don't add the same category twice, and don't add the primary as an extra.
+      if (categoryId === effectivePrimary || current.additional.includes(categoryId)) return prev
+      next.set(productId, {
+        primary: current.primary,
+        additional: [...current.additional, categoryId],
+      })
+      return next
+    })
+  }
+
+  function removeAdditionalCategory(productId: string, categoryId: string) {
+    setOverrides((prev) => {
+      const current = prev.get(productId)
+      if (!current) return prev
+      const filtered = current.additional.filter((id) => id !== categoryId)
+      const next = new Map(prev)
+      if (!current.primary && filtered.length === 0) {
+        next.delete(productId)
+      } else {
+        next.set(productId, { primary: current.primary, additional: filtered })
+      }
       return next
     })
   }
@@ -306,8 +474,32 @@ export function SuggestionsTab({
     if (selectedSuggestions.length === 0) return
     setApplying(true)
     try {
-      const overriddenCount = selectedSuggestions.filter((s) => overrides.has(s.productId)).length
-      const { applied, errors } = await applySmartCategorySuggestions(selectedSuggestions, overrides)
+      // Convert per-row overrides to the SmartCategoryOverride shape the apply
+      // function expects. We always send an object so additional ids ride along.
+      const applyOverrides = new Map<string, SmartCategoryOverride>()
+      for (const s of selectedSuggestions) {
+        const o = overrides.get(s.productId)
+        if (!o) continue
+        applyOverrides.set(s.productId, {
+          primary: o.primary ?? s.suggestedCategoryId,
+          additional: o.additional,
+        })
+      }
+
+      const overriddenCount = selectedSuggestions.filter((s) => {
+        const o = overrides.get(s.productId)
+        return !!(o && (o.primary || o.additional.length > 0))
+      }).length
+
+      const multiCount = selectedSuggestions.filter((s) => {
+        const o = overrides.get(s.productId)
+        return !!(o && o.additional.length > 0)
+      }).length
+
+      const { applied, errors } = await applySmartCategorySuggestions(
+        selectedSuggestions,
+        applyOverrides,
+      )
       const lines: string[] = [
         `Re-categorised ${applied} product${applied === 1 ? '' : 's'}.`,
         `${selectedSuggestions.length - applied} skipped.`,
@@ -315,6 +507,11 @@ export function SuggestionsTab({
       if (overriddenCount > 0) {
         lines.push(
           `${overriddenCount} used your manual override${overriddenCount === 1 ? '' : 's'} — the system has learnt from those for next time.`,
+        )
+      }
+      if (multiCount > 0) {
+        lines.push(
+          `${multiCount} product${multiCount === 1 ? ' was' : 's were'} assigned to multiple categories.`,
         )
       }
       setResult({
@@ -534,15 +731,22 @@ export function SuggestionsTab({
             pageSuggestions.map((s) => {
               const product = productById.get(s.productId)
               const currentCategory = s.currentCategoryId ? categoryById.get(s.currentCategoryId) : null
-              const targetId = overrides.get(s.productId) ?? s.suggestedCategoryId
-              const targetCategory = categoryById.get(targetId)
-              const isOverridden = overrides.has(s.productId)
-              const isSameCategory = currentCategory?.id === targetId
+              const override = overrides.get(s.productId)
+              const primaryId = override?.primary ?? s.suggestedCategoryId
+              const additionalIds = override?.additional ?? []
+              const targetCategory = categoryById.get(primaryId)
+              const isPrimaryOverridden = !!override?.primary
+              const hasExtras = additionalIds.length > 0
+              const isOverridden = isPrimaryOverridden || hasExtras
+              const isSameCategory = currentCategory?.id === primaryId && !hasExtras
               const isLearned = s.learningBoost >= 0.04
               const program = product?.catalog_program
+              const totalCategoriesForRow = 1 + additionalIds.length
 
               const rowTooltip = isOverridden
-                ? `You changed the suggestion. On Apply: move "${s.productName}" from "${currentCategory?.name ?? 'Uncategorised'}" to "${targetCategory?.name ?? 'selected category'}". The system will learn this correction.`
+                ? hasExtras
+                  ? `On Apply: assign "${s.productName}" to ${totalCategoriesForRow} categor${totalCategoriesForRow === 1 ? 'y' : 'ies'} (primary: "${targetCategory?.name ?? 'selected'}"). The system will learn from your choice.`
+                  : `You changed the suggestion. On Apply: move "${s.productName}" from "${currentCategory?.name ?? 'Uncategorised'}" to "${targetCategory?.name ?? 'selected category'}". The system will learn this correction.`
                 : isSameCategory
                   ? `The system thinks "${s.productName}" is already in the right category. Applying will not change anything.`
                   : `On Apply: move "${s.productName}" from "${currentCategory?.name ?? 'Uncategorised'}" to "${targetCategory?.name ?? s.suggestedCategoryName}".`
@@ -615,48 +819,113 @@ export function SuggestionsTab({
                         isOverridden ? ' admin-smart-categorize-target-wrap--overridden' : ''
                       }${isSameCategory ? ' admin-smart-categorize-target-wrap--noop' : ''}`}
                     >
-                      <select
-                        className="admin-smart-categorize-target-select"
-                        value={targetId}
-                        onChange={(e) => {
-                          const next = e.target.value
-                          if (next === s.suggestedCategoryId) clearOverride(s.productId)
-                          else setOverride(s.productId, next)
-                        }}
-                        aria-label="Change suggested category"
-                        title={
-                          isOverridden
-                            ? 'You have overridden the suggestion. Choose another, or click Reset to go back.'
-                            : 'Click to override the system\'s suggestion'
-                        }
-                      >
-                        {!overrideCategoryOptions.some((c) => c.id === s.suggestedCategoryId) && (
-                          <option value={s.suggestedCategoryId}>
-                            {s.suggestedCategoryName} (suggested)
-                          </option>
-                        )}
-                        {overrideCategoryOptions.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.id === s.suggestedCategoryId ? `${c.name} (suggested)` : c.name}
-                          </option>
-                        ))}
-                      </select>
-                      {isOverridden && (
-                        <button
-                          type="button"
-                          className="admin-link-button"
-                          onClick={() => clearOverride(s.productId)}
-                          title="Reset to the original suggestion"
+                      <div className="admin-smart-categorize-target-primary">
+                        <span
+                          className="admin-smart-categorize-primary-tag"
+                          title="Primary category — this is the main bucket the product will sit in."
                         >
-                          Reset
-                        </button>
-                      )}
-                      {isSameCategory && (
+                          Primary
+                        </span>
+                        <select
+                          className="admin-smart-categorize-target-select"
+                          value={primaryId}
+                          onChange={(e) => {
+                            const nextId = e.target.value
+                            if (nextId === s.suggestedCategoryId) clearPrimaryOverride(s.productId)
+                            else setPrimaryOverride(s.productId, nextId)
+                          }}
+                          aria-label="Change primary category"
+                          title={
+                            isPrimaryOverridden
+                              ? 'You have overridden the primary suggestion. Choose another, or click Reset to go back.'
+                              : "Click to override the system's suggested primary category"
+                          }
+                        >
+                          {!overrideCategoryOptions.some((c) => c.id === s.suggestedCategoryId) && (
+                            <option value={s.suggestedCategoryId}>
+                              {s.suggestedCategoryName} (suggested)
+                            </option>
+                          )}
+                          {overrideCategoryOptions.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.id === s.suggestedCategoryId ? `${c.name} (suggested)` : c.name}
+                            </option>
+                          ))}
+                        </select>
+                        {isPrimaryOverridden && (
+                          <button
+                            type="button"
+                            className="admin-link-button"
+                            onClick={() => clearPrimaryOverride(s.productId)}
+                            title="Reset to the original suggestion"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="admin-smart-categorize-extras">
+                        {additionalIds.map((id) => {
+                          const extra = categoryById.get(id)
+                          if (!extra) return null
+                          return (
+                            <span
+                              key={id}
+                              className="admin-smart-categorize-extra-chip"
+                              title={`Also assign to ${extra.name}. Click × to remove.`}
+                            >
+                              {extra.name}
+                              <button
+                                type="button"
+                                className="admin-smart-categorize-extra-remove"
+                                onClick={() => removeAdditionalCategory(s.productId, id)}
+                                aria-label={`Remove ${extra.name} from extra categories`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          )
+                        })}
+                        <select
+                          className="admin-smart-categorize-extra-add"
+                          value=""
+                          onChange={(e) => {
+                            const id = e.target.value
+                            if (id) addAdditionalCategory(s.productId, id, s.suggestedCategoryId)
+                            // Reset to placeholder after picking so the select stays usable.
+                            e.target.value = ''
+                          }}
+                          title="Add another category — the product will appear in the primary plus all extras."
+                          aria-label="Add another category"
+                        >
+                          <option value="">+ Add another…</option>
+                          {overrideCategoryOptions
+                            .filter(
+                              (c) =>
+                                c.id !== primaryId && !additionalIds.includes(c.id),
+                            )
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      {isSameCategory && !hasExtras && (
                         <span
                           className="admin-smart-categorize-noop"
                           title="This row will not change anything because the suggested category is the same as the current one."
                         >
                           no change
+                        </span>
+                      )}
+                      {hasExtras && (
+                        <span
+                          className="admin-smart-categorize-multi-note"
+                          title={`This product will be assigned to ${totalCategoriesForRow} categories: 1 primary + ${additionalIds.length} extra.`}
+                        >
+                          {totalCategoriesForRow} categor{totalCategoriesForRow === 1 ? 'y' : 'ies'}
                         </span>
                       )}
                     </div>

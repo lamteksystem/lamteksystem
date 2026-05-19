@@ -195,7 +195,11 @@ export default function App() {
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="catalogue" element={<AdminCatalogue />} />
         <Route path="catalogue/tealbury" element={<AdminTealburyPricelist />} />
-        <Route path="catalogue/smart-categorise" element={<AdminSmartCategorise />} />
+        <Route path="catalogue/categories" element={<AdminSmartCategorise />} />
+        <Route
+          path="catalogue/smart-categorise"
+          element={<Navigate to="/admin/catalogue/categories?section=smart" replace />}
+        />
         <Route path="stock" element={<AdminStock />} />
         <Route path="locations" element={<AdminLocations />} />
         <Route path="delivery-windows" element={<AdminDeliveryWindows />} />

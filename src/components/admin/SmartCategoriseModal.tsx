@@ -89,7 +89,7 @@ export default function SmartCategoriseModal({
             <h2 id="smart-categorise-modal-title">Smart categorise</h2>
             <p className="admin-muted admin-smart-categorise-modal-sub">
               Review and apply category suggestions for your products.{' '}
-              <Link to="/admin/catalogue/smart-categorise" onClick={onClose}>
+              <Link to="/admin/catalogue/categories?section=smart" onClick={onClose}>
                 Open full page
               </Link>{' '}
               for learning history and advanced settings.

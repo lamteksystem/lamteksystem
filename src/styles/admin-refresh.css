@@ -901,6 +901,110 @@
   vertical-align: top;
 }
 
+/* Categories hub — top-level tabs (General / Smart / Parts).
+   The top tabs sit immediately under the page header and are slightly bolder
+   than the smart section's nested sub-tabs. */
+.admin-categories-hub-tabs .admin-tab {
+  font-size: 1rem;
+  padding: 0.75rem 1.15rem;
+}
+
+.admin-tabs--nested {
+  border-bottom: 1px dashed var(--lamtek-gray-light);
+  margin-top: 0.25rem;
+}
+
+.admin-tabs--nested .admin-tab {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.92rem;
+}
+
+.admin-smart-categorise-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Multi-category target cell — primary select on top, chip list below. */
+.admin-smart-categorize-target-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.admin-smart-categorize-primary-tag {
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--lamtek-text-muted);
+  background: var(--lamtek-gray-light);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+}
+
+.admin-smart-categorize-extras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+  align-items: center;
+}
+
+.admin-smart-categorize-extra-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: rgba(29, 78, 216, 0.08);
+  border: 1px solid rgba(29, 78, 216, 0.3);
+  color: var(--lamtek-text);
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+}
+
+.admin-smart-categorize-extra-remove {
+  background: none;
+  border: none;
+  color: var(--lamtek-text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0.1rem;
+  cursor: pointer;
+}
+
+.admin-smart-categorize-extra-remove:hover {
+  color: #b91c1c;
+}
+
+.admin-smart-categorize-extra-add {
+  font-size: 0.78rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  border: 1px dashed var(--lamtek-gray-light);
+  background: transparent;
+  color: var(--lamtek-text-muted);
+  cursor: pointer;
+}
+
+.admin-smart-categorize-extra-add:hover:not(:disabled) {
+  color: var(--lamtek-text);
+  border-color: var(--lamtek-text-muted);
+}
+
+.admin-smart-categorize-multi-note {
+  font-size: 0.74rem;
+  color: var(--lamtek-text-muted);
+  margin-top: 0.2rem;
+  display: inline-block;
+}
+
+/* Embedded variant of the categories manager — no card chrome, no <details>. */
+.admin-catalogue-categories-manager--embedded .admin-catalogue-categories-body {
+  padding: 0;
+}
+
 .admin-danger {
   color: #b91c1c;
   border-color: rgba(220, 38, 38, 0.45);
@@ -1138,9 +1242,10 @@
 }
 
 .admin-smart-categorize-target-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
   flex-wrap: wrap;
   max-width: 100%;
   min-width: 0;

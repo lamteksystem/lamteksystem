@@ -12,6 +12,7 @@ import {
   recordSmartCategoryLearning,
   type LearningIndex,
 } from '@/lib/smartCategoryLearning'
+import { getCachedSmartCategorySettings } from '@/lib/smartCategorySettings'
 
 export interface SmartCategorySuggestion {
   productId: string
@@ -107,24 +108,32 @@ export function suggestCategoryForProduct(
 
   const haystack = [product.name, product.description, product.sku].filter(Boolean).join(' ')
 
-  const boosts = options?.learning ? learningBoosts(options.learning, haystack) : null
+  const settings = getCachedSmartCategorySettings()
+  const boosts =
+    options?.learning && settings.boostEnabled ? learningBoosts(options.learning, haystack) : null
   let best: { category: CategoryRow; score: number; boost: number } | null = null
 
   for (const category of pool) {
     const baseScore = scoreNameMatch(haystack, category.name)
     const learnWeight = boosts?.get(category.id) ?? 0
-    // Cap the learning boost so a single accidental confirmation can't dominate, but it can still
-    // promote a category from "medium" to "high" with consistent corrections (~5+ confirmations).
-    const learnBoost = Math.min(0.4, learnWeight * 0.04)
+    // Cap the learning boost so a single accidental confirmation can't dominate.
+    const learnBoost = Math.min(
+      settings.learningBoostCap,
+      learnWeight * settings.learningBoostPerWeight,
+    )
     const score = Math.min(1, baseScore + learnBoost)
     if (!best || score > best.score) best = { category, score, boost: learnBoost }
   }
 
-  if (!best || best.score < 0.35) return null
+  if (!best || best.score < settings.minScore) return null
   if (best.category.id === product.category_id && best.score < 0.9) return null
 
   const confidence: SmartCategorySuggestion['confidence'] =
-    best.score >= 0.75 ? 'high' : best.score >= 0.5 ? 'medium' : 'low'
+    best.score >= settings.highThreshold
+      ? 'high'
+      : best.score >= settings.mediumThreshold
+        ? 'medium'
+        : 'low'
 
   return {
     productId: product.id,

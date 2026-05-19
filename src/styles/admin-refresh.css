@@ -634,6 +634,12 @@
   border-color: rgba(29, 78, 216, 0.18);
 }
 
+.admin-callout--warn {
+  background: rgba(202, 138, 4, 0.1);
+  border-color: rgba(202, 138, 4, 0.35);
+  color: #92400e;
+}
+
 .admin-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1644,6 +1650,104 @@
 
 .admin-smart-categorize-list li:last-child .admin-smart-categorize-row {
   border-bottom: none;
+}
+
+/* Settings tab — comprehensive heuristic controls.
+   The Smart Categorise Settings tab now exposes thresholds, learning behaviour,
+   tokenisation rules and a diagnostics token preview. These styles cover the
+   form layout, slider+value rows, and the diagnostics card. */
+.admin-smart-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.admin-smart-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 0.85rem;
+}
+
+.admin-smart-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+
+.admin-smart-settings-label {
+  font-size: 0.88rem;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.admin-smart-settings-label small {
+  font-size: 0.78rem;
+  color: var(--lamtek-text-muted);
+  font-weight: 400;
+}
+
+.admin-smart-settings-field input[type='number'] {
+  width: 7rem;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.admin-smart-settings-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.admin-smart-settings-slider-row input[type='range'] {
+  flex: 1 1 auto;
+}
+
+.admin-smart-settings-value {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-weight: 600;
+  min-width: 3.5rem;
+  text-align: right;
+  color: var(--lamtek-text);
+}
+
+.admin-smart-settings-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.admin-smart-settings-diagnostics {
+  grid-column: span 2;
+}
+
+.admin-smart-settings-diag-input {
+  width: 100%;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 4px;
+  padding: 0.5rem 0.6rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.admin-smart-settings-diag-summary {
+  margin: 0.5rem 0 0.3rem;
+}
+
+.admin-smart-settings-diag-tokens {
+  margin-top: 0.2rem;
+}
+
+@media (max-width: 720px) {
+  .admin-smart-settings-diagnostics {
+    grid-column: auto;
+  }
 }
 
 .admin-smart-categorize-product {

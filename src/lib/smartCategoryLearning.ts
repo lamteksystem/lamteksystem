@@ -8,6 +8,7 @@
  * better the more it is used.
  */
 import { supabase } from '@/lib/supabase'
+import { getCachedSmartCategorySettings, isShortNumericToken } from '@/lib/smartCategorySettings'
 
 export interface LearningRow {
   token: string
@@ -158,13 +159,20 @@ function effectiveStopWordSet(): Set<string> {
 /** Tokenise a product name/description for learning + matching. Same shape as the heuristic. */
 export function learningTokens(text: string): string[] {
   const stopWords = effectiveStopWordSet()
+  const settings = getCachedSmartCategorySettings()
+  const minLen = Math.max(1, settings.minTokenLength)
   return Array.from(
     new Set(
       text
         .toLowerCase()
         .replace(/[^a-z0-9\s]/g, ' ')
         .split(/\s+/)
-        .filter((t) => t.length > 2 && !stopWords.has(t)),
+        .filter(
+          (t) =>
+            t.length >= minLen &&
+            !stopWords.has(t) &&
+            !isShortNumericToken(t, settings),
+        ),
     ),
   )
 }
@@ -193,6 +201,7 @@ export async function recordSmartCategoryLearning(
   productText: string,
   categoryId: string,
 ): Promise<void> {
+  if (!getCachedSmartCategorySettings().learningEnabled) return
   const tokens = learningTokens(productText)
   if (tokens.length === 0 || !categoryId) return
   const rows = tokens.map((token) => ({ token, category_id: categoryId, weight: 1 }))

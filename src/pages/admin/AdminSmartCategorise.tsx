@@ -26,6 +26,7 @@ import {
   addUserSmartStopWord,
   deleteSmartCategoryToken,
   deleteSmartCategoryTokenEverywhere,
+  learningTokens,
   listBuiltInStopWords,
   loadSmartCategoryHistory,
   loadUserSmartStopWords,
@@ -36,6 +37,12 @@ import {
   type LearningIndex,
   type LearningRow,
 } from '@/lib/smartCategoryLearning'
+import {
+  DEFAULT_SMART_CATEGORY_SETTINGS,
+  loadSmartCategorySettings,
+  saveSmartCategorySettings,
+  type SmartCategorySettings,
+} from '@/lib/smartCategorySettings'
 import { rebucketTealburyAccessories } from '@/lib/tealburyAccessoryRebucket'
 import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productCategories'
 import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
@@ -106,18 +113,21 @@ export default function AdminSmartCategorise() {
   const [learning, setLearning] = useState<LearningIndex>(new Map())
   const [history, setHistory] = useState<LearningRow[]>([])
   const [userStopWords, setUserStopWords] = useState<string[]>([])
+  const [settings, setSettings] = useState<SmartCategorySettings>(DEFAULT_SMART_CATEGORY_SETTINGS)
   const [loading, setLoading] = useState(true)
   const [result, setResult] = useState<ResultInfo | null>(null)
 
   const refreshLearning = useCallback(async () => {
-    const [idx, hist, stops] = await Promise.all([
+    const [idx, hist, stops, opts] = await Promise.all([
       loadSmartCategoryLearning(),
       loadSmartCategoryHistory(),
       loadUserSmartStopWords(),
+      loadSmartCategorySettings(),
     ])
     setLearning(idx)
     setHistory(hist)
     setUserStopWords(stops)
+    setSettings(opts)
   }, [])
 
   const loadAll = useCallback(async () => {
@@ -202,6 +212,8 @@ export default function AdminSmartCategorise() {
             setTab={setTab}
             history={history}
             userStopWords={userStopWords}
+            settings={settings}
+            onSettingsChanged={setSettings}
             products={products}
             categories={categories}
             categoryById={categoryById}
@@ -227,6 +239,8 @@ interface SmartSectionProps {
   setTab: (next: Tab) => void
   history: LearningRow[]
   userStopWords: string[]
+  settings: SmartCategorySettings
+  onSettingsChanged: (next: SmartCategorySettings) => void
   products: ProductRow[]
   categories: CategoryRow[]
   categoryById: Map<string, CategoryRow>
@@ -241,6 +255,8 @@ function SmartSection({
   setTab,
   history,
   userStopWords,
+  settings,
+  onSettingsChanged,
   products,
   categories,
   categoryById,
@@ -295,6 +311,7 @@ function SmartSection({
             history={history}
             categoryById={categoryById}
             userStopWords={userStopWords}
+            ambiguousThreshold={settings.autoAmbiguousThreshold}
             onChange={refreshLearning}
             setResult={setResult}
           />
@@ -302,6 +319,8 @@ function SmartSection({
           <SettingsTab
             categories={categories}
             products={products}
+            settings={settings}
+            onSettingsChanged={onSettingsChanged}
             onChanged={async () => {
               await refreshLearning()
             }}
@@ -1055,12 +1074,14 @@ function HistoryTab({
   history,
   categoryById,
   userStopWords,
+  ambiguousThreshold,
   onChange,
   setResult,
 }: {
   history: LearningRow[]
   categoryById: Map<string, CategoryRow>
   userStopWords: string[]
+  ambiguousThreshold: number
   onChange: () => Promise<void>
   setResult: (r: ResultInfo) => void
 }) {
@@ -1069,6 +1090,7 @@ function HistoryTab({
   const [filter, setFilter] = useState('')
   const [showAmbiguousOnly, setShowAmbiguousOnly] = useState(false)
   const [newStopWord, setNewStopWord] = useState('')
+  const [pruneWeight, setPruneWeight] = useState(1)
 
   const builtInStopWords = useMemo(() => listBuiltInStopWords(), [])
 
@@ -1093,18 +1115,23 @@ function HistoryTab({
       totalsByToken.set(row.token, (totalsByToken.get(row.token) ?? 0) + (row.weight ?? 0))
     }
     for (const [token, categories] of tokenCategoryCount) {
-      if (categories >= 2) list.push({ token, categories, totalWeight: totalsByToken.get(token) ?? 0 })
+      if (categories >= ambiguousThreshold)
+        list.push({ token, categories, totalWeight: totalsByToken.get(token) ?? 0 })
     }
     return list.sort(
       (a, b) => b.categories - a.categories || b.totalWeight - a.totalWeight || a.token.localeCompare(b.token),
     )
-  }, [history, tokenCategoryCount])
+  }, [history, tokenCategoryCount, ambiguousThreshold])
 
   const byCategory = useMemo(() => {
     const map = new Map<string, LearningRow[]>()
     for (const row of history) {
       if (filter && !row.token.toLowerCase().includes(filter.trim().toLowerCase())) continue
-      if (showAmbiguousOnly && (tokenCategoryCount.get(row.token) ?? 0) < 2) continue
+      if (
+        showAmbiguousOnly &&
+        (tokenCategoryCount.get(row.token) ?? 0) < ambiguousThreshold
+      )
+        continue
       const bucket = map.get(row.category_id) ?? []
       bucket.push(row)
       map.set(row.category_id, bucket)
@@ -1116,7 +1143,7 @@ function HistoryTab({
         totalWeight: rows.reduce((acc, r) => acc + (r.weight ?? 0), 0),
       }))
       .sort((a, b) => b.totalWeight - a.totalWeight)
-  }, [history, filter, showAmbiguousOnly, tokenCategoryCount])
+  }, [history, filter, showAmbiguousOnly, tokenCategoryCount, ambiguousThreshold])
 
   async function reset() {
     if (
@@ -1239,6 +1266,91 @@ function HistoryTab({
     }
   }
 
+  // Bulk: ignore every ambiguous token (learned for ≥ threshold categories) in one shot.
+  // Each token is deleted from every category's learning AND added to the user ignore list.
+  async function ignoreAllAmbiguous() {
+    if (ambiguousTokens.length === 0) return
+    if (
+      !window.confirm(
+        `Ignore all ${ambiguousTokens.length} ambiguous tokens (learned in ${ambiguousThreshold}+ categories)? They will be removed from every category's learning AND added to the ignore list so they can't be re-learned. This cannot be undone.`,
+      )
+    )
+      return
+    const key = 'bulk-ignore-ambig'
+    setBusyKey(key)
+    try {
+      let removedRows = 0
+      const errors: string[] = []
+      for (const a of ambiguousTokens) {
+        const [{ deleted, error: delError }, { error: stopError }] = await Promise.all([
+          deleteSmartCategoryTokenEverywhere(a.token),
+          addUserSmartStopWord(a.token),
+        ])
+        removedRows += deleted
+        if (delError) errors.push(`${a.token}: ${delError}`)
+        if (stopError) errors.push(`${a.token} (ignore list): ${stopError}`)
+      }
+      setResult({
+        tone: errors.length ? (removedRows > 0 ? 'mixed' : 'error') : 'success',
+        title: errors.length ? 'Ignore all ambiguous — partial' : 'Ambiguous tokens cleaned',
+        lines: [
+          `Cleaned ${ambiguousTokens.length} ambiguous token${ambiguousTokens.length === 1 ? '' : 's'}.`,
+          `Removed ${removedRows} learned row${removedRows === 1 ? '' : 's'} in total.`,
+          `Added ${ambiguousTokens.length} token${ambiguousTokens.length === 1 ? '' : 's'} to the ignore list.`,
+        ],
+        errors,
+      })
+      await onChange()
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  // Bulk: delete every learned row whose weight is ≤ the chosen threshold. Useful after a noisy
+  // re-train: prune the long tail of tokens that only landed once or twice so they stop being
+  // counted toward scoring at all.
+  async function pruneLowWeight() {
+    const cutoff = Math.max(1, Math.floor(pruneWeight))
+    const targets = history.filter((r) => (r.weight ?? 0) <= cutoff)
+    if (targets.length === 0) {
+      setResult({
+        tone: 'mixed',
+        title: 'Nothing to prune',
+        lines: [`No learned rows have weight ≤ ${cutoff}.`],
+        errors: [],
+      })
+      return
+    }
+    if (
+      !window.confirm(
+        `Delete ${targets.length} learned row${targets.length === 1 ? '' : 's'} whose weight is ≤ ${cutoff}? This removes only those specific token→category mappings — the ignore list is not touched. This cannot be undone.`,
+      )
+    )
+      return
+    const key = 'bulk-prune'
+    setBusyKey(key)
+    try {
+      const errors: string[] = []
+      let removed = 0
+      for (const row of targets) {
+        const { error } = await deleteSmartCategoryToken(row.token, row.category_id)
+        if (error) errors.push(`${row.token}: ${error}`)
+        else removed += 1
+      }
+      setResult({
+        tone: errors.length ? (removed > 0 ? 'mixed' : 'error') : 'success',
+        title: errors.length ? 'Prune — partial' : 'Low-weight rows pruned',
+        lines: [
+          `Removed ${removed} of ${targets.length} learned row${targets.length === 1 ? '' : 's'} at weight ≤ ${cutoff}.`,
+        ],
+        errors,
+      })
+      await onChange()
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
   return (
     <div className="admin-smart-categorise-history">
       <p className="admin-callout admin-callout--info">
@@ -1262,8 +1374,10 @@ function HistoryTab({
               {ambiguousTokens.length})
             </h3>
             <p className="admin-muted">
-              These tokens were learned for 2+ different categories. They probably shouldn&apos;t
-              influence scoring — clean them up with <strong>Ignore everywhere</strong>.
+              These tokens were learned for {ambiguousThreshold}+ different categories (configurable
+              under <em>Settings → Heuristic</em>). They probably shouldn&apos;t influence scoring —
+              clean them up with <strong>Ignore everywhere</strong>, or use the toolbar&apos;s{' '}
+              <strong>Ignore all ambiguous</strong> shortcut.
             </p>
           </header>
           <ul className="admin-smart-categorise-ambig-list">
@@ -1312,6 +1426,36 @@ function HistoryTab({
         <button
           type="button"
           className="btn btn-outline btn-small"
+          disabled={busyKey === 'bulk-ignore-ambig' || ambiguousTokens.length === 0}
+          onClick={() => void ignoreAllAmbiguous()}
+          title={`Ignore every token currently learned in ${ambiguousThreshold}+ categories`}
+        >
+          {busyKey === 'bulk-ignore-ambig'
+            ? 'Ignoring…'
+            : `Ignore all ambiguous (${ambiguousTokens.length})`}
+        </button>
+        <label className="admin-inline-field">
+          <span>Prune at weight ≤</span>
+          <input
+            type="number"
+            min={1}
+            max={9}
+            value={pruneWeight}
+            onChange={(e) => setPruneWeight(Math.max(1, Math.min(9, Number(e.target.value) || 1)))}
+          />
+        </label>
+        <button
+          type="button"
+          className="btn btn-outline btn-small"
+          disabled={busyKey === 'bulk-prune' || history.length === 0}
+          onClick={() => void pruneLowWeight()}
+          title={`Delete every learned row with weight ≤ ${pruneWeight}`}
+        >
+          {busyKey === 'bulk-prune' ? 'Pruning…' : 'Prune low-weight rows'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline btn-small admin-danger"
           disabled={resetting || history.length === 0}
           onClick={() => void reset()}
           title="Wipe everything the smart categorise tool has been taught"
@@ -1347,7 +1491,8 @@ function HistoryTab({
                 </header>
                 <ul className="admin-smart-categorise-history-tokens">
                   {group.rows.map((row) => {
-                    const ambiguous = (tokenCategoryCount.get(row.token) ?? 0) >= 2
+                    const ambiguous =
+                      (tokenCategoryCount.get(row.token) ?? 0) >= ambiguousThreshold
                     return (
                       <li
                         key={`${row.token}-${row.category_id}`}
@@ -1501,19 +1646,68 @@ function HistoryTab({
 // Settings tab
 // ---------------------------------------------------------------------------
 
+interface SettingsTabProps {
+  categories: CategoryRow[]
+  products: ProductRow[]
+  settings: SmartCategorySettings
+  onSettingsChanged: (next: SmartCategorySettings) => void
+  onChanged: () => Promise<void>
+  setResult: (r: ResultInfo) => void
+}
+
 function SettingsTab({
   categories,
   products,
+  settings,
+  onSettingsChanged,
   onChanged,
   setResult,
-}: {
-  categories: CategoryRow[]
-  products: ProductRow[]
-  onChanged: () => Promise<void>
-  setResult: (r: ResultInfo) => void
-}) {
+}: SettingsTabProps) {
   const [retraining, setRetraining] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [draft, setDraft] = useState<SmartCategorySettings>(settings)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [previewText, setPreviewText] = useState('')
+
+  useEffect(() => {
+    setDraft(settings)
+  }, [settings])
+
+  const dirty = useMemo(
+    () => JSON.stringify(draft) !== JSON.stringify(settings),
+    [draft, settings],
+  )
+
+  const previewTokens = useMemo(() => {
+    if (!previewText.trim()) return []
+    return learningTokens(previewText)
+  }, [previewText])
+
+  async function saveSettings() {
+    setSavingSettings(true)
+    try {
+      const { error, settings: next } = await saveSmartCategorySettings(draft)
+      if (error) {
+        setResult({ tone: 'error', title: 'Could not save settings', lines: [], errors: [error] })
+        return
+      }
+      onSettingsChanged(next)
+      setResult({
+        tone: 'success',
+        title: 'Settings saved',
+        lines: [
+          'The new heuristic settings are now in effect for scoring, learning and tokenisation.',
+        ],
+        errors: [],
+      })
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
+  function resetDraftToDefaults() {
+    setDraft(DEFAULT_SMART_CATEGORY_SETTINGS)
+  }
 
   async function retrainFromExisting() {
     if (
@@ -1577,12 +1771,306 @@ function SettingsTab({
   return (
     <div className="admin-smart-categorise-settings">
       <p className="admin-callout admin-callout--info">
-        Configure how the smart categorisation tool behaves. Confidence bands are based on a match
-        score from <code>0.0</code> to <code>1.0</code> — adjust them only if the defaults give too
-        many false positives or miss obvious matches.
+        Tune how the smart categorisation tool scores products, learns from corrections and breaks
+        text into tokens. Changes apply globally and take effect immediately after Save.
       </p>
 
+      <form
+        className="admin-smart-settings-form"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void saveSettings()
+        }}
+      >
+        <div className="admin-smart-settings-grid">
+          {/* ----------- Confidence bands ----------- */}
+          <section className="card admin-smart-categorise-setting-card">
+            <h3>Confidence bands</h3>
+            <p className="admin-muted">
+              Each suggestion gets a final score from <code>0.0</code> to <code>1.0</code>. These
+              thresholds decide which band it lands in — and below <strong>min score</strong> the
+              suggestion is dropped entirely.
+            </p>
+
+            <label className="admin-smart-settings-field">
+              <span className="admin-smart-settings-label">
+                Min score <small>(suggestions below this are not returned)</small>
+              </span>
+              <div className="admin-smart-settings-slider-row">
+                <input
+                  type="range"
+                  min={0.1}
+                  max={0.9}
+                  step={0.01}
+                  value={draft.minScore}
+                  onChange={(e) => setDraft((d) => ({ ...d, minScore: Number(e.target.value) }))}
+                />
+                <span className="admin-smart-settings-value">{draft.minScore.toFixed(2)}</span>
+              </div>
+            </label>
+
+            <label className="admin-smart-settings-field">
+              <span className="admin-smart-settings-label">
+                <span className="admin-badge admin-badge--medium">medium</span> threshold{' '}
+                <small>(score ≥ this → medium band)</small>
+              </span>
+              <div className="admin-smart-settings-slider-row">
+                <input
+                  type="range"
+                  min={0.1}
+                  max={0.95}
+                  step={0.01}
+                  value={draft.mediumThreshold}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, mediumThreshold: Number(e.target.value) }))
+                  }
+                />
+                <span className="admin-smart-settings-value">
+                  {draft.mediumThreshold.toFixed(2)}
+                </span>
+              </div>
+            </label>
+
+            <label className="admin-smart-settings-field">
+              <span className="admin-smart-settings-label">
+                <span className="admin-badge admin-badge--high">high</span> threshold{' '}
+                <small>(score ≥ this → high band — "safe to bulk apply")</small>
+              </span>
+              <div className="admin-smart-settings-slider-row">
+                <input
+                  type="range"
+                  min={0.1}
+                  max={0.99}
+                  step={0.01}
+                  value={draft.highThreshold}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, highThreshold: Number(e.target.value) }))
+                  }
+                />
+                <span className="admin-smart-settings-value">{draft.highThreshold.toFixed(2)}</span>
+              </div>
+            </label>
+
+            {draft.minScore > draft.mediumThreshold || draft.mediumThreshold > draft.highThreshold ? (
+              <p className="admin-callout admin-callout--warn">
+                Thresholds will be auto-clamped on save so that min ≤ medium ≤ high.
+              </p>
+            ) : null}
+          </section>
+
+          {/* ----------- Tokenisation ----------- */}
+          <section className="card admin-smart-categorise-setting-card">
+            <h3>Tokenisation</h3>
+            <p className="admin-muted">
+              How product names + descriptions are broken into tokens for learning and matching.
+              Stricter rules = fewer noisy tokens like <code>18mm</code>.
+            </p>
+
+            <label className="admin-smart-settings-field">
+              <span className="admin-smart-settings-label">
+                Min token length <small>(tokens shorter than this are dropped)</small>
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={12}
+                value={draft.minTokenLength}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    minTokenLength: Math.max(1, Math.min(12, Number(e.target.value) || 1)),
+                  }))
+                }
+              />
+            </label>
+
+            <label className="admin-smart-settings-field">
+              <span className="admin-smart-settings-label">
+                Ignore short numeric tokens shorter than{' '}
+                <small>(0 = disabled · 5 catches "18mm", "910mm")</small>
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={12}
+                value={draft.ignoreShortNumericBelow}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    ignoreShortNumericBelow: Math.max(0, Math.min(12, Number(e.target.value) || 0)),
+                  }))
+                }
+              />
+            </label>
+
+            <label className="admin-smart-settings-field">
+              <span className="admin-smart-settings-label">
+                Auto-ambiguous threshold{' '}
+                <small>(token learned in this many categories = flagged + bulk-cleanable)</small>
+              </span>
+              <input
+                type="number"
+                min={2}
+                max={20}
+                value={draft.autoAmbiguousThreshold}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    autoAmbiguousThreshold: Math.max(2, Math.min(20, Number(e.target.value) || 2)),
+                  }))
+                }
+              />
+            </label>
+          </section>
+
+          {/* ----------- Learning behaviour ----------- */}
+          <section className="card admin-smart-categorise-setting-card">
+            <h3>Learning behaviour</h3>
+            <p className="admin-muted">
+              How learned corrections influence scoring. Turn either switch off to freeze behaviour
+              while you tune (e.g. to compare suggestions without/with learning).
+            </p>
+
+            <label className="admin-check-row">
+              <input
+                type="checkbox"
+                checked={draft.learningEnabled}
+                onChange={(e) => setDraft((d) => ({ ...d, learningEnabled: e.target.checked }))}
+              />
+              <span>
+                <strong>Record corrections</strong>{' '}
+                <small className="admin-muted">— when off, new "Apply" actions don&apos;t update the learning store.</small>
+              </span>
+            </label>
+
+            <label className="admin-check-row">
+              <input
+                type="checkbox"
+                checked={draft.boostEnabled}
+                onChange={(e) => setDraft((d) => ({ ...d, boostEnabled: e.target.checked }))}
+              />
+              <span>
+                <strong>Use learning to boost scoring</strong>{' '}
+                <small className="admin-muted">— when off, suggestions are based on name overlap only.</small>
+              </span>
+            </label>
+
+            <label className="admin-smart-settings-field">
+              <span className="admin-smart-settings-label">
+                Boost per learned weight{' '}
+                <small>(score points added per learned weight unit)</small>
+              </span>
+              <div className="admin-smart-settings-slider-row">
+                <input
+                  type="range"
+                  min={0.005}
+                  max={0.2}
+                  step={0.005}
+                  value={draft.learningBoostPerWeight}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      learningBoostPerWeight: Number(e.target.value),
+                    }))
+                  }
+                />
+                <span className="admin-smart-settings-value">
+                  {draft.learningBoostPerWeight.toFixed(3)}
+                </span>
+              </div>
+            </label>
+
+            <label className="admin-smart-settings-field">
+              <span className="admin-smart-settings-label">
+                Boost cap <small>(maximum total boost from learning per category)</small>
+              </span>
+              <div className="admin-smart-settings-slider-row">
+                <input
+                  type="range"
+                  min={0.05}
+                  max={0.8}
+                  step={0.01}
+                  value={draft.learningBoostCap}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, learningBoostCap: Number(e.target.value) }))
+                  }
+                />
+                <span className="admin-smart-settings-value">
+                  {draft.learningBoostCap.toFixed(2)}
+                </span>
+              </div>
+            </label>
+          </section>
+        </div>
+
+        <div className="admin-smart-settings-form-actions">
+          <button
+            type="submit"
+            className="btn"
+            disabled={!dirty || savingSettings}
+            title={dirty ? 'Save settings' : 'No changes to save'}
+          >
+            {savingSettings ? 'Saving…' : dirty ? 'Save settings' : 'Saved'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline btn-small"
+            disabled={savingSettings}
+            onClick={() => setDraft(settings)}
+          >
+            Discard changes
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline btn-small"
+            disabled={savingSettings}
+            onClick={resetDraftToDefaults}
+            title="Reset every knob on this page to the factory default"
+          >
+            Reset to factory defaults
+          </button>
+        </div>
+      </form>
+
       <div className="admin-smart-categorise-settings-grid">
+        {/* ----------- Diagnostics / token preview ----------- */}
+        <section className="card admin-smart-categorise-setting-card admin-smart-settings-diagnostics">
+          <h3>Token preview</h3>
+          <p className="admin-muted">
+            Paste a product name (or name + description) below to see exactly which tokens the
+            current settings would learn or score against. Useful for verifying tokenisation rules
+            after you tweak the knobs above.
+          </p>
+          <textarea
+            className="admin-smart-settings-diag-input"
+            rows={3}
+            value={previewText}
+            onChange={(e) => setPreviewText(e.target.value)}
+            placeholder='e.g. "B100 — 1000mm — Base Unit · Standard Base Units"'
+          />
+          {previewTokens.length > 0 ? (
+            <>
+              <p className="admin-muted admin-smart-settings-diag-summary">
+                <strong>{previewTokens.length}</strong> token
+                {previewTokens.length === 1 ? '' : 's'} would be considered for learning + scoring:
+              </p>
+              <ul className="admin-smart-categorise-history-tokens admin-smart-settings-diag-tokens">
+                {previewTokens.map((t) => (
+                  <li key={t} className="admin-smart-categorise-token-chip">
+                    <span className="admin-smart-categorise-token">{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : previewText.trim() ? (
+            <p className="admin-callout admin-callout--warn">
+              Every token in this text was dropped by the current rules (likely too short, in the
+              ignore list, or matched the short-numeric rule). Try lowering the min token length.
+            </p>
+          ) : null}
+        </section>
+
+        {/* ----------- Catalogue stats ----------- */}
         <section className="card admin-smart-categorise-setting-card">
           <h3>Catalogue overview</h3>
           <dl className="admin-smart-categorise-stats-grid">
@@ -1591,59 +2079,22 @@ function SettingsTab({
             <dt>Categorised products</dt>
             <dd>
               {categorisedProducts}{' '}
-              <span className="admin-muted">({Math.round((categorisedProducts / Math.max(1, products.length)) * 100)}%)</span>
+              <span className="admin-muted">
+                ({Math.round((categorisedProducts / Math.max(1, products.length)) * 100)}%)
+              </span>
             </dd>
             <dt>Uncategorised products</dt>
             <dd>{uncategorisedProducts}</dd>
           </dl>
         </section>
 
+        {/* ----------- Heavy actions ----------- */}
         <section className="card admin-smart-categorise-setting-card">
-          <h3>Confidence bands</h3>
-          <p className="admin-muted">
-            These thresholds determine how each suggestion is labelled. They are currently fixed at
-            the values below; future versions will let you tune them per program.
-          </p>
-          <table className="admin-smart-categorise-thresholds">
-            <thead>
-              <tr>
-                <th>Band</th>
-                <th>Score ≥</th>
-                <th>What it means</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>
-                  <span className="admin-badge admin-badge--high">high</span>
-                </td>
-                <td>0.75</td>
-                <td>Strong word/phrase overlap with the category — safe to apply in bulk.</td>
-              </tr>
-              <tr>
-                <td>
-                  <span className="admin-badge admin-badge--medium">medium</span>
-                </td>
-                <td>0.50</td>
-                <td>Plausible match — review before applying.</td>
-              </tr>
-              <tr>
-                <td>
-                  <span className="admin-badge admin-badge--low">low</span>
-                </td>
-                <td>0.35</td>
-                <td>Weak signal — usually needs manual correction.</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        <section className="card admin-smart-categorise-setting-card">
-          <h3>Learning</h3>
+          <h3>Re-train &amp; reset</h3>
           <p className="admin-muted">
             The system gets better the more you use it. Each accepted or overridden suggestion adds{' '}
             <code>+1</code> to the weight of every meaningful token in the product name against the
-            chosen category.
+            chosen category. Use these tools to rebuild or wipe that knowledge.
           </p>
           <div className="admin-smart-categorise-actions admin-smart-categorise-actions--inline">
             <button
@@ -1655,7 +2106,9 @@ function SettingsTab({
             >
               {retraining
                 ? 'Re-training…'
-                : `Re-train from ${categorisedProducts} categorised product${categorisedProducts === 1 ? '' : 's'}`}
+                : `Re-train from ${categorisedProducts} categorised product${
+                    categorisedProducts === 1 ? '' : 's'
+                  }`}
             </button>
             <button
               type="button"

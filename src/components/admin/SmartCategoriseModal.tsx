@@ -17,8 +17,10 @@ import {
 } from '@/pages/admin/AdminSmartCategorise'
 import {
   loadSmartCategoryLearning,
+  loadUserSmartStopWords,
   type LearningIndex,
 } from '@/lib/smartCategoryLearning'
+import { loadSmartCategorySettings } from '@/lib/smartCategorySettings'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
 interface SmartCategoriseModalProps {
@@ -50,7 +52,14 @@ export default function SmartCategoriseModal({
   const refreshLearning = useCallback(async () => {
     setLoadingLearning(true)
     try {
-      setLearning(await loadSmartCategoryLearning())
+      // Refresh all three caches the heuristic depends on (learning, stop-words, settings) before
+      // we compute suggestions so they reflect any tweaks made on the Settings or History tabs.
+      const [idx] = await Promise.all([
+        loadSmartCategoryLearning(),
+        loadUserSmartStopWords(),
+        loadSmartCategorySettings(),
+      ])
+      setLearning(idx)
     } finally {
       setLoadingLearning(false)
     }

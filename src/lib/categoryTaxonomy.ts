@@ -9,19 +9,41 @@ export function getCategoryKind(category: CategoryRow): CategoryKind {
   return inferCategoryKindFromName(category.name)
 }
 
+/** Tealbury/Lamtek door family names spotted in pricelists. Used by smart categorise + browse mode. */
+export const KNOWN_DOOR_RANGE_PATTERNS: RegExp[] = [
+  /\boakham(\s+(glass|soft\s*matte|matte|gloss))?\b/i,
+  /\bknightsbridge(\s+(std|standard|prm|premium))?\b/i,
+  /\bdawson\b/i,
+  /\bpopplewick\b/i,
+  /\bnorwood\b/i,
+  /\bcleveland\b/i,
+  /\bharrington\b/i,
+  /\bfenton\b/i,
+  /\bhadfield\b/i,
+  /\bberkeley\b/i,
+  /\bdover\b/i,
+  /\baura\b/i,
+  /\balto\b/i,
+  /\bbryson\b/i,
+  /\bharborne\b/i,
+  /\bgreenwich\b/i,
+  /\blincoln\b/i,
+  /\bcambridge\b/i,
+  /\bwindsor\b/i,
+  /\bhamilton\b/i,
+]
+
 export function inferCategoryKindFromName(name: string): CategoryKind {
   const n = name.toLowerCase()
   if (
-    /\b(oakham|dawson|norwood|alto|bryson|harborne|greenwich|lincoln|cambridge|windsor|hamilton)\b/.test(
-      n,
-    ) ||
+    KNOWN_DOOR_RANGE_PATTERNS.some((re) => re.test(n)) ||
     /\bdoor range\b/.test(n) ||
     (n.includes('kitchen') && n.includes('range') && n.split(/\s+/).length <= 4)
   ) {
     return 'door_range'
   }
   if (
-    /wirework|accessor|drawer box|drawer boxes|hinge|fitting|plinth|cornice|pelmet|worktop|internal storage|orgatray|cutlery|cabinet|base unit|wall unit|tall unit|carcass|\bunits\b|\bunit\b|panel/.test(
+    /wirework|accessor|drawer box|drawer boxes|hinge|fitting|plinth|cornice|pelmet|worktop|internal storage|orgatray|cutlery|cabinet|base unit|wall unit|tall unit|carcass|\bunits\b|\bunit\b|\bpanels?\b|\bposts?\b|mould(ing|s)?|corbel|mantle|mantel/.test(
       n,
     )
   ) {

@@ -202,6 +202,36 @@ function sectionFromCustomerHeaderRow(row: unknown[], codeCol: number): string {
   return s || 'Tealbury catalogue'
 }
 
+/**
+ * Map a Tealbury "ACCESSORIES" line (description + code) onto the user's specialised category set
+ * instead of dumping everything in a single "Accessories" bucket.
+ *
+ * Returns the new category name or null if no mapping applies.
+ */
+export function mapTealburyAccessoryToCategory(description: string, code: string): string | null {
+  const text = `${description} ${code}`.toLowerCase()
+
+  if (/(modern cornice|cornice|pelmet)/.test(text)) return 'Cornice & Pelmet'
+  if (/(plinth)/.test(text)) return 'Plinth'
+  if (
+    /(end panel|base panel|tower panel|wall panel|splashback panel|\bpanel\b|18mm.*panel)/.test(text)
+  ) {
+    return 'Panels'
+  }
+  if (/(internal corner post|corner post|tall feature end post|\bpost\b)/.test(text)) return 'Posts'
+  if (
+    /(corbel|mantle|mantel|universal moulding|moulding|quadrant|2450quadrant|skirting)/.test(text)
+  ) {
+    return 'Mouldings'
+  }
+  return null
+}
+
+/** Tealbury sections that are accessory-style and benefit from re-mapping per item. */
+function sectionLooksLikeTealburyAccessories(section: string): boolean {
+  return /accessor/i.test(section)
+}
+
 /** Tealbury "Customer Copy" style: CODE / H/W/D / PRICE blocks (one price column per sheet). */
 function parseTealburyCustomerCatalogMatrix(
   data: unknown[][],
@@ -245,11 +275,17 @@ function parseTealburyCustomerCatalogMatrix(
       .filter(Boolean)
       .join('\n')
 
+    let categoryName = section
+    if (sectionLooksLikeTealburyAccessories(section)) {
+      const remapped = mapTealburyAccessoryToCategory(desc, code)
+      if (remapped) categoryName = remapped
+    }
+
     let parsed: TealburyParsedRow = {
       sku: code,
       name,
       description,
-      categoryName: section,
+      categoryName,
       unitPrice: p,
       cost_price: Math.round(p * COST_FACTOR * 100) / 100,
       options: {

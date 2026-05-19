@@ -6,6 +6,7 @@ import {
   syncInferredCategoryKinds,
   type SmartCategorySuggestion,
 } from '@/lib/smartProductCategorize'
+import { rebucketTealburyAccessories } from '@/lib/tealburyAccessoryRebucket'
 
 interface SmartCategorizePanelProps {
   products: ProductRow[]
@@ -24,6 +25,7 @@ export default function SmartCategorizePanel({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [applying, setApplying] = useState(false)
   const [syncingKinds, setSyncingKinds] = useState(false)
+  const [rebucketing, setRebucketing] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
   const suggestions = useMemo(() => {
@@ -79,6 +81,26 @@ export default function SmartCategorizePanel({
     }
   }
 
+  async function splitTealburyAccessories() {
+    setRebucketing(true)
+    setMessage(null)
+    try {
+      const summary = await rebucketTealburyAccessories()
+      const parts = [
+        `Created ${summary.ensured} categor${summary.ensured === 1 ? 'y' : 'ies'}`,
+        `Re-assigned ${summary.reassigned} product${summary.reassigned === 1 ? '' : 's'}`,
+        `Skipped ${summary.skipped}`,
+      ]
+      if (summary.errors.length > 0) {
+        parts.push(`${summary.errors.length} error(s): ${summary.errors.slice(0, 2).join('; ')}`)
+      }
+      setMessage(parts.join(' · '))
+      onApplied()
+    } finally {
+      setRebucketing(false)
+    }
+  }
+
   return (
     <div className="admin-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="smart-cat-title">
       <div className="admin-modal card admin-smart-categorize-modal">
@@ -111,6 +133,15 @@ export default function SmartCategorizePanel({
           </label>
           <button type="button" className="btn btn-outline btn-small" disabled={syncingKinds} onClick={() => void syncKinds()}>
             {syncingKinds ? 'Syncing…' : 'Sync category types'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline btn-small"
+            disabled={rebucketing}
+            onClick={() => void splitTealburyAccessories()}
+            title="Move Tealbury accessory items into Cornice & Pelmet, Plinth, Panels, Mouldings, Posts"
+          >
+            {rebucketing ? 'Splitting Tealbury accessories…' : 'Split Tealbury accessories'}
           </button>
         </div>
         <p className="admin-muted">

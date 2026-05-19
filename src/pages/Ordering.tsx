@@ -35,7 +35,18 @@ export default function Ordering() {
   const hasExplicitGuidance =
     Boolean(modeParam || rangeId || prefillSearch || prefillAssemblySearch || checklistHint || suggestionsRaw)
 
-  const { draftOrder, draftOrders, setActiveDraftOrder, createDraftOrder, duplicateDraftOrder, refresh, ensureDraftOrder } = useDraftOrder()
+  const {
+    draftOrder,
+    draftOrders,
+    setActiveDraftOrder,
+    createDraftOrder,
+    duplicateDraftOrder,
+    renameDraftOrder,
+    refresh,
+    ensureDraftOrder,
+  } = useDraftOrder()
+  const [renamingBasket, setRenamingBasket] = useState(false)
+  const [basketNameDraft, setBasketNameDraft] = useState('')
   const effectiveUserId = useEffectiveUserId()
   const [project, setProject] = useState<OrderProject | null>(null)
   const [mode, setMode] = useState<OrderMode>(modeParam ?? 'component')
@@ -447,6 +458,48 @@ export default function Ordering() {
               ))}
             </select>
           </label>
+          {draftOrder?.id && !renamingBasket && (
+            <button
+              type="button"
+              className="btn btn-outline btn-small"
+              onClick={() => {
+                setBasketNameDraft((draftOrder.reference ?? '').trim())
+                setRenamingBasket(true)
+              }}
+              title="Give this basket a friendly name (e.g. Mrs Smith — Kitchen A)"
+            >
+              Rename basket
+            </button>
+          )}
+          {draftOrder?.id && renamingBasket && (
+            <form
+              className="cart-basket-rename-form"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void renameDraftOrder(draftOrder.id, basketNameDraft).then(() => setRenamingBasket(false))
+              }}
+            >
+              <input
+                type="text"
+                value={basketNameDraft}
+                onChange={(e) => setBasketNameDraft(e.target.value)}
+                placeholder="Basket name"
+                aria-label="Basket name"
+                autoFocus
+                maxLength={120}
+              />
+              <button type="submit" className="btn btn-small">
+                Save
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-small"
+                onClick={() => setRenamingBasket(false)}
+              >
+                Cancel
+              </button>
+            </form>
+          )}
           <button type="button" className="btn btn-outline btn-small" onClick={() => createDraftOrder()}>
             New basket
           </button>

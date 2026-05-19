@@ -31,6 +31,7 @@ import {
   type ProductCategoryMap,
 } from '@/lib/productCategories'
 import { ProductCategoryMultiSelect } from '@/components/admin/ProductCategoryMultiSelect'
+import SmartCategorizePanel from '@/components/admin/SmartCategorizePanel'
 import type { CategoryRow } from '@/types/database'
 import type { ProductRow } from '@/types/database'
 import {
@@ -142,6 +143,7 @@ export default function AdminCatalogue() {
   const [activeOnly, setActiveOnly] = useState(true)
   const [stockOnly, setStockOnly] = useState(false)
   const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'sku_asc' | 'sku_desc' | 'price_asc' | 'price_desc'>('name_asc')
+  const [smartCategorizeOpen, setSmartCategorizeOpen] = useState(false)
   const [catalogProgramFilter, setCatalogProgramFilter] = useState<'all' | 'lamtek' | 'tealbury'>('all')
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
@@ -1110,6 +1112,16 @@ export default function AdminCatalogue() {
           <input type="checkbox" checked={stockOnly} onChange={(e) => setStockOnly(e.target.checked)} />
           Stock items only
         </label>
+        {canEditCatalogue && (
+          <button
+            type="button"
+            className="btn btn-outline btn-small"
+            onClick={() => setSmartCategorizeOpen(true)}
+            title="Suggest categories from product names"
+          >
+            Smart categorise
+          </button>
+        )}
         <label>
           Sort by
           <select
@@ -1830,6 +1842,17 @@ export default function AdminCatalogue() {
             setSelectedProduct((prev) =>
               prev && prev.id === productId ? { ...prev, category_id: primary } : prev
             )
+          }}
+        />
+      )}
+
+      {smartCategorizeOpen && (
+        <SmartCategorizePanel
+          products={products}
+          categories={categories}
+          onClose={() => setSmartCategorizeOpen(false)}
+          onApplied={() => {
+            void load()
           }}
         />
       )}

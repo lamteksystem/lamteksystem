@@ -19,12 +19,15 @@ export interface MarketingSiteSettingsRow {
   updated_at: string
 }
 
+export type CategoryKind = 'product_type' | 'door_range' | 'universal'
+
 export interface CategoryRow {
   id: string
   name: string
   slug: string
   sort_order: number
   parent_id: string | null
+  category_kind?: CategoryKind
 }
 
 export interface ProductCategoryRow {
@@ -327,6 +330,7 @@ export interface OrderLineRow {
   quantity: number
   unit_price: number
   options: Json
+  created_at?: string
 }
 
 export interface OrderEventRow {

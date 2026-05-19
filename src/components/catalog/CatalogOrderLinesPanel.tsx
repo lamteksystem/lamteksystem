@@ -1,0 +1,147 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import type { WorkbenchOrderLine } from '@/hooks/useWorkbenchOrderLines'
+import { loadOrderLineBreakdown, type OrderLineComponentRow } from '@/lib/orderLineBreakdown'
+
+interface CatalogOrderLinesPanelProps {
+  lines: WorkbenchOrderLine[]
+  loading?: boolean
+  cartHref?: string
+  onRemoveLine?: (lineId: string) => void
+}
+
+function lineTitle(line: WorkbenchOrderLine): string {
+  return line.product_snapshot.name ?? 'Product'
+}
+
+function lineCode(line: WorkbenchOrderLine): string {
+  return line.product_snapshot.sku ?? '—'
+}
+
+function LineBreakdown({ line }: { line: WorkbenchOrderLine }) {
+  const [rows, setRows] = useState<OrderLineComponentRow[]>([])
+  const [source, setSource] = useState<'bom' | 'options' | 'single'>('single')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    void loadOrderLineBreakdown(line.product_id, line.options).then((result) => {
+      if (cancelled) return
+      setRows(result.rows)
+      setSource(result.source)
+      setLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [line.id, line.product_id, line.options])
+
+  if (loading) {
+    return <p className="tb-order-line-breakdown tb-muted">Loading parts…</p>
+  }
+  if (source === 'single' || rows.length === 0) {
+    return <p className="tb-order-line-breakdown tb-muted">Single catalogue line (no component breakdown).</p>
+  }
+  return (
+    <ul className="tb-order-line-parts">
+      {rows.map((row, idx) => (
+        <li key={`${row.label}-${row.sku ?? idx}`}>
+          <span className="tb-order-line-part-name">{row.label}</span>
+          {row.sku ? <span className="tb-order-line-part-sku">{row.sku}</span> : null}
+          {row.quantity != null ? (
+            <span className="tb-order-line-part-qty">× {row.quantity}</span>
+          ) : null}
+          {row.detail ? <span className="tb-order-line-part-role">{row.detail}</span> : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export default function CatalogOrderLinesPanel({
+  lines,
+  loading = false,
+  cartHref = '',
+  onRemoveLine,
+}: CatalogOrderLinesPanelProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const totalExVat = lines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0)
+
+  return (
+    <section className="tb-order-lines" aria-label="Lines on order">
+      <header className="tb-basket-header">
+        <h3>On order</h3>
+        <span className="tb-basket-count">
+          {lines.length} line{lines.length === 1 ? '' : 's'}
+        </span>
+      </header>
+
+      {loading && lines.length === 0 ? (
+        <p className="tb-basket-empty">Loading order lines…</p>
+      ) : lines.length === 0 ? (
+        <p className="tb-basket-empty">No lines yet. Add products from the table or detail panel.</p>
+      ) : (
+        <ul className="tb-order-lines-list">
+          {lines.map((line) => {
+            const expanded = expandedId === line.id
+            return (
+              <li key={line.id} className={`tb-order-line${expanded ? ' tb-order-line--expanded' : ''}`}>
+                <button
+                  type="button"
+                  className="tb-order-line-summary"
+                  onClick={() => setExpandedId((prev) => (prev === line.id ? null : line.id))}
+                  aria-expanded={expanded}
+                >
+                  <span className="tb-order-line-chevron" aria-hidden>
+                    {expanded ? '▾' : '▸'}
+                  </span>
+                  <span className="tb-order-line-main">
+                    <span className="tb-basket-line-code">{lineCode(line)}</span>
+                    <span className="tb-basket-line-name" title={lineTitle(line)}>
+                      {lineTitle(line)}
+                    </span>
+                  </span>
+                  <span className="tb-order-line-meta">
+                    <span className="tb-order-line-qty">× {line.quantity}</span>
+                    <span className="tb-order-line-price">
+                      £{(line.quantity * line.unit_price).toFixed(2)}
+                    </span>
+                  </span>
+                </button>
+                {expanded && (
+                  <div className="tb-order-line-detail">
+                    <LineBreakdown line={line} />
+                    {onRemoveLine && (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-small tb-order-line-remove"
+                        onClick={() => onRemoveLine(line.id)}
+                      >
+                        Remove line
+                      </button>
+                    )}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {lines.length > 0 && (
+        <footer className="tb-order-lines-footer">
+          <div className="tb-basket-total">
+            <span>Total ex VAT</span>
+            <strong>£{totalExVat.toFixed(2)}</strong>
+          </div>
+          {cartHref ? (
+            <Link to={cartHref} className="btn btn-small btn-block">
+              Review in cart →
+            </Link>
+          ) : null}
+        </footer>
+      )}
+    </section>
+  )
+}

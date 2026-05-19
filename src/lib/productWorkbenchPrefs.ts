@@ -69,12 +69,12 @@ const LAYOUT_KEY = 'catalog_workbench_layout_v1'
 
 export interface WorkbenchLayoutPrefs {
   leftCollapsed: boolean
-  rightDetailVisible: boolean
+  rightPaneOpen: boolean
 }
 
 const DEFAULT_LAYOUT: WorkbenchLayoutPrefs = {
   leftCollapsed: false,
-  rightDetailVisible: true,
+  rightPaneOpen: true,
 }
 
 export async function loadWorkbenchLayout(): Promise<WorkbenchLayoutPrefs> {
@@ -82,9 +82,11 @@ export async function loadWorkbenchLayout(): Promise<WorkbenchLayoutPrefs> {
   if (!raw) return { ...DEFAULT_LAYOUT }
   try {
     const parsed = JSON.parse(raw) as Partial<WorkbenchLayoutPrefs>
+    const legacyDetail = (parsed as { rightDetailVisible?: boolean }).rightDetailVisible
     return {
       leftCollapsed: Boolean(parsed.leftCollapsed),
-      rightDetailVisible: parsed.rightDetailVisible !== false,
+      rightPaneOpen:
+        parsed.rightPaneOpen !== false && legacyDetail !== false,
     }
   } catch {
     return { ...DEFAULT_LAYOUT }

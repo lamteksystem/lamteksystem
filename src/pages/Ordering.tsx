@@ -13,6 +13,7 @@ import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
 import { resolveChecklistAssemblyFilters, resolveChecklistCategoryId, type ChecklistHint } from '@/lib/checklistRouting'
 import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
+import { loadWorkbenchFilters, saveWorkbenchFilters } from '@/lib/productWorkbenchPrefs'
 import type { CategoryRow, ProductRow, AssemblyWithLines } from '@/types/database'
 
 type OrderMode = 'component' | 'complete'
@@ -28,6 +29,7 @@ export default function Ordering() {
   const suggestionsRaw = (searchParams.get('suggestions') ?? '').trim()
   const suggestionIndex = Number(searchParams.get('suggestionIndex') ?? '0') || 0
   const flowGuided = searchParams.get('flow') === 'guided'
+  const clearRange = searchParams.get('clearRange') === '1'
   const workflowComplete = type === 'stock' && rangeId && (modeParam === 'component' || modeParam === 'complete')
   const showWizard = flowGuided && (!type || (type === 'stock' && (!rangeId || !modeParam)))
   const hasExplicitGuidance =
@@ -106,6 +108,36 @@ export default function Ordering() {
     if (modeParam) setMode(modeParam)
     if (rangeId) setSelectedCategory(rangeId)
   }, [modeParam, rangeId])
+
+  useEffect(() => {
+    if (!clearRange || rangeId) return
+    let cancelled = false
+    async function resetBrowseFilters() {
+      setSelectedCategory(null)
+      const saved = await loadWorkbenchFilters('ordering_lamtek')
+      if (!cancelled) {
+        await saveWorkbenchFilters('ordering_lamtek', { ...saved, categoryId: null })
+      }
+      await setUserPreference(
+        PREF_ORDERING_STATE,
+        JSON.stringify({
+          mode: 'component',
+          selectedCategory: null,
+          searchQuery: '',
+          assemblyTypeFilter: '',
+          assemblyCollectionFilter: '',
+          assemblySearch: '',
+        }),
+      )
+      const next = new URLSearchParams(searchParams)
+      next.delete('clearRange')
+      setSearchParams(next, { replace: true })
+    }
+    void resetBrowseFilters()
+    return () => {
+      cancelled = true
+    }
+  }, [clearRange, rangeId, searchParams, setSearchParams])
 
   useEffect(() => {
     let cancelled = false
@@ -264,6 +296,7 @@ export default function Ordering() {
 
   const displayCategories = categories.filter((c) => !c.parent_id)
   const [lineCount, setLineCount] = useState(0)
+  const [orderLinesRefreshToken, setOrderLinesRefreshToken] = useState(0)
   const refreshLineCount = useCallback(async () => {
     if (!draftOrder?.id) {
       setLineCount(0)
@@ -304,6 +337,7 @@ export default function Ordering() {
       }
       await refresh()
       await refreshLineCount()
+      setOrderLinesRefreshToken((t) => t + 1)
       const total = payload.products.length + payload.assemblies.length
       setLastAddedMessage(`Added ${total} line${total === 1 ? '' : 's'} to your order`)
     },
@@ -453,7 +487,9 @@ export default function Ordering() {
         preferencesScope="ordering_lamtek"
         cartLineCount={lineCount}
         cartHref="/ordering/cart"
-        initialCategoryId={selectedCategory}
+        orderId={draftOrder?.id ?? null}
+        orderLinesRefreshToken={orderLinesRefreshToken}
+        initialCategoryId={rangeId || null}
         commitLabel="Add to order"
         linePersistence="immediate"
         addButtonLabel="Add to order"

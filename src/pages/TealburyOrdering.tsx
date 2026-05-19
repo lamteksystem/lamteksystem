@@ -15,6 +15,7 @@ export default function TealburyOrdering() {
   const effectiveUserId = useEffectiveUserId()
   const { products, categories, loading } = useCatalogWorkbenchData([CATALOG_PROGRAM.TEALBURY])
   const [lineCount, setLineCount] = useState(0)
+  const [orderLinesRefreshToken, setOrderLinesRefreshToken] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -57,6 +58,7 @@ export default function TealburyOrdering() {
         .select('*', { count: 'exact', head: true })
         .eq('order_id', orderId)
       setLineCount(count ?? 0)
+      setOrderLinesRefreshToken((t) => t + 1)
     },
     [effectiveUserId, ensureDraftOrder, refresh],
   )
@@ -108,6 +110,8 @@ export default function TealburyOrdering() {
         allowedCatalogPrograms={[CATALOG_PROGRAM.TEALBURY]}
         customerUserId={effectiveUserId}
         preferencesScope="ordering_tealbury"
+        orderId={draftOrder?.id ?? null}
+        orderLinesRefreshToken={orderLinesRefreshToken}
         cartLineCount={lineCount}
         cartHref="/ordering/cart"
         commitLabel="Add to order"

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import type { AssemblyWithLines, CategoryRow, ProductRow } from '@/types/database'
 import { CATALOG_PROGRAM, type CatalogProgram } from '@/lib/catalogProgram'
 import { getProductAvailabilityMeta } from '@/lib/productAvailability'
+import { buildCategoryTreeOptions, countProductsForBrowseOption } from '@/lib/categoryTaxonomy'
 import {
   EMPTY_WORKBENCH_FILTERS,
   buildCatalogFacets,
@@ -27,9 +27,11 @@ import {
 } from '@/lib/productWorkbenchPrefs'
 import { resolveProductPriceBreakdown } from '@/lib/productWorkbenchPricing'
 import CatalogProductDetailPanel from '@/components/catalog/CatalogProductDetailPanel'
+import CatalogOrderLinesPanel from '@/components/catalog/CatalogOrderLinesPanel'
 import CatalogProductStagingBasket, {
   type StagedCatalogLine,
 } from '@/components/catalog/CatalogProductStagingBasket'
+import { useWorkbenchOrderLines } from '@/hooks/useWorkbenchOrderLines'
 import type { CatalogPickerCommitPayload } from '@/components/catalog/CatalogProductPickerModal'
 
 type MainTab = 'products' | 'assemblies'
@@ -42,6 +44,8 @@ interface CatalogProductWorkbenchProps {
   allowedCatalogPrograms?: CatalogProgram[]
   customerUserId?: string | null
   preferencesScope: string
+  orderId?: string | null
+  orderLinesRefreshToken?: number
   cartLineCount?: number
   cartHref?: string
   commitLabel?: string
@@ -60,6 +64,8 @@ export default function CatalogProductWorkbench({
   allowedCatalogPrograms = [CATALOG_PROGRAM.LAMTEK],
   customerUserId,
   preferencesScope,
+  orderId = null,
+  orderLinesRefreshToken = 0,
   cartLineCount = 0,
   cartHref = '/ordering/cart',
   commitLabel = 'Add to order',
@@ -86,8 +92,11 @@ export default function CatalogProductWorkbench({
   const [sellPriceByProductId, setSellPriceByProductId] = useState<Record<string, number>>({})
   const [prefsReady, setPrefsReady] = useState(false)
   const [leftCollapsed, setLeftCollapsed] = useState(false)
-  const [rightDetailVisible, setRightDetailVisible] = useState(true)
+  const [rightPaneOpen, setRightPaneOpen] = useState(true)
   const [layoutReady, setLayoutReady] = useState(false)
+  const immediate = linePersistence === 'immediate'
+  const { lines: orderLines, loading: orderLinesLoading, reload: reloadOrderLines } =
+    useWorkbenchOrderLines(immediate ? orderId : null, orderLinesRefreshToken)
 
   const favouriteSet = useMemo(() => new Set(favouriteIds), [favouriteIds])
 
@@ -99,8 +108,12 @@ export default function CatalogProductWorkbench({
   const facets = useMemo(() => buildCatalogFacets(scopeProducts), [scopeProducts])
   const catMap = useMemo(() => categoryNameById(categories), [categories])
   const filtered = useMemo(
-    () => filterCatalogProducts(scopeProducts, filters, favouriteSet),
-    [scopeProducts, filters, favouriteSet],
+    () => filterCatalogProducts(scopeProducts, filters, favouriteSet, categories),
+    [scopeProducts, filters, favouriteSet, categories],
+  )
+  const browseOptions = useMemo(
+    () => buildCategoryTreeOptions(categories, filters.browseMode),
+    [categories, filters.browseMode],
   )
   const selectedProduct = useMemo(
     () => products.find((p) => p.id === selectedProductId) ?? null,
@@ -109,12 +122,14 @@ export default function CatalogProductWorkbench({
 
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const p of scopeProducts) {
-      if (!p.category_id) continue
-      counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1)
+    for (const opt of browseOptions) {
+      counts.set(
+        opt.id,
+        countProductsForBrowseOption(scopeProducts, categories, filters.browseMode, opt.id),
+      )
     }
     return counts
-  }, [scopeProducts])
+  }, [browseOptions, scopeProducts, categories, filters.browseMode])
 
   const updateFilter = useCallback((patch: Partial<WorkbenchFilterState>) => {
     setFilters((prev) => ({ ...prev, ...patch }))
@@ -129,7 +144,7 @@ export default function CatalogProductWorkbench({
     void loadWorkbenchLayout().then((layout) => {
       if (cancelled) return
       setLeftCollapsed(layout.leftCollapsed)
-      setRightDetailVisible(layout.rightDetailVisible)
+      setRightPaneOpen(layout.rightPaneOpen)
       setLayoutReady(true)
     })
     return () => {
@@ -139,8 +154,8 @@ export default function CatalogProductWorkbench({
 
   useEffect(() => {
     if (!layoutReady) return
-    void saveWorkbenchLayout({ leftCollapsed, rightDetailVisible })
-  }, [layoutReady, leftCollapsed, rightDetailVisible])
+    void saveWorkbenchLayout({ leftCollapsed, rightPaneOpen })
+  }, [layoutReady, leftCollapsed, rightPaneOpen])
 
   useEffect(() => {
     let cancelled = false
@@ -152,8 +167,10 @@ export default function CatalogProductWorkbench({
       ])
       if (cancelled) return
       setFilters({
+        ...EMPTY_WORKBENCH_FILTERS,
         ...savedFilters,
-        categoryId: initialCategoryId ?? savedFilters.categoryId,
+        browseMode: savedFilters.browseMode ?? 'category',
+        categoryId: initialCategoryId,
       })
       setFavouriteIds(favs)
       setFilterPresets(presets)
@@ -222,6 +239,7 @@ export default function CatalogProductWorkbench({
       setCommitting(true)
       try {
         await onCommit(payload)
+        if (immediate) await reloadOrderLines()
         setStatusMessage(successMessage)
       } catch (e) {
         console.error(e)
@@ -230,7 +248,7 @@ export default function CatalogProductWorkbench({
         setCommitting(false)
       }
     },
-    [onCommit],
+    [immediate, onCommit, reloadOrderLines],
   )
 
   const addProductToBasket = useCallback(
@@ -341,7 +359,7 @@ export default function CatalogProductWorkbench({
     'tb-workbench',
     embedded ? 'tb-workbench--embedded' : '',
     leftCollapsed ? 'tb-workbench--filters-collapsed' : '',
-    !rightDetailVisible ? 'tb-workbench--detail-hidden' : '',
+    !rightPaneOpen ? 'tb-workbench--right-hidden' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -382,23 +400,57 @@ export default function CatalogProductWorkbench({
           />
         </label>
 
+        <fieldset className="tb-filter-field tb-filter-browse-mode">
+          <legend>Browse by</legend>
+          <label className="tb-check-row">
+            <input
+              type="radio"
+              name="tb-browse-mode"
+              checked={filters.browseMode === 'category'}
+              onChange={() => updateFilter({ browseMode: 'category', categoryId: null })}
+            />
+            Category
+          </label>
+          <label className="tb-check-row">
+            <input
+              type="radio"
+              name="tb-browse-mode"
+              checked={filters.browseMode === 'range'}
+              onChange={() => updateFilter({ browseMode: 'range', categoryId: null })}
+            />
+            Kitchen range
+          </label>
+        </fieldset>
+
         <label className="tb-filter-field">
-          <span>Range</span>
+          <span>{filters.browseMode === 'range' ? 'Kitchen range' : 'Category'}</span>
           <select
             value={filters.categoryId ?? ''}
             onChange={(e) => updateFilter({ categoryId: e.target.value || null })}
           >
-            <option value="">All ranges ({scopeProducts.length})</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {categoryCounts.has(c.id) ? ` (${categoryCounts.get(c.id)})` : ''}
+            <option value="">
+              {filters.browseMode === 'range'
+                ? `All ranges (${scopeProducts.length})`
+                : `All categories (${scopeProducts.length})`}
+            </option>
+            {browseOptions.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.depth > 0 ? '— ' : ''}
+                {opt.label}
+                {categoryCounts.has(opt.id) ? ` (${categoryCounts.get(opt.id)})` : ''}
               </option>
             ))}
           </select>
+          {filters.browseMode === 'range' ? (
+            <p className="tb-filter-hint">
+              Door families plus cross-range groups (wirework, accessories, units, etc.).
+            </p>
+          ) : (
+            <p className="tb-filter-hint">Product types such as doors, handles, panels and units.</p>
+          )}
         </label>
 
-        {facets.doorRanges.length > 0 && (
+        {filters.browseMode === 'category' && facets.doorRanges.length > 0 && (
           <label className="tb-filter-field">
             <span>Door range</span>
             <select
@@ -540,16 +592,22 @@ export default function CatalogProductWorkbench({
               </button>
             )}
           </form>
+          {!rightPaneOpen && (
+            <button
+              type="button"
+              className="btn btn-outline btn-small tb-pane-reopen"
+              onClick={() => setRightPaneOpen(true)}
+            >
+              Show order panel
+              {(immediate ? orderLines.length : cartLineCount) > 0
+                ? ` (${immediate ? orderLines.length : cartLineCount})`
+                : ''}
+            </button>
+          )}
           <p className="tb-result-meta">
             <strong>{mainTab === 'products' ? filtered.length : filteredAssemblies.length}</strong>{' '}
             {mainTab === 'products' ? 'product' : 'unit'}
             {(mainTab === 'products' ? filtered.length : filteredAssemblies.length) === 1 ? '' : 's'}
-            {cartLineCount > 0 && cartHref && (
-              <>
-                {' '}
-                · <Link to={cartHref}>View order ({cartLineCount})</Link>
-              </>
-            )}
           </p>
         </header>
 
@@ -642,6 +700,9 @@ export default function CatalogProductWorkbench({
                         {product.sku && product.sku !== displayProductCode(product) && (
                           <span className="tb-desc-sku">SKU {product.sku}</span>
                         )}
+                        <span className="tb-avail" title={availability.detail ?? availability.label}>
+                          {availability.label}
+                        </span>
                       </td>
                       <td className="tb-col-spec">
                         {specs.length > 0 ? (
@@ -656,22 +717,15 @@ export default function CatalogProductWorkbench({
                       </td>
                       <td className="tb-col-props">
                         {props.length > 0 ? (
-                          <table className="tb-mini-props">
-                            <tbody>
-                              {props.slice(0, 4).map((row) => (
-                                <tr key={row.label}>
-                                  <th scope="row">{row.label}</th>
-                                  <td>{row.value}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                          <span className="tb-props-summary" title={props.map((r) => `${r.label}: ${r.value}`).join(' · ')}>
+                            {props
+                              .slice(0, 3)
+                              .map((row) => `${row.label}: ${row.value}`)
+                              .join(' · ')}
+                          </span>
                         ) : (
                           <span className="tb-muted">—</span>
                         )}
-                        <span className="tb-avail" title={availability.detail ?? availability.label}>
-                          {availability.label}
-                        </span>
                       </td>
                       <td className="tb-col-price">
                         <strong>£{sell.toFixed(2)}</strong>
@@ -822,21 +876,20 @@ export default function CatalogProductWorkbench({
         )}
       </section>
 
-      <aside className="tb-workbench-right" aria-label="Details and basket">
+      {rightPaneOpen && (
+      <aside className="tb-workbench-right" aria-label="Order and product details">
         <div className="tb-right-pane-toolbar">
-          <span className="tb-right-pane-toolbar-label">Product panel</span>
+          <span className="tb-right-pane-toolbar-label">Order panel</span>
           <button
             type="button"
             className="tb-pane-toggle tb-pane-toggle--detail"
-            onClick={() => setRightDetailVisible((v) => !v)}
-            aria-pressed={rightDetailVisible}
-            title={rightDetailVisible ? 'Hide product details' : 'Show product details'}
+            onClick={() => setRightPaneOpen(false)}
+            title="Hide order panel"
           >
-            {rightDetailVisible ? 'Hide product details' : 'Show product details'}
+            Hide panel
           </button>
         </div>
-        {rightDetailVisible && (
-          selectedProduct && mainTab === 'products' ? (
+        {selectedProduct && mainTab === 'products' ? (
             <CatalogProductDetailPanel
               product={selectedProduct}
               categories={categories}
@@ -852,24 +905,32 @@ export default function CatalogProductWorkbench({
             <section className="tb-detail tb-detail--placeholder">
               <p>Select a product row to view specification, properties and customer pricing.</p>
             </section>
-          )
-        )}
+          )}
 
-        <CatalogProductStagingBasket
-          lines={staged}
-          linePersistence={linePersistence}
-          cartLineCount={cartLineCount}
-          cartHref={cartHref}
-          commitLabel={commitLabel}
-          onQuantityChange={(lineId, quantity) => {
-            setStaged((prev) => prev.map((l) => (l.id === lineId ? { ...l, quantity } : l)))
-          }}
-          onRemove={(lineId) => setStaged((prev) => prev.filter((l) => l.id !== lineId))}
-          onClear={() => setStaged([])}
-          onCommit={() => void commitBasket()}
-          committing={committing}
-        />
+        {immediate ? (
+          <CatalogOrderLinesPanel
+            lines={orderLines}
+            loading={orderLinesLoading}
+            cartHref={cartHref}
+          />
+        ) : (
+          <CatalogProductStagingBasket
+            lines={staged}
+            linePersistence={linePersistence}
+            cartLineCount={cartLineCount}
+            cartHref={cartHref}
+            commitLabel={commitLabel}
+            onQuantityChange={(lineId, quantity) => {
+              setStaged((prev) => prev.map((l) => (l.id === lineId ? { ...l, quantity } : l)))
+            }}
+            onRemove={(lineId) => setStaged((prev) => prev.filter((l) => l.id !== lineId))}
+            onClear={() => setStaged([])}
+            onCommit={() => void commitBasket()}
+            committing={committing}
+          />
+        )}
       </aside>
+      )}
     </article>
   )
 }

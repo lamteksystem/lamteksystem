@@ -1,9 +1,14 @@
 import { CATALOG_PROGRAM, type CatalogProgram } from '@/lib/catalogProgram'
+import {
+  productMatchesBrowseFilter,
+  type CatalogBrowseMode,
+} from '@/lib/categoryTaxonomy'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
 export interface WorkbenchFilterState {
   productCode: string
   search: string
+  browseMode: CatalogBrowseMode
   categoryId: string | null
   doorRange: string | null
   section: string | null
@@ -15,6 +20,7 @@ export interface WorkbenchFilterState {
 export const EMPTY_WORKBENCH_FILTERS: WorkbenchFilterState = {
   productCode: '',
   search: '',
+  browseMode: 'category',
   categoryId: null,
   doorRange: null,
   section: null,
@@ -133,10 +139,18 @@ export function filterCatalogProducts(
   products: ProductRow[],
   filters: WorkbenchFilterState,
   favouriteIds?: Set<string>,
+  categories: CategoryRow[] = [],
 ): ProductRow[] {
   return products.filter((p) => {
     if (filters.catalogProgram && p.catalog_program !== filters.catalogProgram) return false
-    if (filters.categoryId && p.category_id !== filters.categoryId) return false
+    if (
+      filters.categoryId &&
+      categories.length > 0 &&
+      !productMatchesBrowseFilter(p, categories, filters.browseMode, filters.categoryId)
+    ) {
+      return false
+    }
+    if (filters.categoryId && categories.length === 0 && p.category_id !== filters.categoryId) return false
     if (filters.doorRange && getDoorRange(p) !== filters.doorRange) return false
     if (filters.section && !getProductSections(p).includes(filters.section)) return false
     if (filters.inStockOnly && (p.stock_quantity ?? 0) <= 0) return false

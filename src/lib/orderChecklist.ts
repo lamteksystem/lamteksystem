@@ -1,3 +1,4 @@
+import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
 import type { CategoryRow, ProductRow } from '@/types/database'
 import type { OrderProject } from '@/lib/orderProject'
 
@@ -36,10 +37,40 @@ function productText(p: { name?: string | null; sku?: string | null; category_id
   return `${norm(p.name)} ${norm(p.sku)} ${categoryText(p.category_id ?? null, categoriesById)}`
 }
 
+function checklistProgressKey(orderId: string) {
+  return `order_build_checklist_${orderId}`
+}
+
+export async function loadOrderChecklistCompleted(orderId: string): Promise<ChecklistGroupId[]> {
+  const raw = await getUserPreference(checklistProgressKey(orderId))
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((id): id is ChecklistGroupId => typeof id === 'string')
+  } catch {
+    return []
+  }
+}
+
+export async function saveOrderChecklistCompleted(
+  orderId: string,
+  completedIds: ChecklistGroupId[],
+): Promise<void> {
+  const unique = [...new Set(completedIds)]
+  await setUserPreference(checklistProgressKey(orderId), JSON.stringify(unique))
+}
+
+/** Button label for the complete-units search link for a checklist row. */
+export function checklistFindUnitsLabel(group: Pick<ChecklistGroup, 'title'>): string {
+  return `Find ${group.title}`
+}
+
 export function buildOrderChecklist(params: {
   project: OrderProject | null
   lines: Array<{ product: Pick<ProductRow, 'name' | 'sku' | 'category_id'> | null; snapshotName?: string | null; snapshotSku?: string | null }>
   categories: CategoryRow[]
+  completedIds?: ChecklistGroupId[]
 }): ChecklistGroup[] {
   const categoriesById = new Map(params.categories.map((c) => [c.id, c]))
 
@@ -48,7 +79,9 @@ export function buildOrderChecklist(params: {
     return `${norm(l.snapshotName)} ${norm(l.snapshotSku)}`
   })
 
-  const hasAny = (keywords: string[]) => {
+  const completedSet = new Set(params.completedIds ?? [])
+
+  const cartMayMatch = (keywords: string[]) => {
     if (keywords.length === 0) return false
     return lineTexts.some((t) => keywords.some((k) => t.includes(k)))
   }
@@ -145,18 +178,18 @@ export function buildOrderChecklist(params: {
     },
   ]
 
-  // If the user is doing "collection" and doesn’t know postcode, don’t block; checklist is informative anyway.
-  const _room = params.project?.room_type ?? null
-  const prioritizeUnits = _room === 'kitchen' || _room === 'bedroom' || _room === 'other'
+  void params.project
 
   const evaluated = groups.map((g) => {
-    const isComplete = hasAny(g.keywords) || (!prioritizeUnits && g.id === 'units')
+    const isComplete = completedSet.has(g.id)
+    const hasCartMatches = cartMayMatch(g.keywords)
     return {
       id: g.id,
       title: g.title,
       hint: g.hint,
       is_complete: isComplete,
-      matched_examples: isComplete ? examplesFor(g.keywords) : [],
+      matched_examples:
+        isComplete || hasCartMatches ? examplesFor(g.keywords) : [],
       suggested_search_terms: g.suggested_search_terms,
     } satisfies ChecklistGroup
   })

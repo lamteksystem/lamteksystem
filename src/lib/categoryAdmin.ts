@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { CategoryRow } from '@/types/database'
+import type { CategoryKind, CategoryRow } from '@/types/database'
 
 export function slugifyCategoryName(name: string): string {
   return (
@@ -34,6 +34,7 @@ export async function createCategory(params: {
   slug?: string
   parent_id?: string | null
   sort_order?: number
+  category_kind?: CategoryKind
 }): Promise<{ category: CategoryRow | null; error: string | null }> {
   const name = params.name.trim()
   if (!name) return { category: null, error: 'Category name is required.' }
@@ -53,10 +54,20 @@ export async function createCategory(params: {
       slug,
       sort_order: params.sort_order ?? maxSort + 10,
       parent_id: params.parent_id ?? null,
+      category_kind: params.category_kind ?? 'product_type',
     })
     .select('*')
     .single()
 
+  if (error) return { category: null, error: error.message }
+  return { category: data as CategoryRow, error: null }
+}
+
+export async function updateCategory(
+  id: string,
+  patch: Partial<Pick<CategoryRow, 'name' | 'slug' | 'sort_order' | 'parent_id' | 'category_kind'>>,
+): Promise<{ category: CategoryRow | null; error: string | null }> {
+  const { data, error } = await supabase.from('categories').update(patch).eq('id', id).select('*').single()
   if (error) return { category: null, error: error.message }
   return { category: data as CategoryRow, error: null }
 }

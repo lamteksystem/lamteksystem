@@ -43,6 +43,7 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
   const [parentLoadError, setParentLoadError] = useState<string | null>(null)
   const [orderId, setOrderId] = useState('')
   const [lineCount, setLineCount] = useState(0)
+  const [orderLinesRefreshToken, setOrderLinesRefreshToken] = useState(0)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [lastAddedMessage, setLastAddedMessage] = useState<string | null>(null)
@@ -206,6 +207,7 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
         })
       }
       await refreshLineCount()
+      setOrderLinesRefreshToken((t) => t + 1)
       const added = payload.products.length + payload.assemblies.length
       const label = isQuote ? 'quote' : 'order'
       setLastAddedMessage(
@@ -349,6 +351,8 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
               showCatalogueSwitcher
               customerUserId={selectedUserId}
               preferencesScope={preferencesScope}
+              orderId={orderId}
+              orderLinesRefreshToken={orderLinesRefreshToken}
               cartLineCount={lineCount}
               cartHref={orderHref}
               commitLabel={isQuote ? 'Add to quote' : 'Add to order'}

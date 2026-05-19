@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PageNav } from '@/components/PageNav'
 import { supabase } from '@/lib/supabase'
@@ -6,8 +6,15 @@ import { useDraftOrder } from '@/hooks/useDraftOrder'
 import { repriceDraftOrderLinesForCustomer } from '@/lib/orderPricing'
 import { useEffectiveUserId } from '@/contexts/ImpersonationContext'
 import { getOrderProject, type OrderProject } from '@/lib/orderProject'
-import { buildOrderChecklist, type ChecklistGroup } from '@/lib/orderChecklist'
-import { getUserPreference } from '@/lib/userPreferences'
+import {
+  buildOrderChecklist,
+  loadOrderChecklistCompleted,
+  saveOrderChecklistCompleted,
+  type ChecklistGroup,
+  type ChecklistGroupId,
+} from '@/lib/orderChecklist'
+import OrderBuildChecklist from '@/components/order/OrderBuildChecklist'
+import CartOrderLineItem from '@/components/order/CartOrderLineItem'
 import type {
   CategoryRow,
   ProductRow,
@@ -25,6 +32,7 @@ import {
 } from '@/lib/deliveryWindows'
 import { formatOrderReferenceOrFallback } from '@/lib/orderDisplayName'
 import { lamtekPortalLocations } from '@/lib/lamtekLocations'
+import { preserveLineOrder } from '@/lib/orderLineOrder'
 import { recalcOrderTotals } from '@/lib/orders'
 import { VAT_RATE } from '@/lib/tax'
 
@@ -34,12 +42,21 @@ interface LineWithDetails {
   unit_price: number
   product_snapshot: { name?: string; description?: string; sku?: string; image_url?: string }
   product_id?: string | null
+  options?: Record<string, unknown>
   product?: Pick<ProductRow, 'name' | 'sku' | 'category_id'> | null
 }
 
 export default function OrderCart() {
   const navigate = useNavigate()
-  const { draftOrder, draftOrders, setActiveDraftOrder, createDraftOrder, duplicateDraftOrder, refresh } = useDraftOrder()
+  const {
+    draftOrder,
+    draftOrders,
+    setActiveDraftOrder,
+    createDraftOrder,
+    duplicateDraftOrder,
+    renameDraftOrder,
+    refresh,
+  } = useDraftOrder()
   const effectiveUserId = useEffectiveUserId()
   const [lines, setLines] = useState<LineWithDetails[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,53 +84,38 @@ export default function OrderCart() {
   const [deliveryScheduledDate, setDeliveryScheduledDate] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const fulfillmentCardRef = useRef<HTMLDivElement | null>(null)
+  const cartLinesOrderIdRef = useRef<string | null>(null)
   const [qtyDraftByLineId, setQtyDraftByLineId] = useState<Record<string, string>>({})
-  const [continueShoppingHref, setContinueShoppingHref] = useState<string>('/ordering')
-
-  useEffect(() => {
-    let cancelled = false
-    async function hydrateContinueShopping() {
-      const raw = await getUserPreference('ordering_last_state_v1')
-      if (!raw || cancelled) return
-      try {
-        const parsed = JSON.parse(raw) as {
-          mode?: 'component' | 'complete'
-          selectedCategory?: string | null
-        }
-        const params = new URLSearchParams()
-        if (parsed.mode === 'component' || parsed.mode === 'complete') params.set('mode', parsed.mode)
-        if (typeof parsed.selectedCategory === 'string' && parsed.selectedCategory) params.set('range', parsed.selectedCategory)
-        if (params.toString()) {
-          params.set('type', 'stock')
-          setContinueShoppingHref(`/ordering?${params.toString()}`)
-        }
-      } catch {
-        // ignore malformed preference
-      }
-    }
-    hydrateContinueShopping().catch(() => {})
-    return () => { cancelled = true }
-  }, [])
+  const [checklistCompletedIds, setChecklistCompletedIds] = useState<ChecklistGroupId[]>([])
+  const [renamingBasket, setRenamingBasket] = useState(false)
+  const [basketNameDraft, setBasketNameDraft] = useState('')
+  const continueShoppingHref = '/ordering?type=stock&clearRange=1'
 
   useEffect(() => {
     setPricingApplied(false)
     setFormError(null)
     if (!draftOrder?.id) {
+      cartLinesOrderIdRef.current = null
       setLines([])
       setLoading(false)
       setProject(null)
       return
     }
+    const orderId = draftOrder.id
     supabase
       .from('order_lines')
-      .select('id, quantity, unit_price, product_snapshot, product_id, product:products(name, sku, category_id)')
-      .eq('order_id', draftOrder.id)
+      .select('id, quantity, unit_price, product_snapshot, product_id, options, product:products(name, sku, category_id)')
+      .eq('order_id', orderId)
       .then(({ data }) => {
         const list = ((data ?? []) as any[]).map((r) => ({
           ...r,
           product: Array.isArray(r.product) ? (r.product[0] ?? null) : (r.product ?? null),
         })) as LineWithDetails[]
-        setLines(list)
+        setLines((prev) => {
+          const preserve = cartLinesOrderIdRef.current === orderId && prev.length > 0
+          return preserve ? preserveLineOrder(prev, list) : list
+        })
+        cartLinesOrderIdRef.current = orderId
         setQtyDraftByLineId(Object.fromEntries(list.map((l) => [l.id, String(l.quantity)])))
         setLoading(false)
       })
@@ -125,6 +127,20 @@ export default function OrderCart() {
       return
     }
     getOrderProject(draftOrder.id).then(setProject).catch(() => setProject(null))
+  }, [draftOrder?.id])
+
+  useEffect(() => {
+    if (!draftOrder?.id) {
+      setChecklistCompletedIds([])
+      return
+    }
+    let cancelled = false
+    void loadOrderChecklistCompleted(draftOrder.id).then((ids) => {
+      if (!cancelled) setChecklistCompletedIds(ids)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [draftOrder?.id])
 
   useEffect(() => {
@@ -344,13 +360,18 @@ export default function OrderCart() {
     if (!draftOrder?.id) return
     const { data } = await supabase
       .from('order_lines')
-      .select('id, quantity, unit_price, product_snapshot, product_id, product:products(name, sku, category_id)')
+      .select('id, quantity, unit_price, product_snapshot, product_id, options, product:products(name, sku, category_id)')
       .eq('order_id', draftOrder.id)
     const list = ((data ?? []) as any[]).map((r) => ({
       ...r,
       product: Array.isArray(r.product) ? (r.product[0] ?? null) : (r.product ?? null),
     })) as LineWithDetails[]
-    setLines(list)
+    const orderId = draftOrder.id
+    setLines((prev) => {
+      const preserve = cartLinesOrderIdRef.current === orderId && prev.length > 0
+      return preserve ? preserveLineOrder(prev, list) : list
+    })
+    cartLinesOrderIdRef.current = orderId
     setQtyDraftByLineId(Object.fromEntries(list.map((l) => [l.id, String(l.quantity)])))
   }
 
@@ -493,6 +514,37 @@ export default function OrderCart() {
 
   const totalIncVat = useMemo(() => totalExVat * VAT_RATE, [totalExVat])
 
+  const toggleChecklistGroup = useCallback(
+    (groupId: ChecklistGroupId) => {
+      if (!draftOrder?.id) return
+      setChecklistCompletedIds((prev) => {
+        const next = prev.includes(groupId)
+          ? prev.filter((id) => id !== groupId)
+          : [...prev, groupId]
+        void saveOrderChecklistCompleted(draftOrder.id, next)
+        return next
+      })
+    },
+    [draftOrder?.id],
+  )
+
+  const checklist: ChecklistGroup[] = useMemo(
+    () =>
+      draftOrder?.id
+        ? buildOrderChecklist({
+            project,
+            categories,
+            completedIds: checklistCompletedIds,
+            lines: lines.map((l) => ({
+              product: (l.product ?? null) as any,
+              snapshotName: (l.product_snapshot as any)?.name ?? null,
+              snapshotSku: (l.product_snapshot as any)?.sku ?? null,
+            })),
+          })
+        : [],
+    [draftOrder?.id, project, categories, checklistCompletedIds, lines],
+  )
+
   if (!draftOrder && !loading) {
     return (
       <div className="order-cart-page">
@@ -507,18 +559,6 @@ export default function OrderCart() {
   }
 
   const busy = !!action
-  const checklist: ChecklistGroup[] =
-    draftOrder?.id
-      ? buildOrderChecklist({
-        project,
-        categories,
-        lines: lines.map((l) => ({
-          product: (l.product ?? null) as any,
-          snapshotName: (l.product_snapshot as any)?.name ?? null,
-          snapshotSku: (l.product_snapshot as any)?.sku ?? null,
-        })),
-      })
-      : []
 
   function checklistAddHref(group: ChecklistGroup): string {
     const q = (group.suggested_search_terms[0] ?? group.title ?? '').trim()
@@ -569,6 +609,47 @@ export default function OrderCart() {
               ))}
             </select>
           </label>
+          {draftOrder?.id && !renamingBasket && (
+            <button
+              type="button"
+              className="btn btn-outline btn-small"
+              onClick={() => {
+                setBasketNameDraft((draftOrder.reference ?? '').trim())
+                setRenamingBasket(true)
+              }}
+            >
+              Rename basket
+            </button>
+          )}
+          {draftOrder?.id && renamingBasket && (
+            <form
+              className="cart-basket-rename-form"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void renameDraftOrder(draftOrder.id, basketNameDraft).then(() => setRenamingBasket(false))
+              }}
+            >
+              <input
+                type="text"
+                value={basketNameDraft}
+                onChange={(e) => setBasketNameDraft(e.target.value)}
+                placeholder="Basket name"
+                aria-label="Basket name"
+                autoFocus
+                maxLength={120}
+              />
+              <button type="submit" className="btn btn-small">
+                Save
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-small"
+                onClick={() => setRenamingBasket(false)}
+              >
+                Cancel
+              </button>
+            </form>
+          )}
           <button type="button" className="btn btn-outline btn-small" onClick={() => createDraftOrder()}>
             New basket
           </button>
@@ -597,54 +678,30 @@ export default function OrderCart() {
               ) : (
                 <ul className="cart-lines">
                   {lines.map((line) => (
-                    <li key={line.id} className="cart-line">
-                      <div className="cart-line-media">
-                        {(line.product_snapshot as { image_url?: string })?.image_url ? (
-                          <img src={(line.product_snapshot as { image_url?: string }).image_url} alt="" />
-                        ) : (
-                          <div className="cart-line-placeholder">—</div>
-                        )}
-                      </div>
-                      <div className="cart-line-info">
-                        <span className="cart-line-name">{(line.product_snapshot as { name?: string })?.name ?? 'Product'}</span>
-                        {(line.product_snapshot as { sku?: string })?.sku && (
-                          <span className="cart-line-sku">SKU: {(line.product_snapshot as { sku?: string }).sku}</span>
-                        )}
-                        <span className="cart-line-unit">£{Number(line.unit_price).toFixed(2)} each</span>
-                      </div>
-                      <div className="cart-line-qty">
-                        <button type="button" className="btn btn-icon" onClick={() => updateQuantity(line.id, -1)} aria-label="Decrease quantity">−</button>
-                        <input
-                          className="cart-line-qty-input"
-                          inputMode="numeric"
-                          aria-label="Quantity"
-                          value={qtyDraftByLineId[line.id] ?? String(line.quantity)}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            // allow empty while typing
-                            if (v === '' || /^[0-9]+$/.test(v)) setQtyDraftByLineId((prev) => ({ ...prev, [line.id]: v }))
-                          }}
-                          onBlur={() => {
-                            const raw = qtyDraftByLineId[line.id] ?? String(line.quantity)
-                            const parsed = raw.trim() === '' ? 0 : Number(raw)
-                            const next = Number.isFinite(parsed) ? parsed : line.quantity
-                            // Fire-and-forget; errors will just leave quantity unchanged on refresh.
-                            setExactQuantity(line.id, next).catch(() => {})
-                          }}
-                        />
-                        <button type="button" className="btn btn-icon" onClick={() => updateQuantity(line.id, 1)} aria-label="Increase quantity">+</button>
-                      </div>
-                      <span className="cart-line-total">£{(line.quantity * Number(line.unit_price)).toFixed(2)}</span>
-                      <button
-                        type="button"
-                        className="btn btn-icon cart-line-remove"
-                        onClick={() => removeLine(line.id).catch(() => {})}
-                        aria-label="Remove line"
-                        title="Remove"
-                      >
-                        ×
-                      </button>
-                    </li>
+                    <CartOrderLineItem
+                      key={line.id}
+                      line={{
+                        id: line.id,
+                        quantity: line.quantity,
+                        unit_price: line.unit_price,
+                        product_id: line.product_id,
+                        product_snapshot: line.product_snapshot,
+                        options: line.options ?? {},
+                      }}
+                      qtyDraft={qtyDraftByLineId[line.id] ?? String(line.quantity)}
+                      onQtyDraftChange={(value) =>
+                        setQtyDraftByLineId((prev) => ({ ...prev, [line.id]: value }))
+                      }
+                      onQtyBlur={() => {
+                        const raw = qtyDraftByLineId[line.id] ?? String(line.quantity)
+                        const parsed = raw.trim() === '' ? 0 : Number(raw)
+                        const next = Number.isFinite(parsed) ? parsed : line.quantity
+                        void setExactQuantity(line.id, next)
+                      }}
+                      onDecrease={() => void updateQuantity(line.id, -1)}
+                      onIncrease={() => void updateQuantity(line.id, 1)}
+                      onRemove={() => void removeLine(line.id)}
+                    />
                   ))}
                 </ul>
               )}
@@ -959,37 +1016,12 @@ export default function OrderCart() {
                 </ul>
               </div>
 
-              {checklist.length > 0 && (
-                <div style={{ marginTop: '0.75rem' }}>
-                  <h3 style={{ margin: '0 0 0.25rem' }}>Build checklist</h3>
-                  <p className="admin-muted" style={{ marginTop: 0 }}>
-                    Helps ensure you don’t miss anything important. This is guidance (not enforced).
-                  </p>
-                  <ul className="admin-report-list" style={{ marginTop: '0.25rem' }}>
-                    {checklist.map((g) => (
-                      <li key={g.id} className="admin-report-list-item">
-                        <span className="admin-report-list-label">
-                          {g.is_complete ? '✓' : '•'} {g.title}
-                          {!g.is_complete ? <span className="admin-muted"> · {g.hint}</span> : null}
-                        </span>
-                        <span className="admin-report-list-value">
-                          {g.is_complete ? (g.matched_examples[0] ?? 'Added') : (
-                            <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                              <Link to={checklistAddHref(g)} title={`Open component products with search prefilled (${g.suggested_search_terms.join(', ')})`}>
-                                Add parts
-                              </Link>
-                              <span className="admin-muted">|</span>
-                              <Link to={checklistUnitsHref(g)} title={`Open complete units with search prefilled (${g.suggested_search_terms.join(', ')})`}>
-                                Find units
-                              </Link>
-                            </span>
-                          )}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <OrderBuildChecklist
+                groups={checklist}
+                componentHref={checklistAddHref}
+                unitsHref={checklistUnitsHref}
+                onToggleComplete={toggleChecklistGroup}
+              />
 
               <div className="cart-summary-actions">
                 <button type="button" className="btn btn-block btn-primary" onClick={placeOrder} disabled={busy || !canSubmit}>

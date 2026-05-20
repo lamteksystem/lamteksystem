@@ -327,6 +327,20 @@
   padding-left: 0;
 }
 
+.marketing-hero-panel a,
+.marketing-hero-panel a:visited {
+  color: #fff;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.45);
+  text-underline-offset: 0.15em;
+}
+
+.marketing-hero-panel a:hover,
+.marketing-hero-panel a:focus-visible {
+  color: #fffefb;
+  text-decoration-color: rgba(255, 255, 255, 0.85);
+}
+
 .marketing-hero-panel li:last-child {
   margin-bottom: 0;
 }
@@ -869,7 +883,14 @@
 [data-theme="dark"] .marketing-prose-block p,
 [data-theme="dark"] .marketing-stat-card p,
 [data-theme="dark"] .marketing-hero-panel li {
-  color: var(--mk-text-soft);
+  color: rgba(255, 250, 252, 0.95);
+}
+
+[data-theme="dark"] .marketing-hero-panel a,
+[data-theme="dark"] .marketing-hero-panel a:visited,
+[data-theme="dark"] .marketing-hero-panel a:hover,
+[data-theme="dark"] .marketing-hero-panel a:focus-visible {
+  color: #fff;
 }
 
 [data-theme="dark"] .marketing-resources a,

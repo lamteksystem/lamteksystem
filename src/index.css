@@ -6188,9 +6188,16 @@ button.ordering-wizard-card {
   font-size: 0.9rem; cursor: pointer;
 }
 .admin-pricing-tab:hover { background: var(--lamtek-gray-light); }
-.admin-pricing-tab.active { background: var(--lamtek-gold); color: var(--lamtek-black); border-color: var(--lamtek-gold); }
+.admin-pricing-tab.active,
+.admin-pricing-tab.active:hover {
+  background: var(--lamtek-gold);
+  color: var(--lamtek-white);
+  border-color: var(--lamtek-gold);
+}
 .admin-pricing-segments { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.25rem; }
 .admin-segment-card { }
+.admin-segment-card > .btn,
+.admin-card > .admin-table-wrap ~ .btn { margin-top: 1rem; }
 .admin-segment-card h3 { margin: 0 0 0.75rem; font-size: 1.1rem; }
 .admin-segment-add-form { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .admin-segment-add-form input { padding: 0.4rem 0.6rem; border: 1px solid var(--lamtek-gray-light); border-radius: 6px; min-width: 120px; }

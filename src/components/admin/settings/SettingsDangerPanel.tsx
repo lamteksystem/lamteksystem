@@ -2,7 +2,12 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { downloadFullBackupXlsx } from '@/lib/catalogue-import-export'
+import { formatUnknownError } from '@/lib/formatError'
 import type { CategoryRow, ProductRow } from '@/types/database'
+
+function supabaseErr(res: { error: { message: string } | null }): void {
+  if (res.error) throw new Error(res.error.message)
+}
 
 export default function SettingsDangerPanel() {
   const [resetLoading, setResetLoading] = useState(false)
@@ -36,15 +41,21 @@ export default function SettingsDangerPanel() {
         setResetLoading(false)
         return
       }
-      await supabase.from('product_stock').delete().in('product_id', ids)
-      await supabase.from('order_lines').delete().in('product_id', ids)
-      await supabase.from('assembly_lines').delete().in('product_id', ids)
-      const { error } = await supabase.from('products').delete().in('id', ids)
-      if (error) throw error
+      const { data: assemblies } = await supabase.from('assemblies').select('id').in('product_id', ids)
+      const assemblyIds = (assemblies ?? []).map((a) => a.id)
+      if (assemblyIds.length > 0) {
+        supabaseErr(await supabase.from('assembly_lines').delete().in('assembly_id', assemblyIds))
+      }
+      supabaseErr(await supabase.from('assembly_lines').delete().in('product_id', ids))
+      supabaseErr(await supabase.from('assemblies').delete().in('product_id', ids))
+      supabaseErr(await supabase.from('product_categories').delete().in('product_id', ids))
+      supabaseErr(await supabase.from('product_stock').delete().in('product_id', ids))
+      supabaseErr(await supabase.from('order_lines').delete().in('product_id', ids))
+      supabaseErr(await supabase.from('products').delete().in('id', ids))
       setConfirmDelete(null)
       setConfirmText('')
     } catch (e) {
-      setResetError(e instanceof Error ? e.message : String(e))
+      setResetError(formatUnknownError(e, 'Could not delete products.'))
     } finally {
       setResetLoading(false)
     }
@@ -58,22 +69,30 @@ export default function SettingsDangerPanel() {
       const { data: products } = await supabase.from('products').select('id')
       const productIds = (products ?? []).map((p) => p.id)
       if (productIds.length > 0) {
-        await supabase.from('product_stock').delete().in('product_id', productIds)
-        await supabase.from('order_lines').delete().in('product_id', productIds)
-        await supabase.from('assembly_lines').delete().in('product_id', productIds)
-        await supabase.from('products').delete().in('id', productIds)
+        const { data: assemblies } = await supabase.from('assemblies').select('id').in('product_id', productIds)
+        const assemblyIds = (assemblies ?? []).map((a) => a.id)
+        if (assemblyIds.length > 0) {
+          supabaseErr(await supabase.from('assembly_lines').delete().in('assembly_id', assemblyIds))
+        }
+        supabaseErr(await supabase.from('assembly_lines').delete().in('product_id', productIds))
+        supabaseErr(await supabase.from('assemblies').delete().in('product_id', productIds))
+        supabaseErr(await supabase.from('product_categories').delete().in('product_id', productIds))
+        supabaseErr(await supabase.from('product_stock').delete().in('product_id', productIds))
+        supabaseErr(await supabase.from('order_lines').delete().in('product_id', productIds))
+        supabaseErr(await supabase.from('products').delete().in('id', productIds))
       }
       const { data: categories } = await supabase.from('categories').select('id')
       const catIds = (categories ?? []).map((c) => c.id)
       if (catIds.length > 0) {
-        await supabase.from('categories').update({ parent_id: null }).not('parent_id', 'is', null)
-        const { error } = await supabase.from('categories').delete().in('id', catIds)
-        if (error) throw error
+        supabaseErr(
+          await supabase.from('categories').update({ parent_id: null }).not('parent_id', 'is', null)
+        )
+        supabaseErr(await supabase.from('categories').delete().in('id', catIds))
       }
       setConfirmDelete(null)
       setConfirmText('')
     } catch (e) {
-      setResetError(e instanceof Error ? e.message : String(e))
+      setResetError(formatUnknownError(e, 'Could not delete categories.'))
     } finally {
       setResetLoading(false)
     }

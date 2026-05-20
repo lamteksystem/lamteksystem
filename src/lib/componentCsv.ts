@@ -17,6 +17,7 @@
 
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
+import { formatUnknownError } from '@/lib/formatError'
 import type {
   AssemblyPartTypeRow,
   CategoryRow,
@@ -460,7 +461,7 @@ export async function applyImportPlan(plan: ImportPlan): Promise<ImportApplyResu
           result.failures.push({ sku: r.sku, message: `categories: ${rpcError.message}` })
         }
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
+        const msg = formatUnknownError(e, 'Import failed for this row.')
         result.failures.push({ sku: r.sku, message: `categories: ${msg}` })
       }
     }

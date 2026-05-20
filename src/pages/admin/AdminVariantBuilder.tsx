@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { formatUnknownError } from '@/lib/formatError'
 import { usePermission } from '@/hooks/usePermission'
 import { useAssemblyPartTypes } from '@/hooks/useAssemblyPartTypes'
 import PartTypeSelectWithAdd from '@/components/admin/PartTypeSelectWithAdd'
@@ -271,7 +272,7 @@ export default function AdminVariantBuilder() {
       setResultMessage(`Created ${data?.length ?? 0} component(s).`)
       await reload()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
+      const msg = formatUnknownError(e, 'Could not create variants.')
       console.error('[variant-builder] create failed:', msg)
       setResultError(msg)
     } finally {

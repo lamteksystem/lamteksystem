@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { downloadFullBackupXlsx } from '@/lib/catalogue-import-export'
+import { formatUnknownError } from '@/lib/formatError'
 import { usePermission } from '@/hooks/usePermission'
 import { useStaff } from '@/hooks/useStaff'
 import type { CategoryRow, ProductRow } from '@/types/database'
@@ -121,7 +122,7 @@ export default function AdminCatalogueWipe() {
       setConfirmText('')
       await reload()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
+      const msg = formatUnknownError(e, 'Could not wipe catalogue.')
       console.error('[wipe] wipe_product_catalogue RPC failed:', msg)
       setError(msg)
     } finally {

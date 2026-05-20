@@ -1,5 +1,5 @@
--- Extend wipe_product_catalogue to clear all product FK dependents.
--- Also add wipe_all_categories for Settings danger-zone "delete all categories".
+-- Supabase / pg_safeupdate requires a WHERE clause on DELETE (and often UPDATE).
+-- Re-define wipe RPCs with predicates that still remove every row.
 
 create or replace function public.wipe_product_catalogue()
 returns jsonb
@@ -81,8 +81,8 @@ begin
 end;
 $$;
 
+revoke all on function public.wipe_product_catalogue() from public;
+grant execute on function public.wipe_product_catalogue() to authenticated;
+
 revoke all on function public.wipe_all_categories() from public;
 grant execute on function public.wipe_all_categories() to authenticated;
-
-comment on function public.wipe_all_categories() is
-  'Admin-only: deletes every category after products have been cleared. Returns count wiped.';

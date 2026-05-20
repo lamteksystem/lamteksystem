@@ -33,18 +33,18 @@ begin
   select count(*) into v_pc_before         from public.product_categories;
   select count(*) into v_orderlines_before from public.order_lines;
 
-  -- Order matters: clear dependents first.
-  delete from public.assembly_lines;
-  delete from public.assemblies;
-  delete from public.product_categories;
+  -- Order matters: clear dependents first (WHERE required by Supabase/pg_safeupdate).
+  delete from public.assembly_lines where id is not null;
+  delete from public.assemblies where id is not null;
+  delete from public.product_categories where product_id is not null;
 
   -- product_stock + order_lines reference products. We clear order_lines so any
   -- historical/test orders don't end up with broken FK references; the orders
   -- themselves are kept (they'll show as zero-line orders rather than vanishing).
-  delete from public.product_stock;
-  delete from public.order_lines;
+  delete from public.product_stock where product_id is not null;
+  delete from public.order_lines where id is not null;
 
-  delete from public.products;
+  delete from public.products where id is not null;
 
   return jsonb_build_object(
     'wiped_products',           v_products_before,

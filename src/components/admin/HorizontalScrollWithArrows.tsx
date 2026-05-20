@@ -107,7 +107,7 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
         obs.disconnect()
         el.removeEventListener('scroll', updateScrollState)
       }
-    }, [updateScrollState, children])
+    }, [updateScrollState])
 
     useEffect(() => {
       if (!fixedArrows) return

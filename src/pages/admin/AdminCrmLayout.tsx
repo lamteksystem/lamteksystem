@@ -1,9 +1,10 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
   `btn btn-small ${isActive ? '' : 'btn-outline'}`
 
 export default function AdminCrmLayout() {
+  const location = useLocation()
   return (
     <div className="admin-page">
       <div className="admin-page-header">
@@ -23,7 +24,7 @@ export default function AdminCrmLayout() {
           Directory
         </NavLink>
       </nav>
-      <Outlet />
+      <Outlet key={location.pathname + location.search} />
     </div>
   )
 }

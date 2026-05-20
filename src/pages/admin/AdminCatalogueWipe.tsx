@@ -3,9 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { downloadFullBackupXlsx } from '@/lib/catalogue-import-export'
 import { formatUnknownError } from '@/lib/formatError'
+import { fetchAllPaginated, fetchAllProducts } from '@/lib/supabaseFetchAll'
 import { usePermission } from '@/hooks/usePermission'
 import { useStaff } from '@/hooks/useStaff'
-import type { CategoryRow, ProductRow } from '@/types/database'
+import type { CategoryRow } from '@/types/database'
 
 interface CountSnapshot {
   products: number
@@ -97,14 +98,13 @@ export default function AdminCatalogueWipe() {
   const confirmOk = confirmText.trim().toUpperCase() === expectedConfirm
 
   async function doBackup() {
-    const [catRes, prodRes] = await Promise.all([
-      supabase.from('categories').select('*').order('sort_order').order('name'),
-      supabase.from('products').select('*').order('sort_order').order('name'),
+    const [categories, products] = await Promise.all([
+      fetchAllPaginated<CategoryRow>((from, to) =>
+        supabase.from('categories').select('*').order('sort_order').order('name').range(from, to)
+      ),
+      fetchAllProducts(),
     ])
-    downloadFullBackupXlsx(
-      (catRes.data ?? []) as CategoryRow[],
-      (prodRes.data ?? []) as ProductRow[]
-    )
+    downloadFullBackupXlsx(categories, products)
   }
 
   async function handleWipe() {

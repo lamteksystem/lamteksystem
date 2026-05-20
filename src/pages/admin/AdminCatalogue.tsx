@@ -37,6 +37,7 @@ import type { CategoryRow } from '@/types/database'
 import type { ProductRow } from '@/types/database'
 import ListPager from '@/components/admin/ListPager'
 import { useListPagination, normalizePageSize } from '@/lib/listPagination'
+import { fetchAllProducts } from '@/lib/supabaseFetchAll'
 import {
   buildExportRows,
   downloadCsv,
@@ -249,14 +250,14 @@ export default function AdminCatalogue() {
   }
 
   async function load() {
-    const [catRes, prodRes, catMap, completeIds] = await Promise.all([
+    const [catRes, allProducts, catMap, completeIds] = await Promise.all([
       supabase.from('categories').select('*').order('sort_order').order('name'),
-      supabase.from('products').select('*').order('sort_order').order('name'),
+      fetchAllProducts(),
       fetchProductCategoryMap(),
       fetchCompleteProductIds(),
     ])
     setCategories(catRes.data ?? [])
-    setProducts(prodRes.data ?? [])
+    setProducts(allProducts)
     setProductCategoryMap(catMap)
     setCompleteProductIds(completeIds)
     setLoading(false)

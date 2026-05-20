@@ -3,55 +3,56 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { downloadFullBackupXlsx } from '@/lib/catalogue-import-export'
 import { formatUnknownError } from '@/lib/formatError'
-import type { CategoryRow, ProductRow } from '@/types/database'
+import { fetchAllPaginated, fetchAllProducts } from '@/lib/supabaseFetchAll'
+import { useStaff } from '@/hooks/useStaff'
+import type { CategoryRow } from '@/types/database'
 
-function supabaseErr(res: { error: { message: string } | null }): void {
-  if (res.error) throw new Error(res.error.message)
+interface WipeProductsResult {
+  wiped_products: number
+}
+
+interface WipeCategoriesResult {
+  wiped_categories: number
 }
 
 export default function SettingsDangerPanel() {
+  const { staffProfile } = useStaff()
+  const isAdmin = staffProfile?.role === 'admin'
   const [resetLoading, setResetLoading] = useState(false)
   const [resetError, setResetError] = useState<string | null>(null)
+  const [resetSuccess, setResetSuccess] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<'products' | 'categories' | null>(null)
   const [backupBeforeDelete, setBackupBeforeDelete] = useState(true)
   const [confirmText, setConfirmText] = useState('')
 
-  async function fetchCategoriesAndProducts(): Promise<{ categories: CategoryRow[]; products: ProductRow[] }> {
-    const [catRes, prodRes] = await Promise.all([
-      supabase.from('categories').select('*').order('sort_order').order('name'),
-      supabase.from('products').select('*').order('sort_order').order('name'),
-    ])
-    return { categories: catRes.data ?? [], products: prodRes.data ?? [] }
-  }
-
   async function doBackup() {
-    const { categories, products } = await fetchCategoriesAndProducts()
+    const [categories, products] = await Promise.all([
+      fetchAllPaginated<CategoryRow>((from, to) =>
+        supabase.from('categories').select('*').order('sort_order').order('name').range(from, to)
+      ),
+      fetchAllProducts(),
+    ])
     downloadFullBackupXlsx(categories, products)
   }
 
   async function deleteAllProducts(createBackupFirst: boolean) {
+    if (!isAdmin) {
+      setResetError('Only admins can delete the full product catalogue. Ask an admin or use Reset catalogue.')
+      return
+    }
     setResetLoading(true)
     setResetError(null)
+    setResetSuccess(null)
     try {
       if (createBackupFirst) await doBackup()
-      const { data: products } = await supabase.from('products').select('id')
-      const ids = (products ?? []).map((p) => p.id)
-      if (ids.length === 0) {
-        setConfirmDelete(null)
-        setResetLoading(false)
-        return
-      }
-      const { data: assemblies } = await supabase.from('assemblies').select('id').in('product_id', ids)
-      const assemblyIds = (assemblies ?? []).map((a) => a.id)
-      if (assemblyIds.length > 0) {
-        supabaseErr(await supabase.from('assembly_lines').delete().in('assembly_id', assemblyIds))
-      }
-      supabaseErr(await supabase.from('assembly_lines').delete().in('product_id', ids))
-      supabaseErr(await supabase.from('assemblies').delete().in('product_id', ids))
-      supabaseErr(await supabase.from('product_categories').delete().in('product_id', ids))
-      supabaseErr(await supabase.from('product_stock').delete().in('product_id', ids))
-      supabaseErr(await supabase.from('order_lines').delete().in('product_id', ids))
-      supabaseErr(await supabase.from('products').delete().in('id', ids))
+      const { data, error } = await supabase.rpc('wipe_product_catalogue')
+      if (error) throw error
+      const wiped = (data as WipeProductsResult | null)?.wiped_products ?? 0
+      setResetSuccess(
+        wiped > 0
+          ? `Removed ${wiped} product(s) from the database. Open Admin → Catalogue and refresh if that page was already open.`
+          : 'No products were in the database.'
+      )
       setConfirmDelete(null)
       setConfirmText('')
     } catch (e) {
@@ -62,33 +63,24 @@ export default function SettingsDangerPanel() {
   }
 
   async function deleteAllCategories(createBackupFirst: boolean) {
+    if (!isAdmin) {
+      setResetError('Only admins can wipe the full category tree.')
+      return
+    }
     setResetLoading(true)
     setResetError(null)
+    setResetSuccess(null)
     try {
       if (createBackupFirst) await doBackup()
-      const { data: products } = await supabase.from('products').select('id')
-      const productIds = (products ?? []).map((p) => p.id)
-      if (productIds.length > 0) {
-        const { data: assemblies } = await supabase.from('assemblies').select('id').in('product_id', productIds)
-        const assemblyIds = (assemblies ?? []).map((a) => a.id)
-        if (assemblyIds.length > 0) {
-          supabaseErr(await supabase.from('assembly_lines').delete().in('assembly_id', assemblyIds))
-        }
-        supabaseErr(await supabase.from('assembly_lines').delete().in('product_id', productIds))
-        supabaseErr(await supabase.from('assemblies').delete().in('product_id', productIds))
-        supabaseErr(await supabase.from('product_categories').delete().in('product_id', productIds))
-        supabaseErr(await supabase.from('product_stock').delete().in('product_id', productIds))
-        supabaseErr(await supabase.from('order_lines').delete().in('product_id', productIds))
-        supabaseErr(await supabase.from('products').delete().in('id', productIds))
-      }
-      const { data: categories } = await supabase.from('categories').select('id')
-      const catIds = (categories ?? []).map((c) => c.id)
-      if (catIds.length > 0) {
-        supabaseErr(
-          await supabase.from('categories').update({ parent_id: null }).not('parent_id', 'is', null)
-        )
-        supabaseErr(await supabase.from('categories').delete().in('id', catIds))
-      }
+      const { data: wipeProducts, error: wipeErr } = await supabase.rpc('wipe_product_catalogue')
+      if (wipeErr) throw wipeErr
+      const productsWiped = (wipeProducts as WipeProductsResult | null)?.wiped_products ?? 0
+      const { data: wipeCats, error: catErr } = await supabase.rpc('wipe_all_categories')
+      if (catErr) throw catErr
+      const catsWiped = (wipeCats as WipeCategoriesResult | null)?.wiped_categories ?? 0
+      setResetSuccess(
+        `Removed ${productsWiped} product(s) and ${catsWiped} categor${catsWiped === 1 ? 'y' : 'ies'}. Refresh Admin → Catalogue.`
+      )
       setConfirmDelete(null)
       setConfirmText('')
     } catch (e) {
@@ -120,6 +112,7 @@ export default function SettingsDangerPanel() {
           onClick={() => {
             setConfirmDelete('products')
             setResetError(null)
+            setResetSuccess(null)
             setConfirmText('')
           }}
           disabled={resetLoading}
@@ -132,6 +125,7 @@ export default function SettingsDangerPanel() {
           onClick={() => {
             setConfirmDelete('categories')
             setResetError(null)
+            setResetSuccess(null)
             setConfirmText('')
           }}
           disabled={resetLoading}
@@ -139,7 +133,18 @@ export default function SettingsDangerPanel() {
           Delete all categories (and products)
         </button>
       </div>
+      {resetSuccess && (
+        <p className="admin-message-ok" style={{ marginTop: '0.75rem' }}>
+          {resetSuccess}
+        </p>
+      )}
       {resetError && <p className="admin-error" style={{ marginTop: '0.75rem' }}>{resetError}</p>}
+      {!isAdmin && (
+        <p className="admin-muted" style={{ marginTop: '0.5rem' }}>
+          Product and category wipes require an <strong>admin</strong> account (uses a server-side wipe, not a
+          1000-row batch).
+        </p>
+      )}
 
       {confirmDelete && (
         <div className="admin-settings-confirm card admin-modal--danger" role="dialog" aria-modal="true">
@@ -189,6 +194,7 @@ export default function SettingsDangerPanel() {
                 setConfirmDelete(null)
                 setConfirmText('')
                 setResetError(null)
+                setResetSuccess(null)
               }}
               disabled={resetLoading}
             >

@@ -80,6 +80,7 @@ import AdminLocations from '@/pages/admin/AdminLocations'
 import AdminDeliveryWindows from '@/pages/admin/AdminDeliveryWindows'
 import AdminPricing from '@/pages/admin/AdminPricing'
 import AdminTealburyPricelist from '@/pages/admin/AdminTealburyPricelist'
+import AdminPricelistWorkbench from '@/pages/admin/AdminPricelistWorkbench'
 import AdminSmartCategorise from '@/pages/admin/AdminSmartCategorise'
 import AdminReports from '@/pages/admin/AdminReports'
 import AdminAccounting from '@/pages/admin/AdminAccounting'
@@ -198,6 +199,7 @@ export default function App() {
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="catalogue" element={<AdminCatalogue />} />
         <Route path="catalogue/tealbury" element={<AdminTealburyPricelist />} />
+        <Route path="catalogue/pricelist-workbench" element={<AdminPricelistWorkbench />} />
         <Route path="catalogue/categories" element={<AdminSmartCategorise />} />
         <Route path="catalogue/wipe" element={<AdminCatalogueWipe />} />
         <Route path="catalogue/components/import" element={<AdminComponentImport />} />

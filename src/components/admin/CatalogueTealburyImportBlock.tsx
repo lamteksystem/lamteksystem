@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { parseTealburyPricelistWorkbook, slugifyCategorySegment, type TealburyParsedRow } from '@/lib/tealburyPricelistParse'
@@ -230,8 +231,9 @@ export default function CatalogueTealburyImportBlock() {
     <div className="admin-tealbury-import-block">
       <h3 className="admin-card-subtitle">Tealbury customer workbook (.xlsx)</h3>
       <p className="admin-muted" style={{ marginBottom: '0.75rem' }}>
-        The Excel file may use a <strong>Pricelist</strong> sheet with dropdowns and formulas (VLOOKUP into other sheets). The importer reads
-        each <strong>door / range sheet</strong> (static tables) so every range is loaded. Lamtek component CSV/XLSX uses the Lamtek section above.
+        For full editing, category assignment, and template export, use{' '}
+        <Link to="/admin/catalogue/pricelist-workbench">Pricelist workbench</Link>. Quick replace-import below reads each{' '}
+        <strong>door / range sheet</strong> (skips the Pricelist hub when range sheets exist).
       </p>
       <input
         ref={fileRef}

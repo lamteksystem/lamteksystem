@@ -6309,6 +6309,108 @@ button.ordering-wizard-card {
   padding: 1rem 1.15rem 1.15rem;
 }
 
+/* Pricelist workbench (Tealbury + Lamtek trade → catalogue template) */
+.admin-pricelist-workbench .admin-pricelist-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+.admin-pricelist-upload-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border: 1px dashed var(--lamtek-gray-light);
+  border-radius: var(--lamtek-radius-lg);
+  background: var(--lamtek-bg);
+}
+.admin-pricelist-upload-label { font-weight: 600; font-size: 0.9rem; }
+.admin-pricelist-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+  margin-top: 0.5rem;
+}
+.admin-pricelist-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--lamtek-text-muted, var(--lamtek-gray));
+}
+.admin-pricelist-toolbar input,
+.admin-pricelist-toolbar select {
+  min-width: 10rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 6px;
+  font: inherit;
+}
+.admin-pricelist-check {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.4rem !important;
+  font-weight: 500 !important;
+}
+.admin-pricelist-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--lamtek-gray-light);
+}
+.admin-pricelist-bulk-bar select {
+  min-width: 14rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 6px;
+  font: inherit;
+}
+.admin-pricelist-table-wrap { max-height: min(62vh, 720px); overflow: auto; }
+.admin-pricelist-table { font-size: 0.82rem; }
+.admin-pricelist-table th,
+.admin-pricelist-table td { vertical-align: middle; }
+.admin-pricelist-th-check { width: 2.25rem; }
+.admin-pricelist-inline-input {
+  width: 100%;
+  min-width: 5rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.82rem;
+}
+.admin-pricelist-inline-input--wide { min-width: 10rem; }
+.admin-pricelist-inline-input--price { min-width: 4.5rem; max-width: 5.5rem; }
+.admin-pricelist-category-select {
+  min-width: 9rem;
+  max-width: 14rem;
+  padding: 0.3rem 0.35rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.8rem;
+}
+.admin-pricelist-row--unassigned { background: rgba(202, 138, 4, 0.08); }
+.admin-pricelist-source {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.12rem 0.35rem;
+  border-radius: 4px;
+}
+.admin-pricelist-source--tealbury { background: rgba(103, 39, 50, 0.12); color: var(--lamtek-gold); }
+.admin-pricelist-source--lamtek { background: rgba(37, 99, 235, 0.1); color: #1d4ed8; }
+.admin-pricelist-section,
+.admin-pricelist-range { max-width: 8rem; font-size: 0.78rem; color: var(--lamtek-text-muted, var(--lamtek-gray)); }
+.admin-pricelist-warnings { margin: 0.5rem 0 0; padding-left: 1.25rem; font-size: 0.88rem; }
+.admin-pricelist-error { margin-top: 0.75rem; max-height: 12rem; overflow: auto; }
+
 /* Wipe / import / variant builder layout helpers. */
 .admin-wipe-section {
   margin-bottom: 1.25rem;

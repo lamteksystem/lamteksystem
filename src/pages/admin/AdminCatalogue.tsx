@@ -714,7 +714,10 @@ export default function AdminCatalogue() {
 
       {canEditCatalogue && (
         <div className="admin-catalogue-quick-tools" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-          <Link to="/admin/catalogue/components/import" className="btn btn-small">
+          <Link to="/admin/catalogue/pricelist-workbench" className="btn btn-small">
+            Pricelist workbench
+          </Link>
+          <Link to="/admin/catalogue/components/import" className="btn btn-small btn-outline">
             Component import / export
           </Link>
           <Link to="/admin/catalogue/components/variant-builder" className="btn btn-small btn-outline">

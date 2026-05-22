@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom'
 
-/** @deprecated Tealbury import lives on Catalogue → Import & export. */
+/** @deprecated Use Pricelist workbench. */
 export default function AdminTealburyPricelist() {
-  return <Navigate to="/admin/catalogue?tab=import" replace />
+  return <Navigate to="/admin/catalogue/pricelist-workbench" replace />
 }

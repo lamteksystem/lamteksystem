@@ -177,13 +177,16 @@ export default function AdminLayout() {
         ],
       }
     }
-    if (location.pathname === '/admin/catalogue/tealbury') {
+    if (
+      location.pathname === '/admin/catalogue/tealbury' ||
+      location.pathname === '/admin/catalogue/pricelist-workbench'
+    ) {
       return {
-        pageTitle: 'Tealbury pricelist',
+        pageTitle: 'Pricelist workbench',
         breadcrumb: [
           { to: '/admin', label: 'Today' },
           { to: '/admin/catalogue', label: 'Catalogue' },
-          { label: 'Tealbury pricelist' },
+          { label: 'Pricelist workbench' },
         ],
       }
     }

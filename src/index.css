@@ -6420,6 +6420,20 @@ button.ordering-wizard-card {
   background: var(--lamtek-bg);
 }
 .admin-pricelist-upload-label { font-weight: 600; font-size: 0.9rem; }
+.admin-pricelist-import-progress {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+.admin-pricelist-import-progress .admin-import-progress-bar {
+  margin-bottom: 0.35rem;
+}
+.admin-pricelist-import-filename {
+  font-weight: 600;
+  color: var(--lamtek-text, inherit);
+}
+.admin-pricelist-upload-card:has(.admin-import-progress-fill) {
+  border-color: color-mix(in srgb, var(--lamtek-gold) 45%, var(--lamtek-gray-light));
+}
 .admin-pricelist-tools-layout {
   display: flex;
   flex-direction: column;

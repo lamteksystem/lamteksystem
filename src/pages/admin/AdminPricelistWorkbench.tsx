@@ -13,7 +13,10 @@ import {
   type PricelistSource,
   type PricelistWorkbenchRow,
 } from '@/lib/pricelistWorkbench'
-import { parseTealburyPricelistWorkbook } from '@/lib/tealburyPricelistParse'
+import { parseTealburyPricelistWorkbookAsync } from '@/lib/tealburyPricelistParse'
+import PricelistSourceImportProgress, {
+  type PricelistSourceImportProgressState,
+} from '@/components/admin/PricelistSourceImportProgress'
 import { useListPagination } from '@/lib/listPagination'
 import { deleteRowsByIds } from '@/lib/pricelistWorkbenchRules'
 import PricelistWorkbenchSmartPanel from '@/components/admin/PricelistWorkbenchSmartPanel'
@@ -30,6 +33,9 @@ export default function AdminPricelistWorkbench() {
   const [rows, setRows] = useState<PricelistWorkbenchRow[]>([])
   const [warnings, setWarnings] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  const [importProgress, setImportProgress] = useState<
+    Partial<Record<PricelistSource, PricelistSourceImportProgressState>>
+  >({})
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -99,19 +105,63 @@ export default function AdminPricelistWorkbench() {
   const selectedCount = useMemo(() => rows.filter((r) => r.selected).length, [rows])
   const filteredSelectedCount = useMemo(() => filtered.filter((r) => r.selected).length, [filtered])
 
+  const clearImportProgress = useCallback((source: PricelistSource, delayMs = 0) => {
+    const run = () => {
+      setImportProgress((prev) => {
+        if (!prev[source]) return prev
+        const next = { ...prev }
+        delete next[source]
+        return next
+      })
+    }
+    if (delayMs > 0) window.setTimeout(run, delayMs)
+    else run()
+  }, [])
+
+  const setSourceImportProgress = useCallback(
+    (source: PricelistSource, percent: number, label: string, fileName: string) => {
+      setImportProgress((prev) => ({
+        ...prev,
+        [source]: { percent, label, fileName },
+      }))
+    },
+    []
+  )
+
+  const isSourceImporting = useCallback(
+    (source: PricelistSource) => {
+      const p = importProgress[source]
+      return p != null && p.percent < 100
+    },
+    [importProgress]
+  )
+
+  const anyImporting = useMemo(
+    () => (['tealbury', 'lamtek'] as const).some((s) => isSourceImporting(s)),
+    [isSourceImporting]
+  )
+
   async function ingestWorkbook(file: File, source: PricelistSource) {
     if (!/\.xlsx$/i.test(file.name)) {
       setError('Please choose an .xlsx Excel workbook.')
       return
     }
-    setBusy(true)
     setError(null)
     setMessage(null)
+    setSourceImportProgress(source, 2, 'Preparing import…', file.name)
     try {
       const cats = await fetchAllCategories()
       setCategories(cats)
+      setSourceImportProgress(source, 8, 'Loading categories…', file.name)
+
       const buf = await file.arrayBuffer()
-      const { rows: parsed, warnings: w } = parseTealburyPricelistWorkbook(buf)
+      setSourceImportProgress(source, 12, 'Reading Excel file…', file.name)
+
+      const { rows: parsed, warnings: w } = await parseTealburyPricelistWorkbookAsync(buf, (p) => {
+        const mapped = 12 + Math.round(p.percent * 0.72)
+        setSourceImportProgress(source, mapped, p.label, file.name)
+      })
+
       if (!parsed.length) {
         setError(
           source === 'tealbury'
@@ -119,8 +169,15 @@ export default function AdminPricelistWorkbench() {
             : 'No Lamtek trade rows parsed. Expect kitchen Code/Size/Description tables or bedroom Code/Description layouts.'
         )
         setWarnings(w)
+        clearImportProgress(source)
         return
       }
+
+      setSourceImportProgress(source, 88, `Building ${parsed.length} workbench row(s)…`, file.name)
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0)
+      })
+
       const workbench = parsed.map((p) => parsedToWorkbenchRow(p, source, cats))
       setRows((prev) => [...prev.filter((r) => r.source !== source), ...workbench])
       setWarnings((prev) => [...prev, ...w.map((line) => `[${source}] ${line}`)])
@@ -130,11 +187,12 @@ export default function AdminPricelistWorkbench() {
             ? 'Each door/range sheet is imported separately; accessories are mapped to Cornice, Plinth, Panels, etc. where possible.'
             : 'Multi-finish columns use the lowest price as unit price.')
       )
+      setSourceImportProgress(source, 100, `Complete — ${workbench.length} row(s) loaded`, file.name)
       goToPage(1)
+      clearImportProgress(source, 2200)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(false)
+      clearImportProgress(source)
     }
   }
 
@@ -321,18 +379,19 @@ export default function AdminPricelistWorkbench() {
               ref={tealburyInputRef}
               type="file"
               accept=".xlsx"
-              disabled={busy}
+              disabled={isSourceImporting('tealbury')}
               onChange={(e) => {
                 const f = e.target.files?.[0]
                 if (f) void ingestWorkbook(f, 'tealbury')
                 e.target.value = ''
               }}
             />
-            {tealburyCount > 0 ? (
+            <PricelistSourceImportProgress progress={importProgress.tealbury} />
+            {tealburyCount > 0 && !isSourceImporting('tealbury') ? (
               <span className="admin-muted">{tealburyCount} row(s) loaded</span>
-            ) : (
+            ) : !importProgress.tealbury ? (
               <span className="admin-muted">Not loaded</span>
-            )}
+            ) : null}
           </label>
           <label className="admin-pricelist-upload-card">
             <span className="admin-pricelist-upload-label">
@@ -343,18 +402,19 @@ export default function AdminPricelistWorkbench() {
               ref={lamtekInputRef}
               type="file"
               accept=".xlsx"
-              disabled={busy}
+              disabled={isSourceImporting('lamtek')}
               onChange={(e) => {
                 const f = e.target.files?.[0]
                 if (f) void ingestWorkbook(f, 'lamtek')
                 e.target.value = ''
               }}
             />
-            {lamtekCount > 0 ? (
+            <PricelistSourceImportProgress progress={importProgress.lamtek} />
+            {lamtekCount > 0 && !isSourceImporting('lamtek') ? (
               <span className="admin-muted">{lamtekCount} row(s) loaded</span>
-            ) : (
+            ) : !importProgress.lamtek ? (
               <span className="admin-muted">Not loaded</span>
-            )}
+            ) : null}
           </label>
         </div>
         {rows.length > 0 && (
@@ -362,7 +422,7 @@ export default function AdminPricelistWorkbench() {
             type="button"
             className="btn btn-outline btn-small"
             style={{ marginTop: '0.75rem' }}
-            disabled={busy}
+            disabled={busy || anyImporting}
             onClick={() => {
               if (window.confirm('Clear all draft rows from the workbench?')) {
                 setRows([])

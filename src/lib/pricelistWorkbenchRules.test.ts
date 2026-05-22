@@ -1,0 +1,75 @@
+import { describe, expect, it } from 'vitest'
+import {
+  applyRuleToRows,
+  parseSmartCommandPrompt,
+  removeSkuFromName,
+  WORKBENCH_RULE_PRESETS,
+} from '@/lib/pricelistWorkbenchRules'
+import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
+
+function row(partial: Partial<PricelistWorkbenchRow>): PricelistWorkbenchRow {
+  return {
+    id: partial.id ?? '1',
+    source: partial.source ?? 'tealbury',
+    catalog_program: partial.catalog_program ?? CATALOG_PROGRAM.TEALBURY,
+    sku: partial.sku ?? 'B15 · No Doors',
+    name: partial.name ?? 'B15 — 150 BASE UNIT (No Doors)',
+    description: '',
+    unit_price: 10,
+    cost_price: 7.5,
+    active: true,
+    is_stock: true,
+    image_url: '',
+    image_alt: '',
+    category_id: null,
+    category_slug: '',
+    category_name: '',
+    section: 'Units',
+    door_range: partial.door_range ?? 'No Doors',
+    trade_code: partial.trade_code ?? 'B15',
+    selected: false,
+    options: {},
+    ...partial,
+  }
+}
+
+describe('pricelistWorkbenchRules', () => {
+  it('deletes Tealbury No Doors via preset', () => {
+    const rows = [
+      row({ id: 'a', door_range: 'No Doors' }),
+      row({ id: 'b', door_range: 'Dawson' }),
+    ]
+    const preset = WORKBENCH_RULE_PRESETS[0]
+    const { rows: next, result } = applyRuleToRows(rows, preset)
+    expect(next).toHaveLength(1)
+    expect(next[0].id).toBe('b')
+    expect(result.changed).toBe(1)
+  })
+
+  it('removes sku prefix from name', () => {
+    const cleaned = removeSkuFromName(
+      row({ name: 'B15 — 150 BASE UNIT (No Doors)', trade_code: 'B15', door_range: 'No Doors' })
+    )
+    expect(cleaned).not.toMatch(/^B15\b/i)
+    expect(cleaned).not.toContain('(No Doors)')
+  })
+
+  it('parses delete Tealbury No Doors prompt', () => {
+    const { rule, error } = parseSmartCommandPrompt(
+      'Find all items with "No Doors" from the Tealbury catalogue and delete from the product list'
+    )
+    expect(error).toBeUndefined()
+    expect(rule?.action).toBe('delete')
+    expect(rule?.conditions.some((c) => c.field === 'source' && c.value === 'tealbury')).toBe(true)
+    expect(rule?.conditions.some((c) => c.field === 'door_range' && c.value.includes('No Doors'))).toBe(true)
+  })
+
+  it('parses remove sku from name prompt', () => {
+    const { rule } = parseSmartCommandPrompt(
+      'Find all products in the Tealbury catalogue with the SKU showing in the name field and remove the SKU from the name field'
+    )
+    expect(rule?.action).toBe('remove_sku_from_name')
+    expect(rule?.conditions.some((c) => c.op === 'sku_appears_in_name')).toBe(true)
+  })
+})

@@ -15,6 +15,8 @@ import {
 } from '@/lib/pricelistWorkbench'
 import { parseTealburyPricelistWorkbook } from '@/lib/tealburyPricelistParse'
 import { useListPagination } from '@/lib/listPagination'
+import { deleteRowsByIds } from '@/lib/pricelistWorkbenchRules'
+import PricelistWorkbenchSmartPanel from '@/components/admin/PricelistWorkbenchSmartPanel'
 import type { CategoryRow } from '@/types/database'
 
 type SourceFilter = 'all' | PricelistSource
@@ -172,6 +174,40 @@ export default function AdminPricelistWorkbench() {
         ? 'Auto-mapped categories for rows without an assigned category.'
         : 'Auto-mapped categories for all rows (matched section names to existing categories).'
     )
+  }
+
+  function deleteRow(id: string) {
+    const row = rows.find((r) => r.id === id)
+    if (!row) return
+    if (!window.confirm(`Remove “${row.sku || row.name}” from the workbench?`)) return
+    setRows((prev) => deleteRowsByIds(prev, new Set([id])))
+    setMessage('Row removed from workbench.')
+    setError(null)
+  }
+
+  function deleteBulk(scope: 'selected' | 'filtered') {
+    const targets = scope === 'selected' ? rows.filter((r) => r.selected) : filtered
+    if (!targets.length) {
+      setError(scope === 'selected' ? 'No rows selected.' : 'No rows in current filter.')
+      return
+    }
+    if (
+      !window.confirm(
+        `Remove ${targets.length} row(s) from the workbench draft? This does not delete live catalogue products.`
+      )
+    ) {
+      return
+    }
+    const ids = new Set(targets.map((r) => r.id))
+    setRows((prev) => deleteRowsByIds(prev, ids))
+    setMessage(`Removed ${targets.length} row(s) from workbench.`)
+    setError(null)
+  }
+
+  function notifySmart(message: string, err?: string | null) {
+    if (err) setError(err)
+    else setError(null)
+    if (message) setMessage(message)
   }
 
   async function runPublish(scope: 'all' | 'selected') {
@@ -333,145 +369,183 @@ export default function AdminPricelistWorkbench() {
 
       {rows.length > 0 && (
         <>
-          <section className="admin-modal-card admin-wipe-section">
-            <h2>2. Filter &amp; bulk tools</h2>
-            <div className="admin-pricelist-toolbar">
-              <label>
-                Search
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value)
-                    goToPage(1)
-                  }}
-                  placeholder="SKU, name, section…"
-                />
-              </label>
-              <label>
-                Source
-                <select
-                  value={sourceFilter}
-                  onChange={(e) => {
-                    setSourceFilter(e.target.value as SourceFilter)
-                    goToPage(1)
-                  }}
-                >
-                  <option value="all">All ({rows.length})</option>
-                  <option value="tealbury">Tealbury ({tealburyCount})</option>
-                  <option value="lamtek">Lamtek trade ({lamtekCount})</option>
-                </select>
-              </label>
-              <label>
-                Door / range
-                <select
-                  value={doorFilter}
-                  onChange={(e) => {
-                    setDoorFilter(e.target.value)
-                    goToPage(1)
-                  }}
-                >
-                  <option value="">All ranges</option>
-                  {doorRanges.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Section
-                <select
-                  value={sectionFilter}
-                  onChange={(e) => {
-                    setSectionFilter(e.target.value)
-                    goToPage(1)
-                  }}
-                >
-                  <option value="">All sections</option>
-                  {sections.slice(0, 200).map((s) => (
-                    <option key={s} value={s}>
-                      {s.length > 48 ? `${s.slice(0, 48)}…` : s}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="admin-pricelist-check">
-                <input
-                  type="checkbox"
-                  checked={onlyUnassigned}
-                  onChange={(e) => {
-                    setOnlyUnassigned(e.target.checked)
-                    goToPage(1)
-                  }}
-                />
-                Unassigned only ({unassignedCount})
-              </label>
-            </div>
+          <section className="admin-modal-card admin-wipe-section admin-pricelist-tools-section">
+            <h2>2. Filter, bulk edit &amp; smart commands</h2>
 
-            <div className="admin-pricelist-bulk-bar">
-              <select
-                value={bulkCategoryId}
-                onChange={(e) => setBulkCategoryId(e.target.value)}
-                aria-label="Bulk category"
-              >
-                <option value="">Bulk assign category…</option>
-                {categoryOptions.parents.map((p) => (
-                  <optgroup key={p.id} label={p.name}>
-                    <option value={p.id}>{p.name}</option>
-                    {(categoryOptions.childrenByParent.get(p.id) ?? []).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        — {c.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-                {categories
-                  .filter((c) => c.parent_id && !categoryOptions.parents.some((p) => p.id === c.parent_id))
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-              </select>
-              <button
-                type="button"
-                className="btn btn-small"
-                disabled={!bulkCategoryId}
-                onClick={() => onBulkCategoryApply('filtered')}
-              >
-                Apply to filtered ({filtered.length})
-              </button>
-              <button
-                type="button"
-                className="btn btn-small btn-outline"
-                disabled={!bulkCategoryId || filteredSelectedCount === 0}
-                onClick={() => onBulkCategoryApply('selected')}
-              >
-                Apply to selected ({filteredSelectedCount})
-              </button>
-              <button type="button" className="btn btn-small btn-outline" onClick={() => runAutoMap('unassigned')}>
-                Auto-map unassigned
-              </button>
-              <button type="button" className="btn btn-small btn-outline" onClick={() => runAutoMap('all')}>
-                Auto-map all sections
-              </button>
-              <button
-                type="button"
-                className="btn btn-small btn-outline"
-                onClick={() => toggleSelectAllFiltered(true)}
-              >
-                Select filtered
-              </button>
-              <button type="button" className="btn btn-small btn-ghost" onClick={() => setRows((p) => p.map((r) => ({ ...r, selected: false })))}>
-                Clear selection
-              </button>
-            </div>
+            <div className="admin-pricelist-tools-layout">
+              <div className="admin-pricelist-panel admin-pricelist-panel--filters">
+                <h3>Filters</h3>
+                <div className="admin-pricelist-filter-grid">
+                  <label className="admin-pricelist-field admin-pricelist-field--wide">
+                    <span>Search</span>
+                    <input
+                      type="search"
+                      value={search}
+                      onChange={(e) => {
+                        setSearch(e.target.value)
+                        goToPage(1)
+                      }}
+                      placeholder="SKU, name, section…"
+                    />
+                  </label>
+                  <label className="admin-pricelist-field">
+                    <span>Source</span>
+                    <select
+                      value={sourceFilter}
+                      onChange={(e) => {
+                        setSourceFilter(e.target.value as SourceFilter)
+                        goToPage(1)
+                      }}
+                    >
+                      <option value="all">All ({rows.length})</option>
+                      <option value="tealbury">Tealbury ({tealburyCount})</option>
+                      <option value="lamtek">Lamtek ({lamtekCount})</option>
+                    </select>
+                  </label>
+                  <label className="admin-pricelist-field">
+                    <span>Door / range</span>
+                    <select
+                      value={doorFilter}
+                      onChange={(e) => {
+                        setDoorFilter(e.target.value)
+                        goToPage(1)
+                      }}
+                    >
+                      <option value="">All ranges</option>
+                      {doorRanges.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="admin-pricelist-field">
+                    <span>Section</span>
+                    <select
+                      value={sectionFilter}
+                      onChange={(e) => {
+                        setSectionFilter(e.target.value)
+                        goToPage(1)
+                      }}
+                    >
+                      <option value="">All sections</option>
+                      {sections.slice(0, 200).map((s) => (
+                        <option key={s} value={s}>
+                          {s.length > 48 ? `${s.slice(0, 48)}…` : s}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="admin-pricelist-field admin-pricelist-field--check">
+                    <input
+                      type="checkbox"
+                      checked={onlyUnassigned}
+                      onChange={(e) => {
+                        setOnlyUnassigned(e.target.checked)
+                        goToPage(1)
+                      }}
+                    />
+                    <span>Unassigned only ({unassignedCount})</span>
+                  </label>
+                </div>
+                <p className="admin-muted admin-pricelist-filter-summary">
+                  Table shows {rangeStart}–{rangeEnd} of {filtered.length} filtered
+                  {selectedCount > 0 ? ` · ${selectedCount} selected` : ''}
+                </p>
+              </div>
 
-            <p className="admin-muted">
-              Showing {rangeStart}–{rangeEnd} of {filtered.length} filtered row(s)
-              {selectedCount > 0 ? ` · ${selectedCount} selected overall` : ''}
-            </p>
+              <div className="admin-pricelist-panel admin-pricelist-panel--bulk">
+                <h3>Selection &amp; bulk actions</h3>
+                <div className="admin-pricelist-action-group">
+                  <span className="admin-pricelist-action-label">Selection</span>
+                  <div className="admin-pricelist-action-row">
+                    <button type="button" className="btn btn-small btn-outline" onClick={() => toggleSelectAllFiltered(true)}>
+                      Select filtered ({filtered.length})
+                    </button>
+                    <button type="button" className="btn btn-small btn-ghost" onClick={() => setRows((p) => p.map((r) => ({ ...r, selected: false })))}>
+                      Clear selection
+                    </button>
+                  </div>
+                </div>
+                <div className="admin-pricelist-action-group">
+                  <span className="admin-pricelist-action-label">Delete from workbench</span>
+                  <div className="admin-pricelist-action-row">
+                    <button
+                      type="button"
+                      className="btn btn-small btn-danger-outline"
+                      disabled={filtered.length === 0}
+                      onClick={() => deleteBulk('filtered')}
+                    >
+                      Delete filtered ({filtered.length})
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-small btn-danger-outline"
+                      disabled={filteredSelectedCount === 0}
+                      onClick={() => deleteBulk('selected')}
+                    >
+                      Delete selected ({filteredSelectedCount})
+                    </button>
+                  </div>
+                </div>
+                <div className="admin-pricelist-action-group">
+                  <span className="admin-pricelist-action-label">Categories</span>
+                  <div className="admin-pricelist-action-row admin-pricelist-action-row--category">
+                    <select
+                      value={bulkCategoryId}
+                      onChange={(e) => setBulkCategoryId(e.target.value)}
+                      aria-label="Bulk category"
+                    >
+                      <option value="">Choose category…</option>
+                      {categoryOptions.parents.map((p) => (
+                        <optgroup key={p.id} label={p.name}>
+                          <option value={p.id}>{p.name}</option>
+                          {(categoryOptions.childrenByParent.get(p.id) ?? []).map((c) => (
+                            <option key={c.id} value={c.id}>
+                              — {c.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn btn-small"
+                      disabled={!bulkCategoryId}
+                      onClick={() => onBulkCategoryApply('filtered')}
+                    >
+                      Apply to filtered
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-small btn-outline"
+                      disabled={!bulkCategoryId || filteredSelectedCount === 0}
+                      onClick={() => onBulkCategoryApply('selected')}
+                    >
+                      Apply to selected
+                    </button>
+                  </div>
+                  <div className="admin-pricelist-action-row">
+                    <button type="button" className="btn btn-small btn-outline" onClick={() => runAutoMap('unassigned')}>
+                      Auto-map unassigned
+                    </button>
+                    <button type="button" className="btn btn-small btn-outline" onClick={() => runAutoMap('all')}>
+                      Auto-map all
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="admin-pricelist-panel admin-pricelist-panel--smart">
+                <h3>Smart commands</h3>
+                <PricelistWorkbenchSmartPanel
+                  rows={rows}
+                  filtered={filtered}
+                  onRowsChange={setRows}
+                  onNotify={notifySmart}
+                />
+              </div>
+            </div>
           </section>
 
           <section className="admin-modal-card admin-wipe-section admin-pricelist-table-section">
@@ -496,6 +570,7 @@ export default function AdminPricelistWorkbench() {
                     <th>Category</th>
                     <th>£</th>
                     <th>Active</th>
+                    <th className="admin-pricelist-th-actions"> </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -580,6 +655,16 @@ export default function AdminPricelistWorkbench() {
                           onChange={(e) => patchRow(r.id, { active: e.target.checked })}
                           title="Active"
                         />
+                      </td>
+                      <td className="admin-pricelist-td-actions">
+                        <button
+                          type="button"
+                          className="btn btn-small btn-danger-outline"
+                          title="Remove row from workbench"
+                          onClick={() => deleteRow(r.id)}
+                        >
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   ))}

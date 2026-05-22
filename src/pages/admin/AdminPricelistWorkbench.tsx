@@ -17,6 +17,9 @@ import { parseTealburyPricelistWorkbook } from '@/lib/tealburyPricelistParse'
 import { useListPagination } from '@/lib/listPagination'
 import { deleteRowsByIds } from '@/lib/pricelistWorkbenchRules'
 import PricelistWorkbenchSmartPanel from '@/components/admin/PricelistWorkbenchSmartPanel'
+import PricelistWorkbenchSection from '@/components/admin/PricelistWorkbenchSection'
+import PricelistWorkbenchTable from '@/components/admin/PricelistWorkbenchTable'
+import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import type { CategoryRow } from '@/types/database'
 
 type SourceFilter = 'all' | PricelistSource
@@ -274,7 +277,10 @@ export default function AdminPricelistWorkbench() {
   return (
     <div className="admin-page admin-pricelist-workbench">
       <div className="admin-page-header">
-        <h1>Pricelist workbench</h1>
+        <h1>
+          Pricelist workbench
+          <AdminHelpTip text="Import Tealbury and Lamtek trade Excel pricelists, edit and categorize rows, then export template.xlsx or publish to the live catalogue by SKU." />
+        </h1>
         <p className="page-intro">
           Build a full product list from the <strong>Tealbury customer pricelist</strong> (per door/range sheets +
           accessories) and the <strong>Lamtek trade kitchen pricelist</strong>. Edit rows, assign categories in bulk,
@@ -286,10 +292,20 @@ export default function AdminPricelistWorkbench() {
           <Link to="/admin/catalogue/components/import">Component import</Link> ·{' '}
           <Link to="/admin/catalogue">Catalogue</Link>
         </p>
+        {rows.length > 0 && (
+          <p className="admin-pricelist-stats">
+            {rows.length} draft row(s) · {tealburyCount} Tealbury · {lamtekCount} Lamtek · {unassignedCount} unassigned
+          </p>
+        )}
       </div>
 
-      <section className="admin-modal-card admin-wipe-section">
-        <h2>1. Load workbooks</h2>
+      <PricelistWorkbenchSection
+        id="workbench-load"
+        title="1. Load workbooks"
+        summary="Upload Tealbury and/or Lamtek trade .xlsx files"
+        tip="Re-importing a source replaces only that source’s rows. Tealbury skips the Pricelist hub sheet when door-range sheets exist."
+        defaultOpen={rows.length === 0}
+      >
         <p className="admin-muted">
           Tealbury: the <strong>Pricelist</strong> sheet uses a door selector (formulas); static prices live on each{' '}
           <strong>door/range sheet</strong> (No Doors, Dawson, Oakham, …) plus an <strong>Accessories</strong> block per
@@ -297,7 +313,10 @@ export default function AdminPricelistWorkbench() {
         </p>
         <div className="admin-pricelist-upload-grid">
           <label className="admin-pricelist-upload-card">
-            <span className="admin-pricelist-upload-label">Tealbury customer pricelist (.xlsx)</span>
+            <span className="admin-pricelist-upload-label">
+              Tealbury customer pricelist (.xlsx)
+              <AdminHelpTip text="Customer-facing Tealbury workbook with one sheet per door range plus accessories blocks." />
+            </span>
             <input
               ref={tealburyInputRef}
               type="file"
@@ -316,7 +335,10 @@ export default function AdminPricelistWorkbench() {
             )}
           </label>
           <label className="admin-pricelist-upload-card">
-            <span className="admin-pricelist-upload-label">Lamtek trade kitchen pricelist (.xlsx)</span>
+            <span className="admin-pricelist-upload-label">
+              Lamtek trade kitchen pricelist (.xlsx)
+              <AdminHelpTip text="Lamtek trade matrix; multi-finish columns use the lowest price as list price and ~75% as Lamtek cost." />
+            </span>
             <input
               ref={lamtekInputRef}
               type="file"
@@ -353,31 +375,74 @@ export default function AdminPricelistWorkbench() {
             Clear workbench
           </button>
         )}
-      </section>
+      </PricelistWorkbenchSection>
 
       {warnings.length > 0 && (
-        <details className="admin-modal-card admin-wipe-section">
-          <summary>Parser notices ({warnings.length})</summary>
+        <PricelistWorkbenchSection
+          id="workbench-warnings"
+          title={`Parser notices (${warnings.length})`}
+          tip="Non-fatal import messages from the Excel parser (skipped rows, ambiguous codes, etc.)."
+          defaultOpen={false}
+        >
           <ul className="admin-pricelist-warnings">
             {warnings.slice(0, 40).map((w, i) => (
               <li key={i}>{w}</li>
             ))}
           </ul>
           {warnings.length > 40 ? <p className="admin-muted">…and {warnings.length - 40} more.</p> : null}
-        </details>
+        </PricelistWorkbenchSection>
       )}
 
       {rows.length > 0 && (
         <>
-          <section className="admin-modal-card admin-wipe-section admin-pricelist-tools-section">
-            <h2>2. Filter, bulk edit &amp; smart commands</h2>
+          <PricelistWorkbenchSection
+            id="workbench-table"
+            title="2. Edit products"
+            summary={`${filtered.length} filtered · page ${currentPage} of ${totalPages}`}
+            tip="Resize and show/hide columns via the gear control. Double-click door/range, section, text fields, or prices to edit."
+            defaultOpen
+            badge={filtered.length}
+          >
+            <PricelistWorkbenchTable
+              pageItems={pageItems}
+              categories={categories}
+              allSelectedOnPage={pageItems.length > 0 && pageItems.every((r) => r.selected)}
+              onToggleSelectAllOnPage={toggleSelectAllOnPage}
+              onPatchRow={patchRow}
+              onDeleteRow={deleteRow}
+            />
+            <ListPager
+              totalItems={filtered.length}
+              totalPages={totalPages}
+              currentPage={currentPage}
+              pageSize={pageSize}
+              rangeStart={rangeStart}
+              rangeEnd={rangeEnd}
+              onPageChange={goToPage}
+              onPageSizeChange={setPageSize}
+              itemLabel="rows"
+            />
+          </PricelistWorkbenchSection>
 
+          <PricelistWorkbenchSection
+            id="workbench-tools"
+            title="3. Filter, bulk actions & smart commands"
+            summary="Narrow the list, assign categories, delete rows, or run plain-English commands"
+            tip="Bulk actions apply to filtered rows or ticked selection. Smart commands can assign categories, clean names, delete, and more."
+            defaultOpen={false}
+          >
             <div className="admin-pricelist-tools-layout">
               <div className="admin-pricelist-panel admin-pricelist-panel--filters">
-                <h3>Filters</h3>
+                <h3>
+                  Filters
+                  <AdminHelpTip text="Filters affect the table and most bulk actions. Selection checkboxes persist across pages." />
+                </h3>
                 <div className="admin-pricelist-filter-grid">
                   <label className="admin-pricelist-field admin-pricelist-field--wide">
-                    <span>Search</span>
+                    <span>
+                      Search
+                      <AdminHelpTip text="Matches SKU, product name, section label, or assigned category name." />
+                    </span>
                     <input
                       type="search"
                       value={search}
@@ -445,7 +510,10 @@ export default function AdminPricelistWorkbench() {
                         goToPage(1)
                       }}
                     />
-                    <span>Unassigned only ({unassignedCount})</span>
+                    <span>
+                      Unassigned only ({unassignedCount})
+                      <AdminHelpTip text="Show only rows without a portal category — useful before bulk assign or publish." />
+                    </span>
                   </label>
                 </div>
                 <p className="admin-muted admin-pricelist-filter-summary">
@@ -455,7 +523,10 @@ export default function AdminPricelistWorkbench() {
               </div>
 
               <div className="admin-pricelist-panel admin-pricelist-panel--bulk">
-                <h3>Selection &amp; bulk actions</h3>
+                <h3>
+                  Selection &amp; bulk actions
+                  <AdminHelpTip text="Select rows with checkboxes, then apply category, delete, or smart commands to filtered or selected rows only." />
+                </h3>
                 <div className="admin-pricelist-action-group">
                   <span className="admin-pricelist-action-label">Selection</span>
                   <div className="admin-pricelist-action-row">
@@ -489,14 +560,17 @@ export default function AdminPricelistWorkbench() {
                   </div>
                 </div>
                 <div className="admin-pricelist-action-group">
-                  <span className="admin-pricelist-action-label">Categories</span>
+                  <span className="admin-pricelist-action-label">
+                    Assign category
+                    <AdminHelpTip text="Pick a portal category, then apply to all filtered rows or only ticked rows. Does not publish until you use Export/Publish." />
+                  </span>
                   <div className="admin-pricelist-action-row admin-pricelist-action-row--category">
                     <select
                       value={bulkCategoryId}
                       onChange={(e) => setBulkCategoryId(e.target.value)}
-                      aria-label="Bulk category"
+                      aria-label="Assign category"
                     >
-                      <option value="">Choose category…</option>
+                      <option value="">Choose category to assign…</option>
                       {categoryOptions.parents.map((p) => (
                         <optgroup key={p.id} label={p.name}>
                           <option value={p.id}>{p.name}</option>
@@ -526,10 +600,20 @@ export default function AdminPricelistWorkbench() {
                     </button>
                   </div>
                   <div className="admin-pricelist-action-row">
-                    <button type="button" className="btn btn-small btn-outline" onClick={() => runAutoMap('unassigned')}>
+                    <button
+                      type="button"
+                      className="btn btn-small btn-outline"
+                      title="Match section headings to existing category names"
+                      onClick={() => runAutoMap('unassigned')}
+                    >
                       Auto-map unassigned
                     </button>
-                    <button type="button" className="btn btn-small btn-outline" onClick={() => runAutoMap('all')}>
+                    <button
+                      type="button"
+                      className="btn btn-small btn-outline"
+                      title="Re-run auto-map on every row"
+                      onClick={() => runAutoMap('all')}
+                    >
                       Auto-map all
                     </button>
                   </div>
@@ -541,151 +625,21 @@ export default function AdminPricelistWorkbench() {
                 <PricelistWorkbenchSmartPanel
                   rows={rows}
                   filtered={filtered}
+                  categories={categories}
                   onRowsChange={setRows}
                   onNotify={notifySmart}
                 />
               </div>
             </div>
-          </section>
+          </PricelistWorkbenchSection>
 
-          <section className="admin-modal-card admin-wipe-section admin-pricelist-table-section">
-            <h2>3. Edit products</h2>
-            <div className="admin-table-wrap admin-pricelist-table-wrap">
-              <table className="admin-table admin-pricelist-table">
-                <thead>
-                  <tr>
-                    <th className="admin-pricelist-th-check">
-                      <input
-                        type="checkbox"
-                        aria-label="Select page"
-                        checked={pageItems.length > 0 && pageItems.every((r) => r.selected)}
-                        onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
-                      />
-                    </th>
-                    <th>Source</th>
-                    <th>Range</th>
-                    <th>Section</th>
-                    <th>SKU</th>
-                    <th>Name</th>
-                    <th>Category</th>
-                    <th>£</th>
-                    <th>Active</th>
-                    <th className="admin-pricelist-th-actions"> </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageItems.map((r) => (
-                    <tr key={r.id} className={!r.category_id ? 'admin-pricelist-row--unassigned' : undefined}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={r.selected}
-                          onChange={(e) => patchRow(r.id, { selected: e.target.checked })}
-                        />
-                      </td>
-                      <td>
-                        <span
-                          className={`admin-pricelist-source admin-pricelist-source--${r.source}`}
-                          title={r.catalog_program}
-                        >
-                          {r.source === 'tealbury' ? 'TB' : 'LK'}
-                        </span>
-                      </td>
-                      <td className="admin-pricelist-range" title={r.door_range}>
-                        {r.door_range ? (r.door_range.length > 14 ? `${r.door_range.slice(0, 14)}…` : r.door_range) : '—'}
-                      </td>
-                      <td className="admin-pricelist-section" title={r.section}>
-                        {r.section.length > 28 ? `${r.section.slice(0, 28)}…` : r.section}
-                      </td>
-                      <td>
-                        <input
-                          className="admin-pricelist-inline-input"
-                          value={r.sku}
-                          onChange={(e) => patchRow(r.id, { sku: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          className="admin-pricelist-inline-input admin-pricelist-inline-input--wide"
-                          value={r.name}
-                          onChange={(e) => patchRow(r.id, { name: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <select
-                          className="admin-pricelist-category-select"
-                          value={r.category_id ?? ''}
-                          onChange={(e) => {
-                            const cat = categories.find((c) => c.id === e.target.value)
-                            if (cat) {
-                              patchRow(r.id, {
-                                category_id: cat.id,
-                                category_slug: cat.slug,
-                                category_name: cat.name,
-                              })
-                            } else {
-                              patchRow(r.id, { category_id: null })
-                            }
-                          }}
-                        >
-                          <option value="">— Assign —</option>
-                          {categories.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.parent_id ? `— ${c.name}` : c.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          className="admin-pricelist-inline-input admin-pricelist-inline-input--price"
-                          value={r.unit_price}
-                          onChange={(e) =>
-                            patchRow(r.id, { unit_price: Math.max(0, parseFloat(e.target.value) || 0) })
-                          }
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={r.active}
-                          onChange={(e) => patchRow(r.id, { active: e.target.checked })}
-                          title="Active"
-                        />
-                      </td>
-                      <td className="admin-pricelist-td-actions">
-                        <button
-                          type="button"
-                          className="btn btn-small btn-danger-outline"
-                          title="Remove row from workbench"
-                          onClick={() => deleteRow(r.id)}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <ListPager
-              totalItems={filtered.length}
-              totalPages={totalPages}
-              currentPage={currentPage}
-              pageSize={pageSize}
-              rangeStart={rangeStart}
-              rangeEnd={rangeEnd}
-              onPageChange={goToPage}
-              onPageSizeChange={setPageSize}
-              itemLabel="rows"
-            />
-          </section>
-
-          <section className="admin-modal-card admin-wipe-section">
-            <h2>4. Export or publish</h2>
+          <PricelistWorkbenchSection
+            id="workbench-export"
+            title="4. Export or publish"
+            summary="Download template.xlsx or upsert live catalogue by SKU"
+            tip="Export is safe preview. Publish writes to Supabase — Tealbury and Lamtek program tags are preserved per row."
+            defaultOpen={false}
+          >
             <p className="admin-muted">
               <strong>Export</strong> downloads rows in the same shape as your template.xlsx.{' '}
               <strong>Publish</strong> upserts into the live catalogue by SKU (
@@ -715,7 +669,7 @@ export default function AdminPricelistWorkbench() {
                 Publish all rows
               </button>
             </div>
-          </section>
+          </PricelistWorkbenchSection>
         </>
       )}
 

@@ -2,6 +2,7 @@
  * Smart rules & natural-language commands for the pricelist workbench draft list.
  */
 import type { PricelistWorkbenchRow, PricelistSource } from '@/lib/pricelistWorkbench'
+import type { CategoryRow } from '@/types/database'
 
 export type WorkbenchMatchField =
   | 'source'
@@ -11,14 +12,21 @@ export type WorkbenchMatchField =
   | 'name'
   | 'category_name'
   | 'description'
+  | 'cost_price'
+  | 'unit_price'
+  | 'category'
 
 export type WorkbenchConditionOp =
   | 'contains'
   | 'equals'
   | 'not_contains'
+  | 'starts_with'
+  | 'greater_than'
+  | 'less_than'
   | 'sku_appears_in_name'
   | 'empty'
   | 'not_empty'
+  | 'unassigned'
 
 export type WorkbenchActionType =
   | 'delete'
@@ -27,6 +35,7 @@ export type WorkbenchActionType =
   | 'deselect'
   | 'set_active'
   | 'set_inactive'
+  | 'assign_category'
 
 export interface WorkbenchCondition {
   field: WorkbenchMatchField
@@ -40,6 +49,8 @@ export interface WorkbenchRule {
   conditions: WorkbenchCondition[]
   matchMode: 'all' | 'any'
   action: WorkbenchActionType
+  /** Category name/slug for assign_category; optional for other actions. */
+  actionParam?: string
 }
 
 export interface ApplyRuleResult {
@@ -68,9 +79,20 @@ function fieldValue(row: PricelistWorkbenchRow, field: WorkbenchMatchField): str
       return row.category_name
     case 'description':
       return row.description
+    case 'cost_price':
+      return String(row.cost_price ?? 0)
+    case 'unit_price':
+      return String(row.unit_price ?? 0)
+    case 'category':
+      return row.category_id ?? ''
     default:
       return ''
   }
+}
+
+function numericFieldValue(row: PricelistWorkbenchRow, field: 'cost_price' | 'unit_price'): number {
+  if (field === 'cost_price') return row.cost_price ?? 0
+  return row.unit_price ?? 0
 }
 
 function skuAppearsInName(row: PricelistWorkbenchRow): boolean {
@@ -85,6 +107,26 @@ function skuAppearsInName(row: PricelistWorkbenchRow): boolean {
 }
 
 export function rowMatchesCondition(row: PricelistWorkbenchRow, cond: WorkbenchCondition): boolean {
+  if (cond.field === 'category' && cond.op === 'unassigned') {
+    return !row.category_id
+  }
+
+  if (cond.field === 'cost_price' || cond.field === 'unit_price') {
+    const num = numericFieldValue(row, cond.field)
+    const threshold = parseFloat(cond.value)
+    if (Number.isNaN(threshold)) return false
+    switch (cond.op) {
+      case 'greater_than':
+        return num > threshold
+      case 'less_than':
+        return num < threshold
+      case 'equals':
+        return Math.abs(num - threshold) < 0.005
+      default:
+        return false
+    }
+  }
+
   const raw = fieldValue(row, cond.field)
   const val = cond.value.trim()
   const hay = raw.toLowerCase()
@@ -97,6 +139,8 @@ export function rowMatchesCondition(row: PricelistWorkbenchRow, cond: WorkbenchC
       return !!raw.trim()
     case 'equals':
       return hay === needle
+    case 'starts_with':
+      return needle ? hay.startsWith(needle) : true
     case 'contains':
       return needle ? hay.includes(needle) : true
     case 'not_contains':
@@ -147,10 +191,27 @@ export function removeSkuFromName(row: PricelistWorkbenchRow): string {
   return name.slice(0, 300)
 }
 
+export function findCategoryForRule(
+  categories: CategoryRow[],
+  param: string | undefined
+): CategoryRow | null {
+  const q = (param ?? '').trim().toLowerCase()
+  if (!q) return null
+  const exact = categories.find(
+    (c) => c.name.toLowerCase() === q || c.slug.toLowerCase() === q
+  )
+  if (exact) return exact
+  const partial = categories.find(
+    (c) => c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q)
+  )
+  return partial ?? null
+}
+
 export function applyRuleToRows(
   rows: PricelistWorkbenchRow[],
   rule: WorkbenchRule,
-  targetIds?: Set<string>
+  targetIds?: Set<string>,
+  categories?: CategoryRow[]
 ): { rows: PricelistWorkbenchRow[]; result: ApplyRuleResult } {
   const pool = targetIds ? rows.filter((r) => targetIds.has(r.id)) : rows
   const matched = filterRowsByRule(pool, rule)
@@ -165,6 +226,41 @@ export function applyRuleToRows(
         matched: matched.length,
         changed: matched.length,
         message: `Removed ${matched.length} row(s) from the workbench draft.`,
+      },
+    }
+  }
+
+  if (rule.action === 'assign_category') {
+    const cat = findCategoryForRule(categories ?? [], rule.actionParam)
+    if (!cat) {
+      return {
+        rows,
+        result: {
+          matched: matched.length,
+          changed: 0,
+          message: matched.length
+            ? `No category matched “${rule.actionParam ?? ''}”. Check the category name in Categories.`
+            : 'No rows matched.',
+        },
+      }
+    }
+    const next = rows.map((row) => {
+      if (!matchedIds.has(row.id)) return row
+      if (row.category_id === cat.id) return row
+      changed++
+      return {
+        ...row,
+        category_id: cat.id,
+        category_slug: cat.slug,
+        category_name: cat.name,
+      }
+    })
+    return {
+      rows: next,
+      result: {
+        matched: matched.length,
+        changed,
+        message: `Assigned category “${cat.name}” to ${changed} of ${matched.length} matched row(s).`,
       },
     }
   }
@@ -201,6 +297,7 @@ export function applyRuleToRows(
     deselect: 'deselected',
     set_active: 'activated',
     set_inactive: 'deactivated',
+    assign_category: 'assigned category on',
   }
 
   return {
@@ -258,8 +355,133 @@ function extractQuotedPhrases(text: string): string[] {
   return out
 }
 
+function parseMatchMode(lower: string): 'all' | 'any' {
+  if (/\b(any|either)\b/.test(lower) && /\bcondition/.test(lower)) return 'any'
+  if (/\bmatch\s+any\b/.test(lower)) return 'any'
+  if (/\bor\b/.test(lower) && !/\band\b/.test(lower)) return 'any'
+  return 'all'
+}
+
+type ParsedAction =
+  | { action: WorkbenchActionType; actionParam?: string }
+  | { error: string }
+  | null
+
+function parseAction(lower: string, _raw: string, quoted: string[]): ParsedAction {
+  const assignMatch =
+    lower.match(
+      /\b(?:assign(?:\s+category)?|categor(?:y|ise|ize)(?:\s+as)?|put\s+in(?:to)?)\s+(?:to\s+)?(?:"([^"]+)"|([a-z][\w\s&/-]{2,40}))/
+    ) ?? lower.match(/\bcategory\s+(?:is|=)\s+"([^"]+)"/)
+  if (assignMatch) {
+    const param = (assignMatch[1] ?? assignMatch[2] ?? quoted.find((q) => !/no doors/i.test(q)))?.trim()
+    if (!param) {
+      return { error: 'Name the category to assign (e.g. assign category "Base units").' }
+    }
+    return { action: 'assign_category', actionParam: param }
+  }
+
+  if (/\b(remove|strip|clean)\b/.test(lower) && /\bsku\b/.test(lower) && /\bname\b/.test(lower)) {
+    return { action: 'remove_sku_from_name' }
+  }
+  if (/\b(deactivate|mark\s+inactive|set\s+inactive)\b/.test(lower)) {
+    return { action: 'set_inactive' }
+  }
+  if (/\b(activate|mark\s+active|set\s+active)\b/.test(lower) && !/\binactiv/.test(lower)) {
+    return { action: 'set_active' }
+  }
+  if (/\b(select|tick|check)\b/.test(lower) && !/\b(de)?select/.test(lower)) {
+    return { action: 'select' }
+  }
+  if (/\b(deselect|untick|uncheck|clear\s+selection)\b/.test(lower)) {
+    return { action: 'deselect' }
+  }
+  if (/\b(delete|drop|remove\s+from\s+(?:the\s+)?(?:workbench|list|draft))\b/.test(lower)) {
+    return { action: 'delete' }
+  }
+  if (/\b(remove|drop)\b/.test(lower) && /\b(row|product|item|line)s?\b/.test(lower)) {
+    return { action: 'delete' }
+  }
+
+  return null
+}
+
+function pushUniqueCondition(conditions: WorkbenchCondition[], cond: WorkbenchCondition) {
+  const key = `${cond.field}:${cond.op}:${cond.value}`
+  if (conditions.some((c) => `${c.field}:${c.op}:${c.value}` === key)) return
+  conditions.push(cond)
+}
+
+function parseFieldConditions(lower: string, raw: string, quoted: string[]): WorkbenchCondition[] {
+  const conditions: WorkbenchCondition[] = []
+
+  if (/\btealbury\b/.test(lower)) {
+    pushUniqueCondition(conditions, { field: 'source', op: 'equals', value: 'tealbury' })
+  } else if (/\blamtek\b/.test(lower)) {
+    pushUniqueCondition(conditions, { field: 'source', op: 'equals', value: 'lamtek' })
+  }
+
+  if (/\b(unassigned|no\s+category|without\s+category|missing\s+category)\b/.test(lower)) {
+    pushUniqueCondition(conditions, { field: 'category', op: 'unassigned', value: '' })
+  }
+
+  const sectionMatch =
+    raw.match(/\bsection\s+(?:contains|with|is|equals?|=)\s+"([^"]+)"/i) ??
+    raw.match(/\bsection\s+(?:contains|with|is|equals?|=)\s+([A-Za-z0-9][\w\s/-]{2,60})/i)
+  if (sectionMatch) {
+    pushUniqueCondition(conditions, { field: 'section', op: 'contains', value: sectionMatch[1].trim() })
+  }
+
+  const rangeMatch =
+    raw.match(/\b(?:door|range)\s+(?:contains|with|is|equals?|=)\s+"([^"]+)"/i) ??
+    raw.match(/\b(?:door|range)\s+(?:contains|with|is|equals?|=)\s+([A-Za-z0-9][\w\s/-]{2,40})/i)
+  if (rangeMatch) {
+    pushUniqueCondition(conditions, { field: 'door_range', op: 'contains', value: rangeMatch[1].trim() })
+  }
+
+  const skuMatch = raw.match(/\bsku\s+(?:contains|with|is|equals?|=)\s+"([^"]+)"/i)
+  if (skuMatch) {
+    pushUniqueCondition(conditions, { field: 'sku', op: 'contains', value: skuMatch[1].trim() })
+  }
+
+  const nameMatch = raw.match(/\bname\s+(?:contains|with|is|equals?|=)\s+"([^"]+)"/i)
+  if (nameMatch) {
+    pushUniqueCondition(conditions, { field: 'name', op: 'contains', value: nameMatch[1].trim() })
+  }
+
+  const costGt = lower.match(/\b(?:cost|lamtek\s+cost)\s+(?:price\s+)?(?:over|above|greater\s+than|>)\s*£?\s*([\d.]+)/)
+  if (costGt) {
+    pushUniqueCondition(conditions, { field: 'cost_price', op: 'greater_than', value: costGt[1] })
+  }
+  const listGt = lower.match(/\b(?:list|sell|unit)\s+price\s+(?:over|above|greater\s+than|>)\s*£?\s*([\d.]+)/)
+  if (listGt) {
+    pushUniqueCondition(conditions, { field: 'unit_price', op: 'greater_than', value: listGt[1] })
+  }
+
+  const noDoors = quoted.find((q) => /no doors/i.test(q)) ?? (/\bno doors\b/.test(lower) ? 'No Doors' : '')
+  if (noDoors) {
+    pushUniqueCondition(conditions, { field: 'door_range', op: 'contains', value: noDoors })
+  }
+
+  for (const q of quoted) {
+    if (/no doors/i.test(q)) continue
+    if (/\bsection\b/.test(lower) && !conditions.some((c) => c.field === 'section' && c.value === q)) {
+      pushUniqueCondition(conditions, { field: 'section', op: 'contains', value: q })
+    } else if (!conditions.some((c) => c.field === 'door_range' && c.value === q)) {
+      pushUniqueCondition(conditions, { field: 'door_range', op: 'contains', value: q })
+    }
+  }
+
+  if (/\bsku\b.*\bname\b/.test(lower) || /\bname\b.*\bsku\b/.test(lower)) {
+    if (!conditions.some((c) => c.op === 'sku_appears_in_name')) {
+      pushUniqueCondition(conditions, { field: 'name', op: 'sku_appears_in_name', value: '' })
+    }
+  }
+
+  return conditions
+}
+
 /**
- * Parse a short English command into a workbench rule (best-effort).
+ * Parse a plain-English command into a workbench rule (best-effort).
  */
 export function parseSmartCommandPrompt(prompt: string): { rule: WorkbenchRule | null; error?: string } {
   const raw = prompt.trim()
@@ -267,64 +489,45 @@ export function parseSmartCommandPrompt(prompt: string): { rule: WorkbenchRule |
 
   const lower = normalizePrompt(raw)
   const quoted = extractQuotedPhrases(raw)
+  const matchMode = parseMatchMode(lower)
 
-  let action: WorkbenchActionType | null = null
-  if (/\b(remove|strip|clean)\b/.test(lower) && /\bsku\b/.test(lower) && /\bname\b/.test(lower)) {
-    action = 'remove_sku_from_name'
-  } else if (/\b(delete|drop)\b/.test(lower) || (/\bremove\b/.test(lower) && /\bfrom\b/.test(lower))) {
-    action = 'delete'
-  } else if (/\b(select|tick)\b/.test(lower)) action = 'select'
-  else if (/\b(deselect|untick)\b/.test(lower)) action = 'deselect'
-
-  if (!action) {
+  const actionParsed = parseAction(lower, raw, quoted)
+  if (!actionParsed) {
     return {
       rule: null,
-      error: 'Could not detect an action. Try: DELETE, REMOVE SKU FROM NAME, or SELECT.',
+      error:
+        'Could not detect an action. Try: delete, assign category "Base units", remove SKU from name, select, activate, or deactivate.',
     }
   }
-
-  const conditions: WorkbenchCondition[] = []
-
-  if (/\btealbury\b/.test(lower)) {
-    conditions.push({ field: 'source', op: 'equals', value: 'tealbury' })
-  } else if (/\blamtek\b/.test(lower)) {
-    conditions.push({ field: 'source', op: 'equals', value: 'lamtek' })
+  if ('error' in actionParsed) {
+    return { rule: null, error: actionParsed.error }
   }
 
-  const noDoors = quoted.find((q) => /no doors/i.test(q)) ?? (/\bno doors\b/.test(lower) ? 'No Doors' : '')
-  if (noDoors) {
-    conditions.push({ field: 'door_range', op: 'contains', value: noDoors })
-  }
+  const { action, actionParam } = actionParsed
+  const conditions = parseFieldConditions(lower, raw, quoted)
 
-  for (const q of quoted) {
-    if (/no doors/i.test(q)) continue
-    if (/\bsku\b/.test(lower) && /name/.test(lower)) continue
-    conditions.push({ field: 'door_range', op: 'contains', value: q })
-  }
-
-  if (action === 'remove_sku_from_name' || /\bsku\b.*\bname\b/.test(lower) || /\bname\b.*\bsku\b/.test(lower)) {
-    if (!conditions.some((c) => c.op === 'sku_appears_in_name')) {
-      conditions.push({ field: 'name', op: 'sku_appears_in_name', value: '' })
-    }
+  if (action === 'remove_sku_from_name' && !conditions.some((c) => c.op === 'sku_appears_in_name')) {
+    pushUniqueCondition(conditions, { field: 'name', op: 'sku_appears_in_name', value: '' })
   }
 
   if (!conditions.length) {
     return {
       rule: null,
-      error: 'Could not detect filters. Mention Tealbury/Lamtek, a range like "No Doors", or SKU-in-name.',
+      error:
+        'Could not detect filters. Mention Tealbury/Lamtek, a range like "No Doors", section contains "…", unassigned, or SKU-in-name.',
     }
   }
 
-  const name =
-    raw.length > 60 ? `${raw.slice(0, 57)}…` : raw
+  const name = raw.length > 72 ? `${raw.slice(0, 69)}…` : raw
 
   return {
     rule: {
       id: `cmd-${Date.now()}`,
       name,
       conditions,
-      matchMode: 'all',
+      matchMode,
       action,
+      actionParam,
     },
   }
 }
@@ -337,10 +540,14 @@ export function describeRule(rule: WorkbenchRule): string {
   const conds = rule.conditions
     .map((c) => {
       if (c.op === 'sku_appears_in_name') return 'SKU appears in name'
+      if (c.op === 'unassigned') return 'category is unassigned'
       if (c.op === 'empty') return `${c.field} is empty`
       if (c.op === 'not_empty') return `${c.field} has value`
+      if (c.op === 'greater_than') return `${c.field} > ${c.value}`
+      if (c.op === 'less_than') return `${c.field} < ${c.value}`
       return `${c.field} ${c.op} "${c.value}"`
     })
     .join(rule.matchMode === 'any' ? ' OR ' : ' AND ')
-  return `${rule.action}: ${conds}`
+  const param = rule.actionParam ? ` → ${rule.actionParam}` : ''
+  return `${rule.action}${param}: ${conds}`
 }

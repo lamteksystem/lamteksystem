@@ -1,0 +1,402 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ColumnSettings } from '@/components/admin/ColumnSettings'
+import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
+import {
+  PRICELIST_WORKBENCH_COLUMNS,
+  workbenchColumnWidth,
+  type WorkbenchColumnId,
+} from '@/lib/pricelistWorkbenchColumns'
+import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import { useColumnVisibility } from '@/hooks/useColumnVisibility'
+import { useColumnWidths } from '@/hooks/useColumnWidths'
+import type { CategoryRow } from '@/types/database'
+
+type EditableField = 'door_range' | 'section' | 'sku' | 'name' | 'description' | 'cost_price' | 'unit_price'
+
+type Props = {
+  pageItems: PricelistWorkbenchRow[]
+  categories: CategoryRow[]
+  allSelectedOnPage: boolean
+  onToggleSelectAllOnPage: (checked: boolean) => void
+  onPatchRow: (id: string, patch: Partial<PricelistWorkbenchRow>) => void
+  onDeleteRow: (id: string) => void
+}
+
+const COLUMN_DEFS = PRICELIST_WORKBENCH_COLUMNS.map(({ id, label }) => ({ id, label }))
+const DBL_CLICK_FIELDS = new Set<EditableField>([
+  'door_range',
+  'section',
+  'sku',
+  'name',
+  'description',
+  'cost_price',
+  'unit_price',
+])
+
+export default function PricelistWorkbenchTable({
+  pageItems,
+  categories,
+  allSelectedOnPage,
+  onToggleSelectAllOnPage,
+  onPatchRow,
+  onDeleteRow,
+}: Props) {
+  const { columnDefs, visibleIds, setColumnVisible, setColumnOrder, resetToDefault, isVisible, order } =
+    useColumnVisibility('pricelist-workbench', COLUMN_DEFS)
+  const { widths: columnWidths, setWidth, persistWidths } = useColumnWidths('pricelist-workbench')
+  const [resizingColId, setResizingColId] = useState<string | null>(null)
+  const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null)
+  const resizeStartRef = useRef({ x: 0, width: 0 })
+  const columnWidthsRef = useRef(columnWidths)
+  columnWidthsRef.current = columnWidths
+
+  const visibleCols = useMemo(
+    () =>
+      order
+        .map((id) => PRICELIST_WORKBENCH_COLUMNS.find((c) => c.id === id))
+        .filter((c): c is (typeof PRICELIST_WORKBENCH_COLUMNS)[number] => !!c && isVisible(c.id)),
+    [order, isVisible]
+  )
+
+  const tableWidthPx = useMemo(
+    () => 40 + visibleCols.reduce((sum, c) => sum + workbenchColumnWidth(c.id, columnWidths), 0),
+    [visibleCols, columnWidths]
+  )
+
+  useEffect(() => {
+    if (!resizingColId) return
+    const def = PRICELIST_WORKBENCH_COLUMNS.find((c) => c.id === resizingColId)
+    const minW = def?.minWidth ?? 60
+    const onMove = (e: MouseEvent) => {
+      const delta = e.clientX - resizeStartRef.current.x
+      const newW = Math.max(minW, resizeStartRef.current.width + delta)
+      setWidth(resizingColId, newW)
+    }
+    const onUp = () => {
+      persistWidths(columnWidthsRef.current)
+      setResizingColId(null)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [resizingColId, setWidth, persistWidths])
+
+  const startEdit = useCallback((id: string, field: EditableField) => {
+    setEditing({ id, field })
+  }, [])
+
+  const commitEdit = useCallback(
+    (row: PricelistWorkbenchRow, field: EditableField, value: string) => {
+      setEditing(null)
+      if (field === 'cost_price' || field === 'unit_price') {
+        const n = Math.max(0, parseFloat(value) || 0)
+        if (n === row[field]) return
+        onPatchRow(row.id, { [field]: n })
+        return
+      }
+      const trimmed = value.trim()
+      if (trimmed === (row[field] as string)) return
+      onPatchRow(row.id, { [field]: trimmed })
+    },
+    [onPatchRow]
+  )
+
+  function renderHeader(col: (typeof PRICELIST_WORKBENCH_COLUMNS)[number]) {
+    const w = workbenchColumnWidth(col.id, columnWidths)
+    return (
+      <th
+        key={col.id}
+        style={{ width: w, minWidth: w }}
+        className={col.id === 'actions' ? 'admin-pricelist-th-actions' : undefined}
+      >
+        <span className="admin-th-label">
+          {col.label}
+          <AdminHelpTip text={col.tip} className="admin-th-help" />
+        </span>
+        {col.id !== 'actions' ? (
+          <span
+            className="admin-th-resizer"
+            role="separator"
+            aria-label={`Resize ${col.label} column`}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              resizeStartRef.current = { x: e.clientX, width: w }
+              setResizingColId(col.id)
+            }}
+          />
+        ) : null}
+      </th>
+    )
+  }
+
+  function renderEditableText(
+    row: PricelistWorkbenchRow,
+    field: EditableField,
+    className?: string
+  ) {
+    const isEditing = editing?.id === row.id && editing.field === field
+    const display = String(row[field] ?? '')
+    if (isEditing) {
+      return (
+        <input
+          className={`admin-pricelist-inline-input ${className ?? ''}`.trim()}
+          autoFocus
+          defaultValue={display}
+          onBlur={(e) => commitEdit(row, field, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.currentTarget.blur()
+            }
+            if (e.key === 'Escape') {
+              setEditing(null)
+            }
+          }}
+        />
+      )
+    }
+    return (
+      <button
+        type="button"
+        className={`admin-pricelist-cell-edit ${className ?? ''}`.trim()}
+        title="Double-click to edit"
+        onDoubleClick={() => startEdit(row.id, field)}
+      >
+        {display || '—'}
+      </button>
+    )
+  }
+
+  function renderCell(row: PricelistWorkbenchRow, colId: WorkbenchColumnId) {
+    switch (colId) {
+      case 'source':
+        return (
+          <span
+            className={`admin-pricelist-source admin-pricelist-source--${row.source}`}
+            title={row.catalog_program}
+          >
+            {row.source === 'tealbury' ? 'TB' : 'LK'}
+          </span>
+        )
+      case 'door_range':
+        return renderEditableText(row, 'door_range', 'admin-pricelist-cell--range')
+      case 'section':
+        return renderEditableText(row, 'section', 'admin-pricelist-cell--section')
+      case 'trade_code':
+        return <span className="admin-pricelist-trade-code">{row.trade_code || '—'}</span>
+      case 'sku':
+        return renderEditableText(row, 'sku')
+      case 'name':
+        return renderEditableText(row, 'name', 'admin-pricelist-inline-input--wide')
+      case 'description':
+        return renderEditableText(row, 'description', 'admin-pricelist-cell--desc')
+      case 'category':
+        return (
+          <select
+            className="admin-pricelist-category-select"
+            value={row.category_id ?? ''}
+            onChange={(e) => {
+              const cat = categories.find((c) => c.id === e.target.value)
+              if (cat) {
+                onPatchRow(row.id, {
+                  category_id: cat.id,
+                  category_slug: cat.slug,
+                  category_name: cat.name,
+                })
+              } else {
+                onPatchRow(row.id, { category_id: null, category_slug: '', category_name: '' })
+              }
+            }}
+          >
+            <option value="">— Assign —</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.parent_id ? `— ${c.name}` : c.name}
+              </option>
+            ))}
+          </select>
+        )
+      case 'cost_price': {
+        const isEditing = editing?.id === row.id && editing.field === 'cost_price'
+        if (isEditing) {
+          return (
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              className="admin-pricelist-inline-input admin-pricelist-inline-input--price"
+              autoFocus
+              defaultValue={row.cost_price ?? 0}
+              onBlur={(e) => commitEdit(row, 'cost_price', e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') setEditing(null)
+              }}
+            />
+          )
+        }
+        return (
+          <button
+            type="button"
+            className="admin-pricelist-cell-edit admin-pricelist-cell-edit--price"
+            title="Lamtek cost price (ex VAT). Double-click to edit."
+            onDoubleClick={() => startEdit(row.id, 'cost_price')}
+          >
+            {(row.cost_price ?? 0).toFixed(2)}
+          </button>
+        )
+      }
+      case 'unit_price': {
+        const isEditing = editing?.id === row.id && editing.field === 'unit_price'
+        if (isEditing) {
+          return (
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              className="admin-pricelist-inline-input admin-pricelist-inline-input--price"
+              autoFocus
+              defaultValue={row.unit_price}
+              onBlur={(e) => commitEdit(row, 'unit_price', e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') setEditing(null)
+              }}
+            />
+          )
+        }
+        return (
+          <button
+            type="button"
+            className="admin-pricelist-cell-edit admin-pricelist-cell-edit--price"
+            title="List / sell price (ex VAT). Double-click to edit."
+            onDoubleClick={() => startEdit(row.id, 'unit_price')}
+          >
+            {row.unit_price.toFixed(2)}
+          </button>
+        )
+      }
+      case 'active':
+        return (
+          <input
+            type="checkbox"
+            checked={row.active}
+            onChange={(e) => onPatchRow(row.id, { active: e.target.checked })}
+            aria-label="Active"
+          />
+        )
+      case 'is_stock':
+        return (
+          <input
+            type="checkbox"
+            checked={row.is_stock}
+            onChange={(e) => onPatchRow(row.id, { is_stock: e.target.checked })}
+            aria-label="Stock item"
+          />
+        )
+      case 'actions':
+        return (
+          <button
+            type="button"
+            className="btn btn-small btn-danger-outline"
+            onClick={() => onDeleteRow(row.id)}
+          >
+            Delete
+          </button>
+        )
+      default:
+        return null
+    }
+  }
+
+  return (
+    <>
+    <div className="admin-pricelist-table-toolbar">
+      <ColumnSettings
+        columnDefs={columnDefs}
+        visibleIds={visibleIds}
+        setColumnVisible={setColumnVisible}
+        order={order}
+        setColumnOrder={setColumnOrder}
+        resetToDefault={resetToDefault}
+        tooltip="Show, hide, and reorder workbench columns. Drag column edges in the header to resize."
+      />
+      <span className="admin-muted admin-pricelist-table-hint">
+        Double-click door/range, section, SKU, name, description, or prices to edit inline.
+      </span>
+    </div>
+    <div
+      className="admin-table-wrap admin-pricelist-table-wrap"
+      style={{ maxHeight: 'min(70vh, 720px)' }}
+    >
+      <table
+        className="admin-table admin-pricelist-table admin-table--resizable admin-table--sticky-header"
+        style={{ width: tableWidthPx, minWidth: tableWidthPx }}
+      >
+        <colgroup>
+          <col style={{ width: 40, minWidth: 40 }} />
+          {visibleCols.map((col) => {
+            const w = workbenchColumnWidth(col.id, columnWidths)
+            return <col key={col.id} style={{ width: w, minWidth: w }} />
+          })}
+        </colgroup>
+        <thead>
+          <tr>
+            <th className="admin-pricelist-th-check">
+              <input
+                type="checkbox"
+                aria-label="Select all on this page"
+                checked={pageItems.length > 0 && allSelectedOnPage}
+                onChange={(e) => onToggleSelectAllOnPage(e.target.checked)}
+              />
+            </th>
+            {visibleCols.map(renderHeader)}
+          </tr>
+        </thead>
+        <tbody>
+          {pageItems.length === 0 ? (
+            <tr>
+              <td colSpan={visibleCols.length + 1} className="admin-table-empty">
+                No rows on this page.
+              </td>
+            </tr>
+          ) : (
+            pageItems.map((r) => (
+              <tr key={r.id} className={!r.category_id ? 'admin-pricelist-row--unassigned' : undefined}>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={r.selected}
+                    onChange={(e) => onPatchRow(r.id, { selected: e.target.checked })}
+                  />
+                </td>
+                {visibleCols.map((col) => (
+                  <td
+                    key={col.id}
+                    className={
+                      col.id === 'actions'
+                        ? 'admin-pricelist-td-actions'
+                        : DBL_CLICK_FIELDS.has(col.id as EditableField)
+                          ? 'admin-pricelist-td-editable'
+                          : undefined
+                    }
+                  >
+                    {renderCell(r, col.id as WorkbenchColumnId)}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+    </>
+  )
+}

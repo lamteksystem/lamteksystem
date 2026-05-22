@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
 import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
+import type { CategoryRow } from '@/types/database'
 import {
   applyRuleToRows,
   describeRule,
@@ -26,19 +28,27 @@ const FIELD_OPTIONS: { value: WorkbenchMatchField; label: string }[] = [
   { value: 'name', label: 'Name' },
   { value: 'category_name', label: 'Category name' },
   { value: 'description', label: 'Description' },
+  { value: 'cost_price', label: 'Lamtek cost price' },
+  { value: 'unit_price', label: 'List / sell price' },
+  { value: 'category', label: 'Category (unassigned)' },
 ]
 
 const OP_OPTIONS: { value: WorkbenchConditionOp; label: string }[] = [
   { value: 'contains', label: 'contains' },
   { value: 'equals', label: 'equals' },
+  { value: 'starts_with', label: 'starts with' },
   { value: 'not_contains', label: 'does not contain' },
+  { value: 'greater_than', label: 'greater than' },
+  { value: 'less_than', label: 'less than' },
   { value: 'sku_appears_in_name', label: 'SKU appears in name' },
+  { value: 'unassigned', label: 'is unassigned' },
   { value: 'empty', label: 'is empty' },
   { value: 'not_empty', label: 'is not empty' },
 ]
 
 const ACTION_OPTIONS: { value: WorkbenchActionType; label: string }[] = [
   { value: 'delete', label: 'Delete from workbench' },
+  { value: 'assign_category', label: 'Assign category' },
   { value: 'remove_sku_from_name', label: 'Remove SKU from name' },
   { value: 'select', label: 'Select rows' },
   { value: 'deselect', label: 'Deselect rows' },
@@ -49,6 +59,7 @@ const ACTION_OPTIONS: { value: WorkbenchActionType; label: string }[] = [
 type Props = {
   rows: PricelistWorkbenchRow[]
   filtered: PricelistWorkbenchRow[]
+  categories: CategoryRow[]
   onRowsChange: (rows: PricelistWorkbenchRow[]) => void
   onNotify: (message: string, error?: string | null) => void
 }
@@ -67,13 +78,20 @@ function parseSavedRules(json: string | null): WorkbenchRule[] {
   }
 }
 
-export default function PricelistWorkbenchSmartPanel({ rows, filtered, onRowsChange, onNotify }: Props) {
+export default function PricelistWorkbenchSmartPanel({
+  rows,
+  filtered,
+  categories,
+  onRowsChange,
+  onNotify,
+}: Props) {
   const [scope, setScope] = useState<SmartApplyScope>('filtered')
   const [prompt, setPrompt] = useState('')
   const [savedRules, setSavedRules] = useState<WorkbenchRule[]>([])
   const [builderName, setBuilderName] = useState('')
   const [builderMode, setBuilderMode] = useState<'all' | 'any'>('all')
   const [builderAction, setBuilderAction] = useState<WorkbenchActionType>('delete')
+  const [builderActionParam, setBuilderActionParam] = useState('')
   const [builderConditions, setBuilderConditions] = useState<WorkbenchCondition[]>([
     { field: 'source', op: 'equals', value: 'tealbury' },
     newCondition(),
@@ -116,11 +134,15 @@ export default function PricelistWorkbenchSmartPanel({ rows, filtered, onRowsCha
         return
       }
     }
+    if (rule.action === 'assign_category' && !rule.actionParam?.trim()) {
+      onNotify('', 'Assign category needs a category name (use the rule builder or quote it in the command).')
+      return
+    }
     finishRun(rule, targetIds)
   }
 
   function finishRun(rule: WorkbenchRule, targetIds?: Set<string>) {
-    const { rows: next, result } = applyRuleToRows(rows, rule, targetIds)
+    const { rows: next, result } = applyRuleToRows(rows, rule, targetIds, categories)
     onRowsChange(next)
     setLastPreview(describeRule(rule))
     onNotify(result.message)
@@ -146,9 +168,17 @@ export default function PricelistWorkbenchSmartPanel({ rows, filtered, onRowsCha
     const rule: WorkbenchRule = {
       id: `saved-${Date.now()}`,
       name: name.slice(0, 120),
-      conditions: builderConditions.filter((c) => c.op === 'sku_appears_in_name' || c.value.trim() || c.op === 'empty' || c.op === 'not_empty'),
+      conditions: builderConditions.filter(
+        (c) =>
+          c.op === 'sku_appears_in_name' ||
+          c.op === 'unassigned' ||
+          c.value.trim() ||
+          c.op === 'empty' ||
+          c.op === 'not_empty'
+      ),
       matchMode: builderMode,
       action: builderAction,
+      actionParam: builderAction === 'assign_category' ? builderActionParam.trim() : undefined,
     }
     if (!rule.conditions.length) {
       onNotify('', 'Add at least one condition.')
@@ -165,7 +195,10 @@ export default function PricelistWorkbenchSmartPanel({ rows, filtered, onRowsCha
   return (
     <div className="admin-pricelist-smart">
       <div className="admin-pricelist-smart-scope">
-        <span className="admin-pricelist-smart-scope-label">Apply commands to</span>
+        <span className="admin-pricelist-smart-scope-label">
+          Apply commands to
+          <AdminHelpTip text="Filtered = current search/filters. Selected = ticked rows only. All = entire workbench draft." />
+        </span>
         <label>
           <input type="radio" name="smart-scope" checked={scope === 'filtered'} onChange={() => setScope('filtered')} />
           Current filter ({filtered.length})
@@ -182,17 +215,21 @@ export default function PricelistWorkbenchSmartPanel({ rows, filtered, onRowsCha
 
       <div className="admin-pricelist-smart-grid">
         <div className="admin-pricelist-smart-card">
-          <h3>Quick command</h3>
+          <h3>
+            Quick command
+            <AdminHelpTip text="Plain English: say which rows (Tealbury, range, section, unassigned, price) and what to do (delete, assign category, clean names, select, activate)." />
+          </h3>
           <p className="admin-muted">
-            Describe what to find and what to do. Examples: delete all Tealbury &quot;No Doors&quot; rows; remove SKU from
-            Tealbury names where SKU is duplicated in the name field.
+            Describe filters and action in one sentence. Examples: delete all Tealbury &quot;No Doors&quot; rows; assign
+            category &quot;Base units&quot; to unassigned Tealbury rows in section HIGHLINE; remove SKU from Tealbury
+            names where SKU is duplicated; select Lamtek rows with list price over 100.
           </p>
           <textarea
             className="admin-pricelist-prompt"
-            rows={3}
+            rows={4}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder='e.g. Find all Tealbury items with "No Doors" and delete from the product list'
+            placeholder='e.g. For all unassigned Tealbury rows in section "HIGHLINE BASE UNITS", assign category "Base units"'
           />
           <div className="admin-pricelist-smart-actions">
             <button type="button" className="btn btn-small" onClick={runPrompt}>
@@ -243,6 +280,22 @@ export default function PricelistWorkbenchSmartPanel({ rows, filtered, onRowsCha
               ))}
             </select>
           </label>
+          {builderAction === 'assign_category' && (
+            <label>
+              Category name
+              <input
+                value={builderActionParam}
+                onChange={(e) => setBuilderActionParam(e.target.value)}
+                placeholder="e.g. Base units"
+                list="workbench-category-suggestions"
+              />
+              <datalist id="workbench-category-suggestions">
+                {categories.map((c) => (
+                  <option key={c.id} value={c.name} />
+                ))}
+              </datalist>
+            </label>
+          )}
         </div>
         <div className="admin-pricelist-conditions">
           {builderConditions.map((c, i) => (
@@ -277,7 +330,12 @@ export default function PricelistWorkbenchSmartPanel({ rows, filtered, onRowsCha
               </select>
               <input
                 value={c.value}
-                disabled={c.op === 'sku_appears_in_name' || c.op === 'empty' || c.op === 'not_empty'}
+                disabled={
+                  c.op === 'sku_appears_in_name' ||
+                  c.op === 'unassigned' ||
+                  c.op === 'empty' ||
+                  c.op === 'not_empty'
+                }
                 onChange={(e) => {
                   const next = [...builderConditions]
                   next[i] = { ...c, value: e.target.value }
@@ -310,6 +368,7 @@ export default function PricelistWorkbenchSmartPanel({ rows, filtered, onRowsCha
                 conditions: builderConditions,
                 matchMode: builderMode,
                 action: builderAction,
+                actionParam: builderAction === 'assign_category' ? builderActionParam : undefined,
               })
             }
           >

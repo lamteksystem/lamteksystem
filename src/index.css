@@ -6309,6 +6309,100 @@ button.ordering-wizard-card {
   padding: 1rem 1.15rem 1.15rem;
 }
 
+/* Admin help tooltips (? icon) — reuse across admin pages */
+.admin-help-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+  cursor: help;
+  outline: none;
+}
+.admin-help-tip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--lamtek-surface, #fff);
+  background: var(--lamtek-gray, #6b7280);
+}
+.admin-help-tip:focus-visible .admin-help-tip-icon,
+.admin-help-tip:hover .admin-help-tip-icon {
+  background: var(--lamtek-gold, #672732);
+}
+.admin-help-tip-popup {
+  position: absolute;
+  z-index: 120;
+  left: 50%;
+  bottom: calc(100% + 0.4rem);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(22rem, 90vw);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--lamtek-surface, #fff);
+  background: rgba(30, 30, 30, 0.94);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease, visibility 0.12s ease;
+}
+.admin-help-tip:hover .admin-help-tip-popup,
+.admin-help-tip:focus-visible .admin-help-tip-popup {
+  opacity: 1;
+  visibility: visible;
+}
+.admin-label-with-tip { display: inline-flex; align-items: center; gap: 0.2rem; }
+.admin-page-header h1 .admin-help-tip { margin-left: 0.5rem; }
+.admin-th-label { display: inline-flex; align-items: center; gap: 0.15rem; flex-wrap: wrap; }
+.admin-th-help .admin-help-tip-icon { width: 0.9rem; height: 0.9rem; font-size: 0.6rem; }
+
+/* Collapsible workbench sections */
+.admin-workbench-section { margin-bottom: 1rem; }
+.admin-workbench-section-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.admin-workbench-section-summary::-webkit-details-marker { display: none; }
+.admin-workbench-section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.admin-workbench-section-summary-text { font-size: 0.85rem; }
+.admin-workbench-section-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lamtek-gold) 18%, transparent);
+  color: var(--lamtek-gold);
+}
+.admin-workbench-section-body { margin-top: 0.85rem; }
+.admin-pricelist-stats {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  color: var(--lamtek-text-muted, var(--lamtek-gray));
+}
+
 /* Pricelist workbench (Tealbury + Lamtek trade → catalogue template) */
 .admin-pricelist-workbench .admin-pricelist-upload-grid {
   display: grid;
@@ -6543,6 +6637,36 @@ button.ordering-wizard-card {
 .admin-pricelist-range { max-width: 8rem; font-size: 0.78rem; color: var(--lamtek-text-muted, var(--lamtek-gray)); }
 .admin-pricelist-warnings { margin: 0.5rem 0 0; padding-left: 1.25rem; font-size: 0.88rem; }
 .admin-pricelist-error { margin-top: 0.75rem; max-height: 12rem; overflow: auto; }
+.admin-pricelist-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin-bottom: 0.65rem;
+}
+.admin-pricelist-table-hint { font-size: 0.8rem; }
+.admin-pricelist-cell-edit {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.2rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: inherit;
+  color: inherit;
+  cursor: text;
+  min-height: 1.6rem;
+}
+.admin-pricelist-cell-edit:hover {
+  border-color: var(--lamtek-gray-light);
+  background: color-mix(in srgb, var(--lamtek-bg) 70%, var(--lamtek-surface) 30%);
+}
+.admin-pricelist-cell-edit--price { font-variant-numeric: tabular-nums; text-align: right; }
+.admin-pricelist-cell--desc { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.admin-pricelist-td-editable { max-width: 0; }
+.admin-pricelist-trade-code { font-size: 0.78rem; font-family: ui-monospace, monospace; }
 
 /* Wipe / import / variant builder layout helpers. */
 .admin-wipe-section {

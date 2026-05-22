@@ -72,4 +72,15 @@ describe('pricelistWorkbenchRules', () => {
     expect(rule?.action).toBe('remove_sku_from_name')
     expect(rule?.conditions.some((c) => c.op === 'sku_appears_in_name')).toBe(true)
   })
+
+  it('parses assign category to unassigned tealbury', () => {
+    const { rule, error } = parseSmartCommandPrompt(
+      'Assign category "Base units" to all unassigned Tealbury rows'
+    )
+    expect(error).toBeUndefined()
+    expect(rule?.action).toBe('assign_category')
+    expect(rule?.actionParam).toMatch(/base units/i)
+    expect(rule?.conditions.some((c) => c.op === 'unassigned')).toBe(true)
+    expect(rule?.conditions.some((c) => c.field === 'source' && c.value === 'tealbury')).toBe(true)
+  })
 })

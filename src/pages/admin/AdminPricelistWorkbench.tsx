@@ -399,7 +399,7 @@ export default function AdminPricelistWorkbench() {
             id="workbench-table"
             title="2. Edit products"
             summary={`${filtered.length} filtered · page ${currentPage} of ${totalPages}`}
-            tip="Resize and show/hide columns via the gear control. Double-click door/range, section, text fields, or prices to edit."
+            tip="Resize and show/hide columns via the gear control. Scroll left/right with the arrow buttons or the scrollbar under the table. Double-click cells to edit."
             defaultOpen
             badge={filtered.length}
           >

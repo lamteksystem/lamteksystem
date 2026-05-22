@@ -6641,10 +6641,65 @@ button.ordering-wizard-card {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 0.65rem 1rem;
   margin-bottom: 0.65rem;
 }
+.admin-pricelist-table-toolbar-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  min-width: 0;
+  flex: 1;
+}
+.admin-pricelist-scroll-arrows { flex-shrink: 0; }
 .admin-pricelist-table-hint { font-size: 0.8rem; }
+/* Pricelist workbench table: horizontal + vertical scroll (matches catalogue table) */
+.admin-horizontal-scroll-wrap--pricelist-table {
+  width: 100%;
+  max-width: 100%;
+}
+.admin-horizontal-scroll-wrap--pricelist-table .admin-pricelist-table-scroll,
+.admin-horizontal-scroll-wrap--pricelist-table .admin-horizontal-scroll-inner.admin-pricelist-table-scroll {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  max-height: min(68vh, calc(100dvh - 16rem));
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--lamtek-gray) 70%, transparent) var(--lamtek-gray-light);
+  -webkit-overflow-scrolling: touch;
+}
+.admin-horizontal-scroll-wrap--pricelist-table .admin-pricelist-table-scroll::-webkit-scrollbar,
+.admin-horizontal-scroll-wrap--pricelist-table .admin-horizontal-scroll-inner.admin-pricelist-table-scroll::-webkit-scrollbar {
+  height: 14px;
+}
+.admin-horizontal-scroll-wrap--pricelist-table .admin-pricelist-table-scroll::-webkit-scrollbar-track,
+.admin-horizontal-scroll-wrap--pricelist-table .admin-horizontal-scroll-inner.admin-pricelist-table-scroll::-webkit-scrollbar-track {
+  background: var(--lamtek-gray-light);
+  border-radius: 7px;
+}
+.admin-horizontal-scroll-wrap--pricelist-table .admin-pricelist-table-scroll::-webkit-scrollbar-thumb,
+.admin-horizontal-scroll-wrap--pricelist-table .admin-horizontal-scroll-inner.admin-pricelist-table-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--lamtek-gray) 75%, var(--lamtek-black) 25%);
+  border-radius: 7px;
+  border: 2px solid var(--lamtek-gray-light);
+  min-height: 14px;
+}
+.admin-horizontal-scroll-wrap--pricelist-table .admin-horizontal-scroll-content {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+.admin-app .admin-horizontal-scroll-wrap--pricelist-table .admin-pricelist-table-wrap.admin-table-wrap {
+  overflow: visible;
+  max-width: none;
+  max-height: none;
+}
 .admin-pricelist-cell-edit {
   display: block;
   width: 100%;

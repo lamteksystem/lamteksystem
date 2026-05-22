@@ -2,6 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ColumnSettings } from '@/components/admin/ColumnSettings'
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import {
+  HorizontalScrollWithArrows,
+  HorizontalScrollToolbarArrows,
+  type HorizontalScrollHandle,
+  type HorizontalScrollState,
+} from '@/components/admin/HorizontalScrollWithArrows'
+import {
   PRICELIST_WORKBENCH_COLUMNS,
   workbenchColumnWidth,
   type WorkbenchColumnId,
@@ -49,6 +55,11 @@ export default function PricelistWorkbenchTable({
   const resizeStartRef = useRef({ x: 0, width: 0 })
   const columnWidthsRef = useRef(columnWidths)
   columnWidthsRef.current = columnWidths
+  const scrollRef = useRef<HorizontalScrollHandle>(null)
+  const [scrollState, setScrollState] = useState<HorizontalScrollState>({
+    canScrollLeft: false,
+    canScrollRight: false,
+  })
 
   const visibleCols = useMemo(
     () =>
@@ -319,27 +330,44 @@ export default function PricelistWorkbenchTable({
   return (
     <>
     <div className="admin-pricelist-table-toolbar">
-      <ColumnSettings
-        columnDefs={columnDefs}
-        visibleIds={visibleIds}
-        setColumnVisible={setColumnVisible}
-        order={order}
-        setColumnOrder={setColumnOrder}
-        resetToDefault={resetToDefault}
-        tooltip="Show, hide, and reorder workbench columns. Drag column edges in the header to resize."
+      <div className="admin-pricelist-table-toolbar-start">
+        <ColumnSettings
+          columnDefs={columnDefs}
+          visibleIds={visibleIds}
+          setColumnVisible={setColumnVisible}
+          order={order}
+          setColumnOrder={setColumnOrder}
+          resetToDefault={resetToDefault}
+          tooltip="Show, hide, and reorder workbench columns. Drag column edges in the header to resize."
+        />
+        <span className="admin-muted admin-pricelist-table-hint">
+          Double-click cells to edit. Scroll horizontally with the bar below or the arrow buttons.
+        </span>
+      </div>
+      <HorizontalScrollToolbarArrows
+        canScrollLeft={scrollState.canScrollLeft}
+        canScrollRight={scrollState.canScrollRight}
+        onScrollLeft={() => scrollRef.current?.scrollLeft()}
+        onScrollRight={() => scrollRef.current?.scrollRight()}
+        className="admin-pricelist-scroll-arrows"
       />
-      <span className="admin-muted admin-pricelist-table-hint">
-        Double-click door/range, section, SKU, name, description, or prices to edit inline.
-      </span>
     </div>
-    <div
-      className="admin-table-wrap admin-pricelist-table-wrap"
-      style={{ maxHeight: 'min(70vh, 720px)' }}
+    <HorizontalScrollWithArrows
+      ref={scrollRef}
+      fixedArrows={false}
+      className="admin-horizontal-scroll-wrap--pricelist-table"
+      innerClassName="admin-pricelist-table-scroll"
+      contentStyle={{ minWidth: tableWidthPx }}
+      onScrollStateChange={setScrollState}
     >
-      <table
-        className="admin-table admin-pricelist-table admin-table--resizable admin-table--sticky-header"
+      <div
+        className="admin-table-wrap admin-pricelist-table-wrap"
         style={{ width: tableWidthPx, minWidth: tableWidthPx }}
       >
+        <table
+          className="admin-table admin-pricelist-table admin-table--resizable admin-table--sticky-header"
+          style={{ width: tableWidthPx, minWidth: tableWidthPx }}
+        >
         <colgroup>
           <col style={{ width: 40, minWidth: 40 }} />
           {visibleCols.map((col) => {
@@ -395,8 +423,9 @@ export default function PricelistWorkbenchTable({
             ))
           )}
         </tbody>
-      </table>
-    </div>
+        </table>
+      </div>
+    </HorizontalScrollWithArrows>
     </>
   )
 }

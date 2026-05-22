@@ -6371,8 +6371,30 @@ button.ordering-wizard-card {
   border-radius: 6px;
   font: inherit;
 }
-.admin-pricelist-table-wrap { max-height: min(62vh, 720px); overflow: auto; }
+.admin-pricelist-table-section { min-height: 0; }
+.admin-pricelist-table-wrap {
+  max-height: min(68vh, calc(100dvh - 16rem));
+  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
 .admin-pricelist-table { font-size: 0.82rem; }
+.admin-pricelist-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--lamtek-surface);
+  box-shadow: 0 1px 0 var(--lamtek-gray-light);
+}
+.admin-app .admin-pricelist-table thead th {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--lamtek-surface) 92%, var(--lamtek-gold) 8%) 0%,
+    var(--lamtek-surface) 100%
+  );
+}
 .admin-pricelist-table th,
 .admin-pricelist-table td { vertical-align: middle; }
 .admin-pricelist-th-check { width: 2.25rem; }

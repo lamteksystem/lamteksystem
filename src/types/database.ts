@@ -38,7 +38,7 @@ export interface ProductCategoryRow {
 
 export interface ProductRow {
   id: string
-  category_id: string
+  category_id: string | null
   name: string
   description: string | null
   sku: string | null

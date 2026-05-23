@@ -964,7 +964,7 @@ function PricingPreviewSection({
         .filter(Boolean)
       const resolvedSell = await resolveCustomerPrice({
         productId: product.id,
-        categoryId: product.category_id,
+        categoryId: product.category_id ?? '',
         baseUnitPrice: Number(product.unit_price || 0),
         segment: {
           customer_group_id: customer.customer_group_id ?? null,
@@ -978,7 +978,7 @@ function PricingPreviewSection({
       })
       const resolvedCost = await resolveCostPrice({
         productId: product.id,
-        categoryId: product.category_id,
+        categoryId: product.category_id ?? '',
         baseCostPrice: product.cost_price != null ? Number(product.cost_price) : null,
         sellPrice: resolvedSell,
       })

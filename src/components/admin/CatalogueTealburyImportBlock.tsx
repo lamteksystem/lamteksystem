@@ -2,33 +2,15 @@ import { useCallback, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
-import { parseTealburyPricelistWorkbook, slugifyCategorySegment, type TealburyParsedRow } from '@/lib/tealburyPricelistParse'
-import type { Json } from '@/types/database'
+import { parseTealburyPricelistWorkbook, type TealburyParsedRow } from '@/lib/tealburyPricelistParse'
+import { resolveExistingCategoryId } from '@/lib/resolveExistingCategory'
+import type { CategoryRow, Json } from '@/types/database'
 
-const TEALBURY_SLUG_PREFIX = 'tealbury-'
 const CHUNK = 200
 
 function csvEscapeCell(v: string): string {
   if (/[",\n\r]/.test(v)) return `"${v.replace(/"/g, '""')}"`
   return v
-}
-
-async function ensureTealburyCategoryId(name: string): Promise<string> {
-  const cleaned = name.trim()
-  let slugCore = slugifyCategorySegment(cleaned)
-  if (slugCore.startsWith('tealbury-')) slugCore = slugCore.slice('tealbury-'.length)
-  const slug = `${TEALBURY_SLUG_PREFIX}${slugCore}`.slice(0, 80)
-  const { data: existing, error: selErr } = await supabase.from('categories').select('id').eq('slug', slug).maybeSingle()
-  if (selErr) throw selErr
-  if (existing?.id) return existing.id
-  const { data: ins, error: insErr } = await supabase
-    .from('categories')
-    .insert({ name: cleaned.slice(0, 200), slug, sort_order: 520 })
-    .select('id')
-    .single()
-  if (insErr) throw insErr
-  if (!ins?.id) throw new Error('Category insert returned no id')
-  return ins.id
 }
 
 async function purgeTealburyCatalogue(): Promise<void> {
@@ -47,10 +29,7 @@ async function purgeTealburyCatalogue(): Promise<void> {
     if (page.length < PAGE) break
     from += PAGE
   }
-  if (!ids.length) {
-    await removeOrphanTealburyCategories()
-    return
-  }
+  if (!ids.length) return
   for (let i = 0; i < ids.length; i += CHUNK) {
     const part = ids.slice(i, i + CHUNK)
     const { error: alErr } = await supabase.from('assembly_lines').delete().in('product_id', part)
@@ -60,20 +39,6 @@ async function purgeTealburyCatalogue(): Promise<void> {
     const part = ids.slice(i, i + CHUNK)
     const { error: delErr } = await supabase.from('products').delete().in('id', part)
     if (delErr) throw delErr
-  }
-  await removeOrphanTealburyCategories()
-}
-
-async function removeOrphanTealburyCategories(): Promise<void> {
-  const { data: cats, error } = await supabase.from('categories').select('id').like('slug', `${TEALBURY_SLUG_PREFIX}%`)
-  if (error) throw error
-  for (const c of cats ?? []) {
-    const { count, error: cErr } = await supabase.from('products').select('*', { count: 'exact', head: true }).eq('category_id', c.id)
-    if (cErr) throw cErr
-    if ((count ?? 0) === 0) {
-      const { error: dErr } = await supabase.from('categories').delete().eq('id', c.id)
-      if (dErr) throw dErr
-    }
   }
 }
 
@@ -140,18 +105,28 @@ export default function CatalogueTealburyImportBlock() {
       setMessage('Removing existing Tealbury products…')
       await purgeTealburyCatalogue()
 
-      const categoryCache = new Map<string, string>()
-      async function catIdFor(section: string): Promise<string> {
+      const { data: catRows, error: catErr } = await supabase
+        .from('categories')
+        .select('*')
+        .order('sort_order')
+        .order('name')
+      if (catErr) throw catErr
+      const categories = (catRows ?? []) as CategoryRow[]
+
+      const categoryCache = new Map<string, string | null>()
+      function catIdFor(section: string): string | null {
         const k = section.trim() || 'Tealbury'
-        if (categoryCache.has(k)) return categoryCache.get(k)!
-        const id = await ensureTealburyCategoryId(k.startsWith('Tealbury') ? k : `Tealbury — ${k}`)
+        if (categoryCache.has(k)) return categoryCache.get(k) ?? null
+        const id = resolveExistingCategoryId(k, categories)
         categoryCache.set(k, id)
         return id
       }
 
+      let uncategorised = 0
       const payloads = []
       for (const row of parsed) {
-        const category_id = await catIdFor(row.categoryName)
+        const category_id = catIdFor(row.categoryName)
+        if (!category_id) uncategorised += 1
         payloads.push({
           category_id,
           name: row.name,
@@ -174,7 +149,12 @@ export default function CatalogueTealburyImportBlock() {
         const { error: insErr } = await supabase.from('products').insert(slice)
         if (insErr) throw insErr
       }
-      setMessage(`Imported ${payloads.length} Tealbury product(s).`)
+      setMessage(
+        `Imported ${payloads.length} Tealbury product(s).` +
+          (uncategorised > 0
+            ? ` ${uncategorised} without a category (assign later via Categories → Smart categorise).`
+            : ''),
+      )
       setParsed(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

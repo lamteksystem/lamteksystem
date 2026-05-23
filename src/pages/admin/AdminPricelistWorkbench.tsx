@@ -287,11 +287,17 @@ export default function AdminPricelistWorkbench() {
   }
 
   async function runPublish(scope: 'all' | 'selected') {
+    const targets = scope === 'selected' ? rows.filter((r) => r.selected) : rows
+    const unassigned = targets.filter((r) => !r.category_id).length
+    const unassignedNote =
+      unassigned > 0
+        ? `\n\n${unassigned} row(s) have no category and will be published as uncategorised. Assign categories in Categories or use Smart categorise later.`
+        : ''
     if (
       !window.confirm(
-        scope === 'selected'
+        (scope === 'selected'
           ? `Publish ${selectedCount} selected product(s) to the catalogue (upsert by SKU)?`
-          : `Publish all ${rows.length} draft row(s) to the catalogue (upsert by SKU)?`
+          : `Publish all ${rows.length} draft row(s) to the catalogue (upsert by SKU)?`) + unassignedNote,
       )
     ) {
       return

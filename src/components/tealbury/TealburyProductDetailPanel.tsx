@@ -50,7 +50,9 @@ export default function TealburyProductDetailPanel({
         </div>
 
         <div className="tb-detail-copy">
-          <p className="tb-detail-range">{catMap.get(product.category_id) ?? 'Tealbury'}</p>
+          <p className="tb-detail-range">
+            {(product.category_id && catMap.get(product.category_id)) ?? 'Tealbury'}
+          </p>
           <h4 className="tb-detail-title">{product.name}</h4>
           <p className="tb-detail-code">{displayProductCode(product)}</p>
           <p className="tb-detail-availability" title={availability.detail ?? availability.label}>

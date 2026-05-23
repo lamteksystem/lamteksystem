@@ -50,7 +50,7 @@ interface AdminProductModalProps {
   onCategoriesChange?: (categories: CategoryRow[]) => void
   onPartTypesChange?: () => void
   /** Called after a successful save with updated category assignment. */
-  onProductSaved?: (productId: string, categoryIds: string[], primaryCategoryId: string) => void
+  onProductSaved?: (productId: string, categoryIds: string[], primaryCategoryId: string | null) => void
   /** When set (e.g. from Catalogue), avoids a second permission round-trip in the modal. */
   canEditCatalogue?: boolean
 }
@@ -222,7 +222,7 @@ export default function AdminProductModal({
         name: form.name.trim(),
         description: form.description.trim() || null,
         sku: form.sku.trim() || null,
-        category_id: catResult.primaryCategoryId,
+        category_id: catResult.primaryCategoryId ?? null,
         unit_price: Number.isFinite(price) ? price : product.unit_price,
         cost_price: Number.isFinite(costPrice) ? costPrice : null,
         stock_quantity: Number.isFinite(stockQty) && stockQty >= 0 ? stockQty : product.stock_quantity ?? 0,
@@ -239,7 +239,7 @@ export default function AdminProductModal({
       return
     }
     setCategoryIds(catResult.categoryIds)
-    setPrimaryCategoryId(catResult.primaryCategoryId)
+    setPrimaryCategoryId(catResult.primaryCategoryId ?? '')
     setLiveProduct((prev) => ({ ...prev, category_id: catResult.primaryCategoryId }))
     onProductSaved?.(product.id, catResult.categoryIds, catResult.primaryCategoryId)
     setEditing(false)
@@ -254,8 +254,12 @@ export default function AdminProductModal({
   function startInlineEdit(field: ProductModalInlineField) {
     if (!canEditCatalogue || editing || inlineSaving) return
     if (field === 'category_id') {
-      const ids = categoryIds.length > 0 ? categoryIds : [liveProduct.category_id]
-      setInlineCategoryDraft({ ids, primary: primaryCategoryId || ids[0] || liveProduct.category_id })
+      const ids =
+        categoryIds.length > 0 ? categoryIds : liveProduct.category_id ? [liveProduct.category_id] : []
+      setInlineCategoryDraft({
+        ids,
+        primary: primaryCategoryId || ids[0] || liveProduct.category_id || '',
+      })
     }
     setEditingField(field)
   }
@@ -365,7 +369,7 @@ export default function AdminProductModal({
       return
     }
     setCategoryIds(result.categoryIds)
-    setPrimaryCategoryId(result.primaryCategoryId)
+    setPrimaryCategoryId(result.primaryCategoryId ?? '')
     setLiveProduct((prev) => ({ ...prev, category_id: result.primaryCategoryId }))
     setInlineCategoryDraft(null)
     onProductSaved?.(liveProduct.id, result.categoryIds, result.primaryCategoryId)

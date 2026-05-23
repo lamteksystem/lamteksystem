@@ -30,7 +30,7 @@ export interface ProductCategoryRow {
 export interface SaveProductCategoriesResult {
   error: string | null
   categoryIds: string[]
-  primaryCategoryId: string
+  primaryCategoryId: string | null
 }
 
 const PRODUCT_CATEGORIES_PAGE_SIZE = 1000
@@ -211,14 +211,36 @@ async function saveProductCategoriesLegacy(
 export async function saveProductCategories(
   productId: string,
   categoryIds: string[],
-  primaryCategoryId: string
+  primaryCategoryId: string | null
 ): Promise<SaveProductCategoriesResult> {
   const unique = [...new Set(categoryIds.filter(Boolean))]
-  if (unique.length === 0 || !primaryCategoryId || !unique.includes(primaryCategoryId)) {
+
+  if (unique.length === 0) {
+    const { error: rpcErr } = await supabase.rpc('save_product_categories', {
+      p_product_id: productId,
+      p_category_ids: [],
+      p_primary_category_id: null,
+    })
+    if (rpcErr && !isSaveRpcMissing(rpcErr.message, rpcErr.code)) {
+      return { error: rpcErr.message, categoryIds: [], primaryCategoryId: null }
+    }
+    if (rpcErr && isSaveRpcMissing(rpcErr.message, rpcErr.code)) {
+      const { error: delErr } = await supabase.from('product_categories').delete().eq('product_id', productId)
+      if (delErr) return { error: delErr.message, categoryIds: [], primaryCategoryId: null }
+      const { error: prodErr } = await supabase
+        .from('products')
+        .update({ category_id: null })
+        .eq('id', productId)
+      if (prodErr) return { error: prodErr.message, categoryIds: [], primaryCategoryId: null }
+    }
+    return { error: null, categoryIds: [], primaryCategoryId: null }
+  }
+
+  if (!primaryCategoryId || !unique.includes(primaryCategoryId)) {
     return {
       error: 'Select at least one category and a valid primary category.',
       categoryIds: [],
-      primaryCategoryId: '',
+      primaryCategoryId: null,
     }
   }
 

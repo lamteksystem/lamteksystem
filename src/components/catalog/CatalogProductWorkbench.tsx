@@ -755,7 +755,7 @@ export default function CatalogProductWorkbench({
                   const sell = productUnitPrice(product)
                   const availability = getProductAvailabilityMeta(product)
                   const qty = rowQtyById[product.id] ?? 1
-                  const rangeName = catMap.get(product.category_id)
+                  const rangeName = product.category_id ? catMap.get(product.category_id) : undefined
 
                   return (
                     <tr

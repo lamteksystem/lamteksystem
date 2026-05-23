@@ -315,11 +315,6 @@ export async function publishWorkbenchRows(
     }
 
     const catId = row.category_id?.trim() || null
-    if (!catId) {
-      result.skipped++
-      result.errors.push(`Skipped ${sku}: no category assigned (pick one in workbench — we never auto-create categories)`)
-      continue
-    }
 
     const payload = {
       category_id: catId,

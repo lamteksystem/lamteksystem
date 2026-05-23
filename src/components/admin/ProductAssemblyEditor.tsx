@@ -204,7 +204,7 @@ export default function ProductAssemblyEditor({
   function handleSelectComponent(p: ProductRow) {
     setAddProductId(p.id)
     setComponentSearch(`${p.sku ?? p.id} — ${p.name}`)
-    const cat = categoryMap.get(p.category_id)
+    const cat = p.category_id ? categoryMap.get(p.category_id) : undefined
     setAddRole(inferComponentRoleFromProduct(p, cat?.slug))
     setPickerOpen(false)
   }

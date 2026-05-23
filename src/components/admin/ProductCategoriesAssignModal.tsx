@@ -115,7 +115,7 @@ export default function ProductCategoriesAssignModal({
       setError(result.error)
       return
     }
-    onSaved(result.categoryIds, result.primaryCategoryId)
+    onSaved(result.categoryIds, result.primaryCategoryId ?? '')
     onClose()
   }
 

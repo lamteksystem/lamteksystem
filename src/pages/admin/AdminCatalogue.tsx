@@ -295,7 +295,10 @@ export default function AdminCatalogue() {
   const filteredProducts = useMemo(() => {
     return products
       .filter((p) => {
-        if (categoryFilter) {
+        if (categoryFilter === '__uncategorised__') {
+          const catIds = getProductCategoryIds(p.id, p.category_id, productCategoryMap)
+          if (catIds.length > 0) return false
+        } else if (categoryFilter) {
           const catIds = getProductCategoryIds(p.id, p.category_id, productCategoryMap)
           if (
             !productMatchesCategoryFilter(
@@ -445,6 +448,7 @@ export default function AdminCatalogue() {
             className="admin-select"
           >
             <option value="">All</option>
+            <option value="__uncategorised__">Uncategorised</option>
             {categoriesByParent.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -785,11 +789,16 @@ export default function AdminCatalogue() {
                                 onDoubleClick={(e) => {
                                   if (!canEditCatalogue) return
                                   e.stopPropagation()
-                                  const ids = catIds.length > 0 ? catIds : [p.category_id]
+                                  const ids =
+                                    catIds.length > 0
+                                      ? catIds
+                                      : p.category_id
+                                        ? [p.category_id]
+                                        : []
                                   setCategoryEditDraft({
                                     productId: p.id,
                                     ids,
-                                    primary: ids[0] ?? p.category_id,
+                                    primary: ids[0] ?? p.category_id ?? '',
                                   })
                                   setEditingCell({ productId: p.id, field: 'category_id' })
                                 }}

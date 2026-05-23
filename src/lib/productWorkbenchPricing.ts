@@ -47,7 +47,7 @@ export async function resolveProductPriceBreakdown(params: {
     const { segment, accountDiscountPercent } = await loadCustomerPricingContext(customerUserId)
     sellPrice = await resolveCustomerPrice({
       productId: product.id,
-      categoryId: product.category_id,
+      categoryId: product.category_id ?? '',
       baseUnitPrice: cataloguePrice,
       segment,
       orderTotalExVat,
@@ -58,7 +58,7 @@ export async function resolveProductPriceBreakdown(params: {
   const baseCost = product.cost_price != null ? Number(product.cost_price) : null
   const costPrice = await resolveCostPrice({
     productId: product.id,
-    categoryId: product.category_id,
+    categoryId: product.category_id ?? '',
     baseCostPrice: baseCost,
     sellPrice,
     supplierId: null,

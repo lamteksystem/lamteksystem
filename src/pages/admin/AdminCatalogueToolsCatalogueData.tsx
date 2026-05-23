@@ -95,14 +95,6 @@ export default function AdminCatalogueToolsCatalogueData() {
       if (!catId && row.category_name?.trim()) {
         catId = nameToId.get(row.category_name.trim().toLowerCase()) ?? null
       }
-      if (!catId) {
-        result.skipped++
-        result.errors.push(
-          `Skipped ${row.sku || row.name}: unknown category "${row.category_name || catSlug || '(empty)'}" — create it in Categories first`,
-        )
-        continue
-      }
-
       const payload = {
         category_id: catId,
         name: row.name.slice(0, 255),
@@ -388,7 +380,8 @@ export default function AdminCatalogueToolsCatalogueData() {
         <div className="admin-catalogue-import-export card admin-card" style={{ marginTop: '1rem' }}>
           <h2>Import &amp; export</h2>
           <p className="admin-muted">
-            Standard portal format: same columns as export. Updates products by SKU. Categories must already exist.
+            Standard portal format: same columns as export. Updates products by SKU. Categories must already exist when
+            provided; rows with unknown categories import as uncategorised.
           </p>
           <div className="admin-import-export-actions">
             <div className="admin-export-buttons">

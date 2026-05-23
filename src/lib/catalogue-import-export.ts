@@ -25,7 +25,7 @@ export function buildExportRows(
 ): CatalogueExportRow[] {
   const catMap = new Map(categories.map((c) => [c.id, c]))
   return products.map((p) => {
-    const cat = catMap.get(p.category_id)
+    const cat = p.category_id ? catMap.get(p.category_id) : undefined
     return {
       category_slug: cat?.slug ?? '',
       category_name: cat?.name ?? '',

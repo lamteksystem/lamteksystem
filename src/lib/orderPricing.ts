@@ -71,7 +71,7 @@ export async function repriceDraftOrderLinesForCustomer(params: {
       if (!p) continue
       const resolved = await resolveCustomerPrice({
         productId,
-        categoryId: p.category_id,
+        categoryId: p.category_id ?? '',
         baseUnitPrice: Number(p.unit_price),
         segment,
         orderTotalExVat: currentOrderTotalExVat,

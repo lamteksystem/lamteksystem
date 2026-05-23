@@ -210,10 +210,10 @@ export default function AdminCatalogueWipe() {
             <li>{result.wiped_order_lines} order lines removed</li>
           </ul>
           <div className="admin-wipe-actions">
-            <Link to="/admin/catalogue/components/import" className="btn">
+            <Link to="/admin/catalogue-tools/components/import" className="btn">
               Import components from CSV
             </Link>
-            <Link to="/admin/catalogue/components/variant-builder" className="btn btn-outline">
+            <Link to="/admin/catalogue-tools/components/variant-builder" className="btn btn-outline">
               Open variant matrix builder
             </Link>
             <button type="button" className="btn btn-ghost" onClick={() => navigate('/admin/catalogue')}>

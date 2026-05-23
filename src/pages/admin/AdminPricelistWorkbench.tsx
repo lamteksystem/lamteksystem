@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { CATALOGUE_TOOLS, LIVE_CATALOGUE } from '@/lib/catalogueToolsPaths'
 import ListPager from '@/components/admin/ListPager'
 import { usePermission } from '@/hooks/usePermission'
 import { fetchAllCategories } from '@/lib/categoryAdmin'
@@ -361,9 +362,10 @@ export default function AdminPricelistWorkbench() {
           <code>template.xlsx</code> (category_slug, category_name, name, sku, unit_price, …).
         </p>
         <p className="admin-muted" style={{ marginTop: '-0.5rem' }}>
-          <Link to="/admin/catalogue/categories">Categories</Link> ·{' '}
-          <Link to="/admin/catalogue/components/import">Component import</Link> ·{' '}
-          <Link to="/admin/catalogue">Catalogue</Link>
+          <Link to={LIVE_CATALOGUE.categories}>Categories</Link> ·{' '}
+          <Link to={CATALOGUE_TOOLS.componentImport}>Component import</Link> ·{' '}
+          <Link to={LIVE_CATALOGUE.products}>Catalogue</Link> ·{' '}
+          <Link to={CATALOGUE_TOOLS.hub}>All tools</Link>
         </p>
         {rows.length > 0 && (
           <p className="admin-pricelist-stats">

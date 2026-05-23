@@ -215,7 +215,8 @@ export default function AdminComponentImport() {
           {plan.unknownCategories.length > 0 && (
             <p className="admin-muted">
               Unknown categories: {plan.unknownCategories.join(', ')}. Add them in{' '}
-              <Link to="/admin/catalogue/categories">Categories</Link>.
+              <Link to="/admin/catalogue/categories">Categories</Link> ·{' '}
+              <Link to="/admin/catalogue-tools">Product &amp; category tools</Link>.
             </p>
           )}
           {plan.unknownRanges.length > 0 && (
@@ -313,7 +314,7 @@ export default function AdminComponentImport() {
             <Link to="/admin/catalogue" className="btn">
               View catalogue
             </Link>
-            <Link to="/admin/catalogue/components/variant-builder" className="btn btn-outline">
+            <Link to="/admin/catalogue-tools/components/variant-builder" className="btn btn-outline">
               Open variant matrix builder
             </Link>
           </div>

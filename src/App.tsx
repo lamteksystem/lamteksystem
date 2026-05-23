@@ -70,6 +70,12 @@ import AdminCatalogue from '@/pages/admin/AdminCatalogue'
 import AdminCatalogueWipe from '@/pages/admin/AdminCatalogueWipe'
 import AdminComponentImport from '@/pages/admin/AdminComponentImport'
 import AdminVariantBuilder from '@/pages/admin/AdminVariantBuilder'
+import CatalogueToolsGate from '@/components/admin/catalogue-tools/CatalogueToolsGate'
+import CatalogueToolsLayout from '@/components/admin/catalogue-tools/CatalogueToolsLayout'
+import AdminCatalogueTools from '@/pages/admin/AdminCatalogueTools'
+import AdminCatalogueToolsCatalogueData from '@/pages/admin/AdminCatalogueToolsCatalogueData'
+import AdminLiveCategories from '@/pages/admin/AdminLiveCategories'
+import { CATALOGUE_TOOLS } from '@/lib/catalogueToolsPaths'
 import AdminDocumentUploads from '@/pages/admin/AdminDocumentUploads'
 import AdminCreateUser from '@/pages/admin/AdminCreateUser'
 import AdminUsers from '@/pages/admin/AdminUsers'
@@ -198,16 +204,37 @@ export default function App() {
         </Route>
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="catalogue" element={<AdminCatalogue />} />
+        <Route path="catalogue/categories" element={<AdminLiveCategories />} />
         <Route path="catalogue/tealbury" element={<AdminTealburyPricelist />} />
-        <Route path="catalogue/pricelist-workbench" element={<AdminPricelistWorkbench />} />
-        <Route path="catalogue/categories" element={<AdminSmartCategorise />} />
-        <Route path="catalogue/wipe" element={<AdminCatalogueWipe />} />
-        <Route path="catalogue/components/import" element={<AdminComponentImport />} />
-        <Route path="catalogue/components/variant-builder" element={<AdminVariantBuilder />} />
+        <Route
+          path="catalogue/pricelist-workbench"
+          element={<Navigate to={CATALOGUE_TOOLS.pricelistWorkbench} replace />}
+        />
+        <Route path="catalogue/wipe" element={<Navigate to={CATALOGUE_TOOLS.wipe} replace />} />
+        <Route
+          path="catalogue/components/import"
+          element={<Navigate to={CATALOGUE_TOOLS.componentImport} replace />}
+        />
+        <Route
+          path="catalogue/components/variant-builder"
+          element={<Navigate to={CATALOGUE_TOOLS.variantBuilder} replace />}
+        />
         <Route
           path="catalogue/smart-categorise"
-          element={<Navigate to="/admin/catalogue/categories?section=smart" replace />}
+          element={<Navigate to={CATALOGUE_TOOLS.smartCategorise} replace />}
         />
+        <Route path="catalogue-tools" element={<CatalogueToolsGate />}>
+          <Route element={<CatalogueToolsLayout />}>
+            <Route index element={<AdminCatalogueTools />} />
+            <Route path="pricelist-workbench" element={<AdminPricelistWorkbench />} />
+            <Route path="catalogue-data" element={<AdminCatalogueToolsCatalogueData />} />
+            <Route path="smart-categorise" element={<AdminSmartCategorise lockSection="smart" />} />
+            <Route path="parts" element={<AdminSmartCategorise lockSection="parts" />} />
+            <Route path="components/import" element={<AdminComponentImport />} />
+            <Route path="components/variant-builder" element={<AdminVariantBuilder />} />
+            <Route path="wipe" element={<AdminCatalogueWipe />} />
+          </Route>
+        </Route>
         <Route path="stock" element={<AdminStock />} />
         <Route path="locations" element={<AdminLocations />} />
         <Route path="delivery-windows" element={<AdminDeliveryWindows />} />

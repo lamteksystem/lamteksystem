@@ -489,8 +489,8 @@ export default function AdminVariantBuilder() {
           >
             {creating ? 'Creating…' : `Create ${newRowCount} component(s)`}
           </button>
-          <Link to="/admin/catalogue" className="btn btn-ghost">
-            Back to catalogue
+          <Link to="/admin/catalogue-tools" className="btn btn-ghost">
+            Back to tools
           </Link>
         </div>
         {resultMessage && (

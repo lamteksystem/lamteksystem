@@ -32,8 +32,10 @@ import {
   Settings,
   Ticket,
   Users,
+  Wrench,
   Zap,
 } from 'lucide-react'
+import { CATALOGUE_TOOLS } from '@/lib/catalogueToolsPaths'
 
 interface CustomerOption {
   user_id: string
@@ -164,29 +166,35 @@ export default function AdminLayout() {
     if (location.pathname === '/admin/create-order') return { pageTitle: 'Create order', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Create order' }] }
     if (location.pathname === '/admin/create-quote') return { pageTitle: 'Create quote', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Create quote' }] }
     if (location.pathname === '/admin/catalogue') return { pageTitle: 'Catalogue', breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Catalogue' }] }
-    if (
-      location.pathname === '/admin/catalogue/categories' ||
-      location.pathname === '/admin/catalogue/smart-categorise'
-    ) {
+    if (location.pathname === '/admin/catalogue/categories') {
       return {
         pageTitle: 'Categories',
-        breadcrumb: [
-          { to: '/admin', label: 'Today' },
-          { to: '/admin/catalogue', label: 'Catalogue' },
-          { label: 'Categories' },
-        ],
+        breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Categories' }],
       }
     }
-    if (
-      location.pathname === '/admin/catalogue/tealbury' ||
-      location.pathname === '/admin/catalogue/pricelist-workbench'
-    ) {
+    if (location.pathname === CATALOGUE_TOOLS.hub) {
       return {
-        pageTitle: 'Pricelist workbench',
+        pageTitle: 'Product & category tools',
+        breadcrumb: [{ to: '/admin', label: 'Today' }, { label: 'Product & category tools' }],
+      }
+    }
+    if (location.pathname.startsWith(CATALOGUE_TOOLS.hub + '/')) {
+      const toolCrumb = (() => {
+        if (location.pathname.includes('/pricelist-workbench')) return 'Pricelist workbench'
+        if (location.pathname.includes('/catalogue-data')) return 'Import, audit & images'
+        if (location.pathname.includes('/smart-categorise')) return 'Smart categorise'
+        if (location.pathname.endsWith('/parts')) return 'Parts registry'
+        if (location.pathname.includes('/components/import')) return 'Component import'
+        if (location.pathname.includes('/variant-builder')) return 'Variant builder'
+        if (location.pathname.includes('/wipe')) return 'Reset catalogue'
+        return 'Tool'
+      })()
+      return {
+        pageTitle: toolCrumb,
         breadcrumb: [
           { to: '/admin', label: 'Today' },
-          { to: '/admin/catalogue', label: 'Catalogue' },
-          { label: 'Pricelist workbench' },
+          { to: CATALOGUE_TOOLS.hub, label: 'Product & category tools' },
+          { label: toolCrumb },
         ],
       }
     }
@@ -211,6 +219,7 @@ export default function AdminLayout() {
   const { allowed: canViewOrders } = usePermission('admin.orders', 'view')
   const { allowed: canViewCustomers } = usePermission('admin.customers', 'view')
   const { allowed: canViewCatalogue } = usePermission('admin.catalogue', 'view')
+  const { allowed: canEditCatalogue } = usePermission('admin.catalogue', 'edit')
   const { allowed: canViewStock } = usePermission('admin.stock', 'view')
   const { allowed: canViewUploads } = usePermission('admin.uploads', 'view')
   const { allowed: canViewUsers } = usePermission('admin.users', 'view')
@@ -231,7 +240,7 @@ export default function AdminLayout() {
     )
       return 'admin.orders'
     if (path.startsWith('/admin/customers') || path.startsWith('/admin/crm')) return 'admin.customers'
-    if (path.startsWith('/admin/catalogue')) return 'admin.catalogue'
+    if (path.startsWith('/admin/catalogue') || path.startsWith('/admin/catalogue-tools')) return 'admin.catalogue'
     if (path === '/admin/stock' || path === '/admin/locations' || path === '/admin/delivery-windows') return 'admin.stock'
     if (path === '/admin/uploads') return 'admin.uploads'
     if (path === '/admin/pricing') return 'admin.pricing'
@@ -291,6 +300,7 @@ export default function AdminLayout() {
     if (path.startsWith('/admin/customers') || path.startsWith('/admin/crm')) return 'customers'
     if (
       path.startsWith('/admin/catalogue') ||
+      path.startsWith('/admin/catalogue-tools') ||
       path === '/admin/stock' ||
       path === '/admin/locations' ||
       path === '/admin/delivery-windows' ||
@@ -491,6 +501,7 @@ export default function AdminLayout() {
             const groupId = 'catalogue'
             const forceOpen =
               location.pathname.startsWith('/admin/catalogue') ||
+              location.pathname.startsWith('/admin/catalogue-tools') ||
               location.pathname === '/admin/stock' ||
               location.pathname === '/admin/locations' ||
               location.pathname === '/admin/delivery-windows' ||
@@ -531,12 +542,26 @@ export default function AdminLayout() {
                     <NavLink
                       to="/admin/catalogue/categories"
                       className={({ isActive }) => `admin-nav-item admin-nav-item--sub ${isActive ? 'active' : ''}`}
-                      title="Manage categories, run smart categorisation, and configure parts"
+                      title="Live category tree"
                     >
                       <span className="admin-nav-icon">
                         <FolderTree size={16} strokeWidth={2} aria-hidden />
                       </span>
                       {!sidebarCollapsed && <span>Categories</span>}
+                    </NavLink>
+                  )}
+                  {canEditCatalogue && (
+                    <NavLink
+                      to={CATALOGUE_TOOLS.hub}
+                      className={({ isActive }) =>
+                        `admin-nav-item admin-nav-item--sub ${isActive || location.pathname.startsWith(CATALOGUE_TOOLS.hub + '/') ? 'active' : ''}`
+                      }
+                      title="Import, parsers, smart categorise, and maintenance"
+                    >
+                      <span className="admin-nav-icon">
+                        <Wrench size={16} strokeWidth={2} aria-hidden />
+                      </span>
+                      {!sidebarCollapsed && <span>Product &amp; category tools</span>}
                     </NavLink>
                   )}
                   {canViewStock && (
@@ -749,6 +774,7 @@ export default function AdminLayout() {
                 {canViewCustomers && <option value="/admin/crm/open-orders">CRM open orders</option>}
                 {canViewCatalogue && <option value="/admin/catalogue">Catalogue</option>}
                 {canViewCatalogue && <option value="/admin/catalogue/categories">Categories</option>}
+                {canEditCatalogue && <option value={CATALOGUE_TOOLS.hub}>Product &amp; category tools</option>}
                 {canViewStock && <option value="/admin/stock">Stock take</option>}
                 {canViewReports && <option value="/admin/reports">Reports</option>}
                 {canViewTickets && <option value="/admin/tickets">Support tickets</option>}

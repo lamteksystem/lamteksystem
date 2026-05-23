@@ -64,14 +64,22 @@ export interface ResultInfo {
   errors: string[]
 }
 
-export default function AdminSmartCategorise() {
+type AdminSmartCategoriseProps = {
+  /** When set, only this section is shown (used under Product & category tools routes). */
+  lockSection?: 'smart' | 'parts'
+}
+
+export default function AdminSmartCategorise({ lockSection }: AdminSmartCategoriseProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const sectionParam = searchParams.get('section') as Section | null
   const tabParam = searchParams.get('tab') as Tab | null
   // Derive section/tab directly from the URL — no separate state + sync effect (would loop
   // because `setSearchParams` from `useSearchParams` is a new reference every render).
-  const section: Section =
-    sectionParam === 'smart' || sectionParam === 'parts' ? sectionParam : 'general'
+  const section: Section = lockSection
+    ? lockSection
+    : sectionParam === 'smart' || sectionParam === 'parts'
+      ? sectionParam
+      : 'general'
   const tab: Tab = tabParam === 'history' || tabParam === 'settings' ? tabParam : 'suggestions'
 
   const setSection = useCallback(
@@ -159,39 +167,52 @@ export default function AdminSmartCategorise() {
     return map
   }, [categories])
 
-  return (
-    <section className="admin-page admin-smart-categorise-page admin-categories-hub">
-      <header className="admin-page-header admin-smart-categorise-header">
-        <div>
-          <h1>Categories</h1>
-          <p className="admin-muted">
-            Manage product categories, run smart bulk categorisation, and configure the parts
-            registry — all in one place.{' '}
-            <Link to="/admin/catalogue">← Back to catalogue</Link>
-          </p>
-        </div>
-      </header>
+  const pageTitle =
+    lockSection === 'smart'
+      ? 'Smart categorise'
+      : lockSection === 'parts'
+        ? 'Parts registry'
+        : 'Categories'
 
-      <nav className="admin-tabs admin-categories-hub-tabs" aria-label="Categories sections">
-        {(
-          [
-            ['general', 'General categories', categories.length],
-            ['smart', 'Smart categorise', history.length],
-            ['parts', 'Parts', null],
-          ] as [Section, string, number | null][]
-        ).map(([key, label, badge]) => (
-          <button
-            key={key}
-            type="button"
-            className={`admin-tab admin-tab--top${section === key ? ' admin-tab--active' : ''}`}
-            onClick={() => setSection(key)}
-            aria-current={section === key ? 'page' : undefined}
-          >
-            {label}
-            {badge && badge > 0 ? <span className="admin-tab-badge">{badge}</span> : null}
-          </button>
-        ))}
-      </nav>
+  return (
+    <section
+      className={`admin-page admin-smart-categorise-page admin-categories-hub${lockSection ? ' admin-smart-categorise-page--locked' : ''}`}
+    >
+      {!lockSection && (
+        <header className="admin-page-header admin-smart-categorise-header">
+          <div>
+            <h1>{pageTitle}</h1>
+            <p className="admin-muted">
+              Legacy hub — use <Link to="/admin/catalogue/categories">Categories</Link> for the live tree
+              or <Link to="/admin/catalogue-tools">Product &amp; category tools</Link> for smart categorise
+              and parts.
+            </p>
+          </div>
+        </header>
+      )}
+
+      {!lockSection && (
+        <nav className="admin-tabs admin-categories-hub-tabs" aria-label="Categories sections">
+          {(
+            [
+              ['general', 'General categories', categories.length],
+              ['smart', 'Smart categorise', history.length],
+              ['parts', 'Parts', null],
+            ] as [Section, string, number | null][]
+          ).map(([key, label, badge]) => (
+            <button
+              key={key}
+              type="button"
+              className={`admin-tab admin-tab--top${section === key ? ' admin-tab--active' : ''}`}
+              onClick={() => setSection(key)}
+              aria-current={section === key ? 'page' : undefined}
+            >
+              {label}
+              {badge && badge > 0 ? <span className="admin-tab-badge">{badge}</span> : null}
+            </button>
+          ))}
+        </nav>
+      )}
 
       <div className="admin-smart-categorise-body">
         {loading ? (

@@ -173,7 +173,7 @@ export default function CatalogueCategoriesManager({
           {variant === 'inline' ? (
             <>
               Need bulk assignment?{' '}
-              <Link to="/admin/catalogue/categories?section=smart">Smart categorise</Link>.
+              <Link to="/admin/catalogue-tools/smart-categorise">Smart categorise</Link>.
             </>
           ) : (
             <>

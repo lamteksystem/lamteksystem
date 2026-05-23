@@ -103,7 +103,7 @@ export default function SettingsDangerPanel() {
         <button type="button" className="btn btn-outline" onClick={() => void doBackup()} disabled={resetLoading}>
           Download full backup (XLSX)
         </button>
-        <Link to="/admin/catalogue/wipe" className="btn btn-danger-outline">
+        <Link to="/admin/catalogue-tools/wipe" className="btn btn-danger-outline">
           Reset catalogue (rebuild component-first)
         </Link>
         <button

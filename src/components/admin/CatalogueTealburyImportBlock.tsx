@@ -232,7 +232,7 @@ export default function CatalogueTealburyImportBlock() {
       <h3 className="admin-card-subtitle">Tealbury customer workbook (.xlsx)</h3>
       <p className="admin-muted" style={{ marginBottom: '0.75rem' }}>
         For full editing, category assignment, and template export, use{' '}
-        <Link to="/admin/catalogue/pricelist-workbench">Pricelist workbench</Link>. Quick replace-import below reads each{' '}
+        <Link to="/admin/catalogue-tools/pricelist-workbench">Pricelist workbench</Link>. Quick replace-import below reads each{' '}
         <strong>door / range sheet</strong> (skips the Pricelist hub when range sheets exist).
       </p>
       <input

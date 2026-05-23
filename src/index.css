@@ -6619,38 +6619,6 @@ button.ordering-wizard-card {
   max-width: 100%;
   box-sizing: border-box;
 }
-/* Sticky Delete column: body cells pin right; header stays above body when scrolling */
-.admin-pricelist-table tbody .admin-pricelist-col-sticky-end {
-  position: sticky;
-  right: 0;
-  z-index: 2;
-  background: var(--lamtek-surface, #fff);
-  box-shadow: -6px 0 10px rgba(0, 0, 0, 0.06);
-}
-.admin-pricelist-table thead .admin-pricelist-col-sticky-end {
-  position: sticky;
-  top: 0;
-  right: 0;
-  z-index: 6;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--lamtek-surface) 92%, var(--lamtek-gold) 8%) 0%,
-    var(--lamtek-surface) 100%
-  );
-  box-shadow:
-    0 1px 0 var(--lamtek-gray-light),
-    -6px 0 10px rgba(0, 0, 0, 0.06);
-}
-.admin-app .admin-pricelist-table thead .admin-pricelist-col-sticky-end {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--lamtek-surface) 92%, var(--lamtek-gold) 8%) 0%,
-    var(--lamtek-surface) 100%
-  );
-}
-.admin-pricelist-row--unassigned .admin-pricelist-col-sticky-end {
-  background: color-mix(in srgb, rgba(202, 138, 4, 0.08) 88%, var(--lamtek-surface) 12%);
-}
 .admin-pricelist-table-section { min-height: 0; }
 .admin-pricelist-table-wrap {
   max-height: min(68vh, calc(100dvh - 16rem));
@@ -7043,13 +7011,10 @@ button.ordering-wizard-card {
   background: var(--lamtek-bg);
   box-shadow: 0 1px 0 var(--lamtek-border, var(--lamtek-gray-light));
 }
-/* Pricelist workbench: header must stack above sticky Delete cells (generic rule above is z-index 2) */
+/* Pricelist workbench: header row stays above body when scrolling vertically */
 .admin-pricelist-table.admin-table--sticky-header thead th {
   z-index: 5;
   background: var(--lamtek-surface);
-}
-.admin-pricelist-table.admin-table--sticky-header thead th.admin-pricelist-col-sticky-end {
-  z-index: 6;
 }
 /* Drop indicator (gold line) when reordering columns - combine with sticky header shadow */
 .admin-th--dragging { opacity: 0.6; }

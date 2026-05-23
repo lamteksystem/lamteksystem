@@ -126,7 +126,7 @@ export default function PricelistWorkbenchTable({
       <th
         key={col.id}
         style={{ width: w, minWidth: w }}
-        className={isActions ? 'admin-pricelist-th-actions admin-pricelist-col-sticky-end' : undefined}
+        className={isActions ? 'admin-pricelist-th-actions' : undefined}
       >
         <span className="admin-th-label">
           {col.label}
@@ -411,7 +411,7 @@ export default function PricelistWorkbenchTable({
                     key={col.id}
                     className={
                       col.id === 'actions'
-                        ? 'admin-pricelist-td-actions admin-pricelist-col-sticky-end'
+                        ? 'admin-pricelist-td-actions'
                         : DBL_CLICK_FIELDS.has(col.id as EditableField)
                           ? 'admin-pricelist-td-editable'
                           : undefined

@@ -26,7 +26,7 @@ import { useStaff } from '@/hooks/useStaff'
 import { AreaTrendChart } from '@/components/charts/AreaTrendChart'
 import { BarTrendChart } from '@/components/charts/BarTrendChart'
 import { DonutChart } from '@/components/charts/DonutChart'
-import { AnimatedChartIllustration, DashboardHeroRibbon, StatOrdersGlyph, StatRevenueGlyph } from '@/components/dashboard/DashboardDecorSvgs'
+import { DashboardHeroRibbon, StatOrdersGlyph, StatRevenueGlyph } from '@/components/dashboard/DashboardDecorSvgs'
 import { VisualStatCard } from '@/components/dashboard/VisualStatCard'
 import { buildDailyCounts, buildDailyRevenue, formatDashboardCurrency, sparklineFromPoints, statusBreakdown } from '@/lib/dashboardAnalytics'
 
@@ -194,9 +194,9 @@ export default function AdminDashboard() {
           <div className="admin-dashboard-hero-title-skeleton" />
           <div className="admin-dashboard-hero-meta-skeleton" />
         </div>
-        <div className="admin-dashboard-metrics admin-dashboard-metrics--skeleton">
+        <div className="dashboard-visual-metrics dashboard-visual-metrics--staff dashboard-visual-metrics--skeleton">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => (
-            <div key={i} className="admin-stat-card admin-stat-card--skeleton" />
+            <div key={i} className="visual-stat-card visual-stat-card--skeleton" aria-hidden />
           ))}
         </div>
         <div className="admin-loading-state">
@@ -259,7 +259,7 @@ export default function AdminDashboard() {
         <h2><BarChart3 size={20} strokeWidth={2} style={{ verticalAlign: 'middle', marginRight: 6 }} aria-hidden /> Last 30 days</h2>
         <div className="dashboard-charts-grid">
           <article className="chart-card">
-            <div className="chart-card-head"><div><h3>Order volume</h3><p>Daily orders</p></div><AnimatedChartIllustration /></div>
+            <div className="chart-card-head"><div><h3>Order volume</h3><p>Daily orders</p></div></div>
             <BarTrendChart data={orderVolumeTrend} ariaLabel="Order volume" />
           </article>
           <article className="chart-card">

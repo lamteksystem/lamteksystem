@@ -23,9 +23,9 @@ export function DashboardHeroRibbon({ className }: { className?: string }) {
         </linearGradient>
       </defs>
       <path className="dash-ribbon-path" d="M0 28 Q120 8 240 26 T480 24 T640 30" fill="none" stroke={`url(#${gradId})`} strokeWidth={2.5} strokeLinecap="round" />
-      <circle className="dash-ribbon-dot dash-ribbon-dot--1" cx="120" cy="22" r="4" fill="#672732" opacity={0.7} />
-      <circle className="dash-ribbon-dot dash-ribbon-dot--2" cx="320" cy="24" r="4" fill="#a85263" opacity={0.85} />
-      <circle className="dash-ribbon-dot dash-ribbon-dot--3" cx="520" cy="20" r="4" fill="#672732" opacity={0.7} />
+      <circle cx="120" cy="22" r="4" fill="#672732" opacity={0.55} />
+      <circle cx="320" cy="24" r="4" fill="#a85263" opacity={0.65} />
+      <circle cx="520" cy="20" r="4" fill="#672732" opacity={0.55} />
     </svg>
   )
 }
@@ -54,7 +54,7 @@ export function StatRevenueGlyph({ className }: { className?: string }) {
   return (
     <svg className={className} width={40} height={40} viewBox="0 0 24 24" aria-hidden focusable="false">
       <path d="M4 18V8l4-3 4 5 4-4 4 3v9" {...stroke} />
-      <circle className="dash-pulse-dot" cx="20" cy="6" r="2" fill="currentColor" opacity={0.85} />
+      <circle cx="20" cy="6" r="2" fill="currentColor" opacity={0.65} />
     </svg>
   )
 }
@@ -73,7 +73,7 @@ export function AnimatedChartIllustration({ className }: { className?: string })
     <svg className={className} viewBox="0 0 120 64" aria-hidden focusable="false">
       <rect x="8" y="8" width="104" height="48" rx="6" fill="rgba(103,39,50,0.06)" stroke="currentColor" strokeWidth={1} opacity={0.35} />
       <polyline className="dash-chart-line" points="20,44 36,32 52,38 68,22 84,28 100,16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <circle className="dash-chart-dot" cx="100" cy="16" r="3" fill="currentColor" />
+      <circle cx="100" cy="16" r="3" fill="currentColor" opacity={0.75} />
     </svg>
   )
 }

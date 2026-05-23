@@ -67,44 +67,105 @@ function tradeCodeFromParsed(row: TealburyParsedRow): string {
   return idx > 0 ? sku.slice(0, idx) : sku
 }
 
-/** Suggest portal category from spreadsheet section (+ Tealbury accessory rules). */
+const UNASSIGNED_CATEGORY = {
+  category_id: null as string | null,
+  category_slug: '',
+  category_name: '',
+}
+
+/** Suggest an existing portal category only — never invent new category names/slugs. */
 export function suggestCategoryForPricelistRow(
   section: string,
   categories: CategoryRow[],
   source: PricelistSource,
   accessoryHint?: { description: string; code: string }
 ): { category_id: string | null; category_slug: string; category_name: string } {
-  let name = section.trim() || 'Uncategorised'
+  const candidates: string[] = []
+  const sectionTrim = section.trim()
+  if (sectionTrim) candidates.push(sectionTrim)
+
   if (source === 'tealbury' && /accessor/i.test(section) && accessoryHint) {
     const mapped = mapTealburyAccessoryToCategory(accessoryHint.description, accessoryHint.code)
-    if (mapped) name = mapped
+    if (mapped) candidates.unshift(mapped)
   }
 
-  const byName = categories.find((c) => c.name.trim().toLowerCase() === name.toLowerCase())
-  if (byName) {
-    return { category_id: byName.id, category_slug: byName.slug, category_name: byName.name }
+  const seen = new Set<string>()
+  for (const name of candidates) {
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+
+    const byName = categories.find((c) => c.name.trim().toLowerCase() === name.toLowerCase())
+    if (byName) {
+      return { category_id: byName.id, category_slug: byName.slug, category_name: byName.name }
+    }
+
+    const slugCandidate = slugifyCategoryName(name)
+    const bySlug = categories.find((c) => c.slug === slugCandidate)
+    if (bySlug) {
+      return { category_id: bySlug.id, category_slug: bySlug.slug, category_name: bySlug.name }
+    }
+
+    const partial = categories.find((c) => {
+      const cn = c.name.toLowerCase()
+      const sn = name.toLowerCase()
+      if (sn.length < 4) return false
+      return cn === sn || (cn.includes(sn) && sn.length >= cn.length * 0.6)
+    })
+    if (partial) {
+      return { category_id: partial.id, category_slug: partial.slug, category_name: partial.name }
+    }
   }
 
-  const slugCandidate = slugifyCategoryName(name)
-  const bySlug = categories.find((c) => c.slug === slugCandidate)
-  if (bySlug) {
-    return { category_id: bySlug.id, category_slug: bySlug.slug, category_name: bySlug.name }
+  return { ...UNASSIGNED_CATEGORY }
+}
+
+/** Build a display name when the parser left name blank (common on sparse accessory lines). */
+export function deriveWorkbenchProductName(row: {
+  name: string
+  sku: string
+  description: string
+  section: string
+  trade_code: string
+}): string {
+  const direct = row.name.trim()
+  if (direct) return direct.slice(0, 300)
+
+  const itemLine =
+    row.description
+      .split('\n')
+      .find((l) => l.startsWith('Item: '))
+      ?.slice(6)
+      .trim() ?? ''
+  if (itemLine) return itemLine.slice(0, 300)
+
+  const specLine =
+    row.description
+      .split('\n')
+      .find((l) => l.startsWith('Specification: '))
+      ?.slice(15)
+      .trim() ?? ''
+  if (specLine) return specLine.slice(0, 300)
+
+  const sku = row.sku.trim()
+  const code = row.trade_code.trim()
+  if (sku && code && sku !== code) return `${code} — ${sku}`.slice(0, 300)
+  if (sku) return sku.slice(0, 300)
+  if (code) return code.slice(0, 300)
+
+  const section = row.section.trim()
+  if (section && !/^tealbury catalogue$/i.test(section) && !/^uncategorised$/i.test(section)) {
+    return section.slice(0, 300)
   }
 
-  const partial = categories.find((c) => {
-    const cn = c.name.toLowerCase()
-    const sn = name.toLowerCase()
-    return cn.includes(sn) || sn.includes(cn)
+  return ''
+}
+
+export function fillMissingWorkbenchProductNames(rows: PricelistWorkbenchRow[]): PricelistWorkbenchRow[] {
+  return rows.map((r) => {
+    const name = deriveWorkbenchProductName(r)
+    return name && !r.name.trim() ? { ...r, name } : r
   })
-  if (partial) {
-    return { category_id: partial.id, category_slug: partial.slug, category_name: partial.name }
-  }
-
-  return {
-    category_id: null,
-    category_slug: slugCandidate,
-    category_name: name,
-  }
 }
 
 export function parsedToWorkbenchRow(
@@ -114,7 +175,7 @@ export function parsedToWorkbenchRow(
   id?: string
 ): PricelistWorkbenchRow {
   const catalog_program = programFromParsed(parsed, fileSource)
-  const section = parsed.categoryName || 'Uncategorised'
+  const section = parsed.categoryName || ''
   const door_range = doorRangeFromParsed(parsed)
   const trade_code = tradeCodeFromParsed(parsed)
   const descParts = parsed.description.split('\n')
@@ -124,7 +185,7 @@ export function parsedToWorkbenchRow(
     code: trade_code,
   })
 
-  return {
+  const draft: PricelistWorkbenchRow = {
     id: id ?? crypto.randomUUID(),
     source: fileSource,
     catalog_program,
@@ -146,6 +207,9 @@ export function parsedToWorkbenchRow(
     selected: false,
     options: { ...parsed.options },
   }
+
+  const name = deriveWorkbenchProductName(draft)
+  return name ? { ...draft, name } : draft
 }
 
 export function workbenchToExportRow(row: PricelistWorkbenchRow): CatalogueExportRow {
@@ -197,6 +261,7 @@ export function autoMapWorkbenchCategories(
       description: itemLine || r.name,
       code: r.trade_code,
     })
+    if (!cat.category_id) return r
     return {
       ...r,
       category_id: cat.category_id,
@@ -219,39 +284,12 @@ export function sectionToDefaultSlug(section: string, source: PricelistSource): 
   return slugifyCategoryName(section).slice(0, 80)
 }
 
-async function ensureCategoryId(
-  slug: string,
-  name: string,
-  slugToId: Map<string, string>
-): Promise<string | null> {
-  const existing = slugToId.get(slug)
-  if (existing) return existing
-  const { data: newCat, error: catErr } = await supabase
-    .from('categories')
-    .insert({
-      name: name.slice(0, 200) || slug.replace(/-/g, ' '),
-      slug: slug.slice(0, 80),
-      sort_order: 0,
-    })
-    .select('id')
-    .single()
-  if (catErr) return null
-  if (newCat?.id) {
-    slugToId.set(slug, newCat.id)
-    return newCat.id
-  }
-  return null
-}
-
-/** Upsert workbench rows into products (by SKU). Creates categories when slug is new. */
+/** Upsert workbench rows into products (by SKU). Only uses categories you assigned — never creates new ones. */
 export async function publishWorkbenchRows(
   rows: PricelistWorkbenchRow[],
   opts?: { onlySelected?: boolean; skipMissingSku?: boolean }
 ): Promise<PublishWorkbenchResult> {
   const result: PublishWorkbenchResult = { inserted: 0, updated: 0, skipped: 0, errors: [] }
-  const slugToId = new Map<string, string>(
-    (await supabase.from('categories').select('id, slug')).data?.map((c) => [c.slug, c.id]) ?? []
-  )
 
   const toPublish = opts?.onlySelected ? rows.filter((r) => r.selected) : rows
   if (!toPublish.length) {
@@ -269,19 +307,23 @@ export async function publishWorkbenchRows(
       continue
     }
 
-    const catSlug = (row.category_slug || slugifyCategoryName(row.category_name || 'other')).slice(0, 80)
-    const catName = row.category_name || catSlug.replace(/-/g, ' ')
-    const catId =
-      row.category_id ?? slugToId.get(catSlug) ?? (await ensureCategoryId(catSlug, catName, slugToId))
+    const displayName = (row.name.trim() || deriveWorkbenchProductName(row)).trim()
+    if (!displayName) {
+      result.skipped++
+      result.errors.push(`Skipped ${sku}: missing product name (edit name before publish)`)
+      continue
+    }
+
+    const catId = row.category_id?.trim() || null
     if (!catId) {
       result.skipped++
-      result.errors.push(`Category ${catSlug}: could not create or resolve`)
+      result.errors.push(`Skipped ${sku}: no category assigned (pick one in workbench — we never auto-create categories)`)
       continue
     }
 
     const payload = {
       category_id: catId,
-      name: row.name.slice(0, 255),
+      name: displayName.slice(0, 255),
       description: row.description || null,
       sku,
       unit_price: Math.max(0, row.unit_price),

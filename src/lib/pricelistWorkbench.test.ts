@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { mapTealburyAccessoryToCategory } from '@/lib/tealburyPricelistParse'
-import { suggestCategoryForPricelistRow } from '@/lib/pricelistWorkbench'
+import {
+  deriveWorkbenchProductName,
+  suggestCategoryForPricelistRow,
+} from '@/lib/pricelistWorkbench'
 import type { CategoryRow } from '@/types/database'
 
 const categories: CategoryRow[] = [
@@ -37,5 +40,28 @@ describe('suggestCategoryForPricelistRow', () => {
     })
     expect(r.category_name).toBe('Plinth')
     expect(r.category_id).toBe('1')
+  })
+
+  it('does not invent categories when no match exists', () => {
+    const r = suggestCategoryForPricelistRow('ACCESSORIES', categories, 'tealbury', {
+      description: 'Modern cornice 2.4m',
+      code: 'MC240',
+    })
+    expect(r.category_id).toBeNull()
+    expect(r.category_slug).toBe('')
+    expect(r.category_name).toBe('')
+  })
+})
+
+describe('deriveWorkbenchProductName', () => {
+  it('uses Item line from description when name is empty', () => {
+    const name = deriveWorkbenchProductName({
+      name: '',
+      sku: 'TB-1',
+      description: 'Section: ACCESSORIES\nItem: 150 Plinth\nDimensions: H 150mm',
+      section: 'ACCESSORIES',
+      trade_code: 'PL150',
+    })
+    expect(name).toBe('150 Plinth')
   })
 })

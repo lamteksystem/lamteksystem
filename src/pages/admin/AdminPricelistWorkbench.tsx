@@ -8,6 +8,7 @@ import {
   applyCategoryToRows,
   autoMapWorkbenchCategories,
   downloadWorkbenchTemplateXlsx,
+  fillMissingWorkbenchProductNames,
   parsedToWorkbenchRow,
   publishWorkbenchRows,
   type PricelistSource,
@@ -186,15 +187,17 @@ export default function AdminPricelistWorkbench() {
         setTimeout(resolve, 0)
       })
 
-      const workbench = parsed.map((p) => parsedToWorkbenchRow(p, source, cats))
+      const workbench = fillMissingWorkbenchProductNames(
+        parsed.map((p) => parsedToWorkbenchRow(p, source, cats)),
+      )
       setRows((prev) => [...prev.filter((r) => r.source !== source), ...workbench])
       setWarnings((prev) => [...prev, ...w.map((line) => `[${source}] ${line}`)])
       showSuccess(
         'Import complete',
         `Loaded ${workbench.length} ${source === 'tealbury' ? 'Tealbury' : 'Lamtek trade'} row(s) from ${file.name}. ` +
           (source === 'tealbury'
-            ? 'Each door/range sheet is imported separately; accessories are mapped to Cornice, Plinth, Panels, etc. where possible.'
-            : 'Multi-finish columns use the lowest price as unit price.')
+            ? 'Each door/range sheet is imported separately. Categories are only filled when a matching category already exists in your catalogue — otherwise assign them yourself before publish.'
+            : 'Multi-finish columns use the lowest price as unit price. Categories match existing names only.')
       )
       setSourceImportProgress(source, 100, `Complete — ${workbench.length} row(s) loaded`, file.name)
       goToPage(1)

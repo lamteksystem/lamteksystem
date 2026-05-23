@@ -202,6 +202,21 @@ function sectionFromCustomerHeaderRow(row: unknown[], codeCol: number): string {
   return s || 'Tealbury catalogue'
 }
 
+/** Display name for a parsed Tealbury/Lamtek trade line (code + optional size + description). */
+export function buildTealburyProductName(
+  code: string,
+  desc?: string | null,
+  extra?: string | null,
+): string {
+  const parts = [
+    code.trim(),
+    extra?.trim() || null,
+    desc?.trim() ? desc.trim().slice(0, 160) : null,
+  ].filter(Boolean) as string[]
+  const joined = parts.join(' — ').slice(0, 300)
+  return joined || code.trim().slice(0, 300)
+}
+
 /**
  * Map a Tealbury "ACCESSORIES" line (description + code) onto the user's specialised category set
  * instead of dumping everything in a single "Accessories" bucket.
@@ -270,7 +285,7 @@ function parseTealburyCustomerCatalogMatrix(
     const wm = colMap.w >= 0 ? trimCell(line[colMap.w]) : ''
     const dm = colMap.d >= 0 ? trimCell(line[colMap.d]) : ''
     const dims = [hm && `H ${hm}mm`, wm && `W ${wm}mm`, dm && `D ${dm}mm`].filter(Boolean).join(', ')
-    const name = [code, desc ? desc.slice(0, 160) : null].filter(Boolean).join(' — ').slice(0, 300)
+    const name = buildTealburyProductName(code, desc)
     const description = [`Section: ${section}`, desc ? `Item: ${desc}` : null, dims ? `Dimensions: ${dims}` : null]
       .filter(Boolean)
       .join('\n')
@@ -438,7 +453,7 @@ function parseKitchenMatrix(data: unknown[][], sheetLabel: string): TealburyPars
 
     const prices = Object.values(finishPrices)
     const unitPrice = Math.min(...prices)
-    const name = [code, size || null, desc ? desc.slice(0, 120) : null].filter(Boolean).join(' — ').slice(0, 300)
+    const name = buildTealburyProductName(code, desc, size || null)
     const description = [`Section: ${section}`, desc ? `Specification: ${desc}` : null, size ? `Size: ${size}` : null]
       .filter(Boolean)
       .join('\n')
@@ -544,7 +559,7 @@ function parseBedroomMatrix(data: unknown[][], sheetLabel: string): TealburyPars
     if (!Object.keys(finishPrices).length) continue
 
     const unitPrice = Math.min(...Object.values(finishPrices))
-    const name = [code, desc ? desc.slice(0, 200) : null].filter(Boolean).join(' — ').slice(0, 300)
+    const name = buildTealburyProductName(code, desc)
     const description = [`Section: ${section}`, desc ? `Specification: ${desc}` : null].filter(Boolean).join('\n')
 
     const baseOpts = {

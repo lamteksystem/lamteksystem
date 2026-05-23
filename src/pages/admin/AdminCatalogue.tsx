@@ -53,6 +53,7 @@ import {
   type ImageMappingRow,
   type ImageMatchResult,
 } from '@/lib/catalogue-import-export'
+import { repairEmptyCatalogueProductNames } from '@/lib/catalogProductRepair'
 
 type CatalogueViewType = 'table' | 'grid' | 'list' | 'compact'
 
@@ -107,15 +108,6 @@ const CENTER_ALIGN_COLUMNS = new Set(['image', 'stock', 'active', 'unit_price', 
 /** Price columns use wrapped header labels so they can stay narrow. */
 const WRAP_HEADER_COLUMNS = new Set(['unit_price', 'cost_price', 'stock'])
 
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '') || 'other'
-}
-
 export default function AdminCatalogue() {
   const { tableDensity, rowsPerPage } = useAdminUi()
   const { allowed: canEditCatalogue } = usePermission('admin.catalogue', 'edit')
@@ -169,6 +161,8 @@ export default function AdminCatalogue() {
   } = useAssemblyPartTypes(true)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [nameRepairing, setNameRepairing] = useState(false)
+  const [nameRepairMessage, setNameRepairMessage] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
   const [imageAssignResult, setImageAssignResult] = useState<{ updated: number; skipped: string[] } | null>(null)
   const [imageMappingRows, setImageMappingRows] = useState<ImageMappingRow[] | null>(null)
@@ -571,32 +565,24 @@ export default function AdminCatalogue() {
       (await supabase.from('categories').select('id, slug')).data?.map((c) => [c.slug, c.id]) ?? []
     )
 
+    const nameToId = new Map(
+      (await supabase.from('categories').select('id, name')).data?.map((c) => [
+        c.name.trim().toLowerCase(),
+        c.id,
+      ]) ?? [],
+    )
+
     for (const row of rows) {
-      const catSlug = row.category_slug || slugify(row.category_name || 'other')
-      let catId = slugToId.get(catSlug)
-      if (!catId) {
-        const { data: newCat, error: catErr } = await supabase
-          .from('categories')
-          .insert({
-            name: row.category_name || catSlug.replace(/-/g, ' '),
-            slug: catSlug,
-            sort_order: 0,
-          })
-          .select('id')
-          .single()
-        if (catErr) {
-          result.errors.push(`Category ${catSlug}: ${catErr.message}`)
-          result.skipped++
-          continue
-        }
-        const newId = newCat?.id
-        if (newId) {
-          catId = newId
-          slugToId.set(catSlug, newId)
-        }
+      const catSlug = (row.category_slug || '').trim()
+      let catId = catSlug ? slugToId.get(catSlug) ?? null : null
+      if (!catId && row.category_name?.trim()) {
+        catId = nameToId.get(row.category_name.trim().toLowerCase()) ?? null
       }
       if (!catId) {
         result.skipped++
+        result.errors.push(
+          `Skipped ${row.sku || row.name}: unknown category "${row.category_name || catSlug || '(empty)'}" — create it in Categories first or leave category blank`,
+        )
         continue
       }
 
@@ -667,6 +653,29 @@ export default function AdminCatalogue() {
     } finally {
       setImporting(false)
       e.target.value = ''
+    }
+  }
+
+  async function repairEmptyProductNames() {
+    if (
+      !window.confirm(
+        'Fill blank product names from their description or SKU (e.g. Tealbury Item: lines)? This updates the database.',
+      )
+    ) {
+      return
+    }
+    setNameRepairing(true)
+    setNameRepairMessage(null)
+    try {
+      const r = await repairEmptyCatalogueProductNames({ catalog_program: CATALOG_PROGRAM.TEALBURY })
+      setNameRepairMessage(
+        r.errors.length
+          ? `Updated ${r.updated} name(s); ${r.errors.length} error(s).`
+          : `Updated ${r.updated} blank name(s); ${r.skipped} already had names.`,
+      )
+      if (r.updated > 0) await load()
+    } finally {
+      setNameRepairing(false)
     }
   }
 
@@ -776,7 +785,7 @@ export default function AdminCatalogue() {
             Lamtek catalogue (CSV or Excel)
           </h3>
           <p className="admin-muted">
-            Standard portal format: same columns as export. Updates products by SKU; creates categories from <code>category_slug</code> / <code>category_name</code>. Lamtek component rows use the default catalogue program unless you set it in the sheet (future).
+            Standard portal format: same columns as export. Updates products by SKU. Categories must already exist — import matches <code>category_slug</code> or <code>category_name</code> and skips rows with unknown categories.
           </p>
           <div className="admin-import-export-actions">
             <div className="admin-export-buttons">
@@ -816,6 +825,17 @@ export default function AdminCatalogue() {
           </div>
           <p className="admin-import-hint">
             Columns: category_slug, category_name, name, description, sku, unit_price, active, image_url, image_alt, is_stock.
+          </p>
+          <p className="admin-import-hint" style={{ marginTop: '0.75rem' }}>
+            <button
+              type="button"
+              className="btn btn-outline btn-small"
+              disabled={nameRepairing || !canEditCatalogue}
+              onClick={() => void repairEmptyProductNames()}
+            >
+              {nameRepairing ? 'Repairing names…' : 'Fix blank Tealbury product names'}
+            </button>
+            {nameRepairMessage ? <span className="admin-muted"> {nameRepairMessage}</span> : null}
           </p>
           {importResult && (
             <div className={`admin-import-result ${importResult.errors.length ? 'has-errors' : ''}`}>

@@ -603,12 +603,9 @@ export function SuggestionsTab({
     try {
       const summary = await rebucketTealburyAccessories()
       const lines = [
-        summary.ensured === 0
-          ? 'All 5 accessory categories already exist.'
-          : `Created ${summary.ensured} new categor${summary.ensured === 1 ? 'y' : 'ies'} (Cornice & Pelmet, Plinth, Panels, Mouldings, Posts).`,
         summary.reassigned === 0
-          ? 'No products needed reassigning — Tealbury accessories already in the right buckets.'
-          : `Re-assigned ${summary.reassigned} Tealbury product${summary.reassigned === 1 ? '' : 's'} into the new accessory categories.`,
+          ? 'No products needed reassigning — Tealbury accessories already in the right buckets (or destination categories are missing).'
+          : `Re-assigned ${summary.reassigned} Tealbury product${summary.reassigned === 1 ? '' : 's'} into Cornice & Pelmet, Plinth, Panels, Mouldings, or Posts where those categories exist.`,
         `Skipped ${summary.skipped} product${summary.skipped === 1 ? '' : 's'} (not a Tealbury accessory).`,
       ]
       setResult({

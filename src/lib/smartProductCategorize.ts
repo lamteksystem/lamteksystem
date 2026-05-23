@@ -13,6 +13,8 @@ import {
   type LearningIndex,
 } from '@/lib/smartCategoryLearning'
 import { getCachedSmartCategorySettings } from '@/lib/smartCategorySettings'
+import { mapTealburyAccessoryToCategory } from '@/lib/tealburyPricelistParse'
+import { slugifyCategoryName } from '@/lib/categoryAdmin'
 
 export interface SmartCategorySuggestion {
   productId: string
@@ -88,6 +90,24 @@ function scoreNameMatch(productName: string, categoryName: string): number {
   return ratio
 }
 
+function isGenericAccessoriesCategory(categoryName: string): boolean {
+  return /^accessories$/i.test(categoryName.trim())
+}
+
+function findCategoryByDisplayName(
+  categories: CategoryRow[],
+  targetName: string,
+): CategoryRow | null {
+  const t = targetName.trim().toLowerCase()
+  if (!t) return null
+  const slug = slugifyCategoryName(targetName)
+  return (
+    categories.find((c) => c.name.trim().toLowerCase() === t) ??
+    categories.find((c) => c.slug === slug) ??
+    null
+  )
+}
+
 export interface SuggestOptions {
   browseMode?: 'category' | 'range'
   learning?: LearningIndex
@@ -108,13 +128,47 @@ export function suggestCategoryForProduct(
 
   const haystack = [product.name, product.description, product.sku].filter(Boolean).join(' ')
 
+  const tealburyAccessoryTarget = mapTealburyAccessoryToCategory(haystack, product.sku ?? '')
+  if (tealburyAccessoryTarget) {
+    const exact = findCategoryByDisplayName(categories, tealburyAccessoryTarget)
+    if (exact && pool.some((c) => c.id === exact.id)) {
+      if (exact.id === product.category_id) return null
+      return {
+        productId: product.id,
+        productName: product.name,
+        productText: haystack,
+        currentCategoryId: product.category_id,
+        suggestedCategoryId: exact.id,
+        suggestedCategoryName: exact.name,
+        score: 0.95,
+        confidence: 'high',
+        learningBoost: 0,
+      }
+    }
+  }
+
   const settings = getCachedSmartCategorySettings()
   const boosts =
     options?.learning && settings.boostEnabled ? learningBoosts(options.learning, haystack) : null
   let best: { category: CategoryRow; score: number; boost: number } | null = null
 
   for (const category of pool) {
-    const baseScore = scoreNameMatch(haystack, category.name)
+    if (
+      tealburyAccessoryTarget &&
+      isGenericAccessoriesCategory(category.name) &&
+      !isGenericAccessoriesCategory(tealburyAccessoryTarget)
+    ) {
+      continue
+    }
+
+    let baseScore = scoreNameMatch(haystack, category.name)
+    if (tealburyAccessoryTarget) {
+      const target = tealburyAccessoryTarget.toLowerCase()
+      const catName = category.name.toLowerCase()
+      if (catName === target || catName.includes(target) || target.includes(catName)) {
+        baseScore = Math.max(baseScore, 0.9)
+      }
+    }
     const learnWeight = boosts?.get(category.id) ?? 0
     // Cap the learning boost so a single accidental confirmation can't dominate.
     const learnBoost = Math.min(

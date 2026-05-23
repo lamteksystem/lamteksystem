@@ -9,12 +9,7 @@
 import { supabase } from '@/lib/supabase'
 import { mapTealburyAccessoryToCategory } from '@/lib/tealburyPricelistParse'
 import { saveProductCategories } from '@/lib/productCategories'
-import {
-  createCategory,
-  fetchAllCategories,
-  slugifyCategoryName,
-  updateCategory,
-} from '@/lib/categoryAdmin'
+import { fetchAllCategories, slugifyCategoryName } from '@/lib/categoryAdmin'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
@@ -41,35 +36,14 @@ function nameMatches(category: CategoryRow, target: { name: string; slug: string
   )
 }
 
-/** Ensure the 5 destination categories exist as top-level "universal" cross-range categories. */
-export async function ensureTealburyAccessoryCategories(
-  existing: CategoryRow[],
-): Promise<{ map: Map<string, string>; ensured: number; errors: string[] }> {
+/** Map Tealbury accessory target names to existing category ids only (never creates categories). */
+export function mapExistingTealburyAccessoryCategories(existing: CategoryRow[]): Map<string, string> {
   const map = new Map<string, string>()
-  const errors: string[] = []
-  let ensured = 0
-
   for (const target of TEALBURY_ACCESSORY_TARGETS) {
-    let cat = existing.find((c) => nameMatches(c, target))
-    if (!cat) {
-      const { category, error } = await createCategory({
-        name: target.name,
-        slug: target.slug,
-        category_kind: 'universal',
-      })
-      if (error || !category) {
-        errors.push(`${target.name}: ${error ?? 'create failed'}`)
-        continue
-      }
-      cat = category
-      ensured += 1
-    } else if (cat.category_kind !== 'universal') {
-      await updateCategory(cat.id, { category_kind: 'universal' })
-    }
-    map.set(target.name, cat.id)
+    const cat = existing.find((c) => nameMatches(c, target))
+    if (cat) map.set(target.name, cat.id)
   }
-
-  return { map, ensured, errors }
+  return map
 }
 
 function looksLikeTealburyAccessory(product: ProductRow): boolean {
@@ -86,10 +60,13 @@ export async function rebucketTealburyAccessories(): Promise<TealburyRebucketSum
   const summary: TealburyRebucketSummary = { ensured: 0, reassigned: 0, skipped: 0, errors: [] }
 
   const categories = await fetchAllCategories()
-  const { map, ensured, errors: ensureErrors } = await ensureTealburyAccessoryCategories(categories)
-  summary.ensured = ensured
-  summary.errors.push(...ensureErrors)
-  if (map.size === 0) return summary
+  const map = mapExistingTealburyAccessoryCategories(categories)
+  if (map.size === 0) {
+    summary.errors.push(
+      'No Tealbury accessory destination categories found (Cornice & Pelmet, Plinth, Panels, Mouldings, Posts). Create them in Categories first.',
+    )
+    return summary
+  }
 
   const { data, error } = await supabase
     .from('products')

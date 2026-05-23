@@ -74,6 +74,16 @@ describe('pricelistWorkbenchRules', () => {
     expect(rule?.conditions.some((c) => c.op === 'sku_appears_in_name')).toBe(true)
   })
 
+  it('parses remove phrase from all product descriptions', () => {
+    const { rule, error } = parseSmartCommandPrompt(
+      'remove the phrase "Section:" from all product descriptions'
+    )
+    expect(error).toBeUndefined()
+    expect(rule?.action).toBe('strip_text_from_field')
+    expect(rule?.actionParam).toBe('description:Section:')
+    expect(rule?.conditions).toHaveLength(0)
+  })
+
   it('parses remove Section: from description for each product', () => {
     const { rule, error } = parseSmartCommandPrompt(
       'remove the word "Section:" from the description of each product'

@@ -8,6 +8,13 @@ import {
   type SavedPromptPreset,
 } from '@/lib/pricelistWorkbenchPromptPresets'
 import {
+  bestPromptSuggestion,
+  buildPromptAssist,
+  type PromptAssistResult,
+  type PromptAssistSuggestion,
+} from '@/lib/pricelistWorkbenchPromptAssist'
+import {
+  describeRule,
   parseSmartCommandPrompt,
   simulateRuleOnRows,
   type RuleSimulationResult,
@@ -43,6 +50,8 @@ export default function PricelistWorkbenchQuickCommand({
   const [presetName, setPresetName] = useState('')
   const [showSaveForm, setShowSaveForm] = useState(false)
   const [refineAddition, setRefineAddition] = useState('')
+  const [assist, setAssist] = useState<PromptAssistResult | null>(null)
+  const [highlightedFix, setHighlightedFix] = useState<PromptAssistSuggestion | null>(null)
 
   useEffect(() => {
     void (async () => {
@@ -56,7 +65,37 @@ export default function PricelistWorkbenchQuickCommand({
     setPendingRule(null)
     setShowSaveForm(false)
     setRefineAddition('')
+    setAssist(null)
+    setHighlightedFix(null)
   }, [])
+
+  function applySimulationResult(
+    rule: WorkbenchRule,
+    sim: RuleSimulationResult,
+    promptText: string = prompt
+  ) {
+    const targetIds = resolveTargetIds()
+    const assistResult = buildPromptAssist(promptText, rule, sim, rows, targetIds, categories)
+    const best = bestPromptSuggestion(assistResult)
+    setPendingRule(rule)
+    setSimulation(sim)
+    setAssist(assistResult)
+    setHighlightedFix(
+      assistResult.needsAttention && best && best.simulation.wouldChange > 0 ? best : null
+    )
+    setPhase('simulated')
+    setShowSaveForm(false)
+    setRefineAddition('')
+  }
+
+  function applySuggestion(sug: PromptAssistSuggestion) {
+    setPrompt(sug.canonicalPrompt)
+    applySimulationResult(sug.rule, sug.simulation, sug.canonicalPrompt)
+    if (sug.simulation.wouldChange > 0) {
+      setPhase('approved')
+      setPresetName(defaultPromptPresetName(sug.canonicalPrompt))
+    }
+  }
 
   function resolveTargetIds(): Set<string> | undefined {
     if (scope === 'all') return undefined
@@ -85,11 +124,7 @@ export default function PricelistWorkbenchQuickCommand({
       return
     }
     const sim = simulateRuleOnRows(rows, rule, targetIds, categories)
-    setPendingRule(rule)
-    setSimulation(sim)
-    setPhase('simulated')
-    setShowSaveForm(false)
-    setRefineAddition('')
+    applySimulationResult(rule, sim)
   }
 
   function runWithoutTest() {
@@ -113,10 +148,7 @@ export default function PricelistWorkbenchQuickCommand({
     }
     const targetIds = resolveTargetIds()
     const sim = simulateRuleOnRows(rows, rule, targetIds, categories)
-    setPendingRule(rule)
-    setSimulation(sim)
-    setPhase('simulated')
-    setShowSaveForm(false)
+    applySimulationResult(rule, sim)
   }
 
   async function saveAsPreset() {
@@ -166,11 +198,11 @@ export default function PricelistWorkbenchQuickCommand({
     <div className="admin-pricelist-smart-card admin-pricelist-quick-command">
       <h3>
         Quick command
-        <AdminHelpTip text="Write plain English, test with a dry-run simulation, confirm it looks right, then run once or save as a preset. Nothing changes until you run on the draft." />
+        <AdminHelpTip text="Test simulation dry-runs your command. If the parser misread it or nothing would change, the assistant suggests a repaired command — apply the fix and re-test until rows would update." />
       </h3>
       <p className="admin-muted">
-        Describe filters and action in one sentence. Use <strong>Test simulation</strong> to preview matches and
-        sample changes before applying.
+        Describe filters and action in one sentence. <strong>Test simulation</strong> checks the result and
+        troubleshoots automatically when the command would not work as intended.
       </p>
 
       {promptPresets.length > 0 && (
@@ -257,9 +289,74 @@ export default function PricelistWorkbenchQuickCommand({
             </div>
           )}
 
-          {phase === 'simulated' && (
+          {assist?.needsAttention && (
+            <div className="admin-pricelist-simulation-troubleshoot">
+              <h4>Assistant — command would not work as written</h4>
+              <ul className="admin-pricelist-simulation-diagnosis">
+                {assist.diagnosis.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              {highlightedFix && (
+                <div className="admin-pricelist-simulation-fix-card admin-pricelist-simulation-fix-card--primary">
+                  <p className="admin-pricelist-simulation-fix-title">Suggested fix</p>
+                  <p className="admin-muted">{highlightedFix.reason}</p>
+                  <p className="admin-pricelist-simulation-parse">
+                    <strong>Would run as:</strong> {describeRule(highlightedFix.rule)}
+                  </p>
+                  <p className="admin-pricelist-simulation-fix-stats">
+                    Would change <strong>{highlightedFix.simulation.wouldChange}</strong> of{' '}
+                    {highlightedFix.simulation.poolSize} row(s) in scope
+                  </p>
+                  <div className="admin-pricelist-smart-actions">
+                    <button
+                      type="button"
+                      className="btn btn-small"
+                      onClick={() => applySuggestion(highlightedFix)}
+                    >
+                      Apply fix &amp; continue
+                    </button>
+                  </div>
+                </div>
+              )}
+              {assist.suggestions.length > 1 && (
+                <div className="admin-pricelist-simulation-alt-fixes">
+                  <p className="admin-pricelist-simulation-samples-title">Other options</p>
+                  <ul className="admin-pricelist-simulation-fix-list">
+                    {assist.suggestions
+                      .filter((s) => s.id !== highlightedFix?.id)
+                      .map((sug) => (
+                        <li key={sug.id}>
+                          <div>
+                            <strong>{sug.label}</strong>
+                            <p className="admin-muted">{sug.reason}</p>
+                            <p className="admin-muted">
+                              {describeRule(sug.rule)} — would change {sug.simulation.wouldChange} row(s)
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-small btn-outline"
+                            onClick={() => applySuggestion(sug)}
+                          >
+                            Try this
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+              <div className="admin-pricelist-smart-actions">
+                <button type="button" className="btn btn-small btn-ghost" onClick={() => setPhase('refining')}>
+                  Edit command manually
+                </button>
+              </div>
+            </div>
+          )}
+
+          {phase === 'simulated' && !assist?.needsAttention && simulation.wouldChange > 0 && (
             <div className="admin-pricelist-simulation-outcome">
-              <p>Did this simulation match what you wanted?</p>
+              <p>Simulation looks good — ready to apply.</p>
               <div className="admin-pricelist-smart-actions">
                 <button
                   type="button"
@@ -269,17 +366,21 @@ export default function PricelistWorkbenchQuickCommand({
                     setPresetName(defaultPromptPresetName(prompt))
                   }}
                 >
-                  Yes, looks right
+                  Continue — run or save
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-small btn-outline"
-                  onClick={() => {
-                    resetFlow()
-                    onNotify('', 'Adjust the command and run Test simulation again.')
-                  }}
-                >
-                  No, needs changes
+                <button type="button" className="btn btn-small btn-outline" onClick={() => setPhase('refining')}>
+                  Refine command
+                </button>
+              </div>
+            </div>
+          )}
+
+          {phase === 'simulated' && !assist?.needsAttention && simulation.wouldChange === 0 && (
+            <div className="admin-pricelist-simulation-outcome">
+              <p>No rows would change. Adjust filters or wording, then test again.</p>
+              <div className="admin-pricelist-smart-actions">
+                <button type="button" className="btn btn-small btn-outline" onClick={() => setPhase('refining')}>
+                  Refine command
                 </button>
               </div>
             </div>

@@ -554,7 +554,44 @@ function parseStripFieldFromPrompt(lower: string, raw: string): StripTextField {
   return 'description'
 }
 
+/** User wants to remove literal text from description/name/sku — not delete rows. */
+function looksLikeStripFromFieldPrompt(lower: string, raw: string): boolean {
+  if (!/\b(remove|strip|delete)\b/.test(lower)) return false
+  if (!/\bfrom\b/.test(lower)) return false
+  if (!/\b(descriptions?|names?|skus?)\b/.test(lower)) return false
+  if (/\bfrom\s+(?:the\s+)?(?:workbench|list|draft)\b/.test(lower)) return false
+  return (
+    /\b(phrase|word|text)\b/.test(lower) ||
+    /"[^"]+"/.test(raw) ||
+    /\bfrom\s+(?:all\s+)?(?:product\s+)?descriptions?\b/i.test(raw)
+  )
+}
+
 function parseAction(lower: string, raw: string, quoted: string[]): ParsedAction {
+  if (looksLikeStripFromFieldPrompt(lower, raw)) {
+    const field = parseStripFieldFromPrompt(lower, raw)
+    const fromAllDescriptions = /\bfrom\s+(?:all\s+)?(?:product\s+)?descriptions?\b/i.test(raw)
+    const removePhraseFromDescriptions = raw.match(
+      /\b(?:remove|strip|delete)\s+(?:the\s+)?(?:word|text|phrase)\s+"([^"]+)"\s+from\s+(?:all\s+)?(?:product\s+)?descriptions?\b/i
+    )
+    const removePhraseFromField = raw.match(
+      /\b(?:remove|strip|delete)\s+(?:the\s+)?(?:word|text|phrase)\s+"([^"]+)"\s+from\s+(?:all\s+)?(?:product\s+)?(description|name|sku)s?\b/i
+    )
+    const text =
+      removePhraseFromDescriptions?.[1] ??
+      removePhraseFromField?.[1] ??
+      quoted[0] ??
+      raw.match(/\b(?:word|text|phrase)\s+"([^"]+)"/i)?.[1]
+    if (text) {
+      const resolvedField =
+        removePhraseFromField?.[2]?.toLowerCase() as StripTextField | undefined
+      return {
+        action: 'strip_text_from_field',
+        actionParam: `${resolvedField ?? (fromAllDescriptions ? 'description' : field)}:${text}`,
+      }
+    }
+  }
+
   const assignMatch =
     lower.match(
       /\b(?:assign(?:\s+category)?|categor(?:y|ise|ize)(?:\s+as)?|put\s+in(?:to)?)\s+(?:to\s+)?(?:"([^"]+)"|([a-z][\w\s&/-]{2,40}))/
@@ -582,7 +619,7 @@ function parseAction(lower: string, raw: string, quoted: string[]): ParsedAction
     }
   }
 
-  if (isStripTextCommand(lower)) {
+  if (isStripTextCommand(lower, raw) && !looksLikeStripFromFieldPrompt(lower, raw)) {
     const field = parseStripFieldFromPrompt(lower, raw)
     const text =
       quoted[0] ??
@@ -621,22 +658,32 @@ function pushUniqueCondition(conditions: WorkbenchCondition[], cond: WorkbenchCo
   conditions.push(cond)
 }
 
-function isStripTextCommand(lower: string): boolean {
+function isStripTextCommand(lower: string, raw = ''): boolean {
+  if (looksLikeStripFromFieldPrompt(lower, raw)) return true
   const scrubbed = lower
     .replace(/\beach\s+product\b/g, ' ')
     .replace(/\bevery\s+product\b/g, ' ')
     .replace(/\ball\s+products?\b/g, ' ')
+    .replace(/\bproduct\s+descriptions?\b/g, ' field-descriptions ')
+    .replace(/\bproduct\s+names?\b/g, ' field-names ')
   return (
     /\b(remove|strip|delete)\b/.test(lower) &&
-    /\b(description|name|sku)\b/.test(lower) &&
+    /\b(description|name|sku|field-descriptions|field-names)\b/.test(lower) &&
     !/\bfrom\s+(?:the\s+)?(?:workbench|list|draft)\b/.test(lower) &&
     !/\b(remove|delete)\s+(?:all\s+)?(?:row|product|item|line)s?\b/.test(scrubbed)
   )
 }
 
-function parseFieldConditions(lower: string, raw: string, quoted: string[]): WorkbenchCondition[] {
+function parseFieldConditions(
+  lower: string,
+  raw: string,
+  quoted: string[],
+  action: WorkbenchActionType,
+  actionParam?: string
+): WorkbenchCondition[] {
   const conditions: WorkbenchCondition[] = []
-  const stripCommand = isStripTextCommand(lower)
+  const stripCommand = action === 'strip_text_from_field' || isStripTextCommand(lower, raw)
+  const stripPhrase = parseStripTextActionParam(actionParam)?.text?.toLowerCase()
 
   if (/\btealbury\b/.test(lower)) {
     pushUniqueCondition(conditions, { field: 'source', op: 'equals', value: 'tealbury' })
@@ -689,6 +736,7 @@ function parseFieldConditions(lower: string, raw: string, quoted: string[]): Wor
   if (!stripCommand) {
     for (const q of quoted) {
       if (/no doors/i.test(q)) continue
+      if (stripPhrase && q.toLowerCase() === stripPhrase) continue
       if (/\bsection\b/.test(lower) && !conditions.some((c) => c.field === 'section' && c.value === q)) {
         pushUniqueCondition(conditions, { field: 'section', op: 'contains', value: q })
       } else if (!conditions.some((c) => c.field === 'door_range' && c.value === q)) {
@@ -730,7 +778,7 @@ export function parseSmartCommandPrompt(prompt: string): { rule: WorkbenchRule |
   }
 
   const { action, actionParam } = actionParsed
-  const conditions = parseFieldConditions(lower, raw, quoted)
+  const conditions = parseFieldConditions(lower, raw, quoted, action, actionParam)
 
   if (action === 'remove_sku_from_name' && !conditions.some((c) => c.op === 'sku_appears_in_name')) {
     pushUniqueCondition(conditions, { field: 'name', op: 'sku_appears_in_name', value: '' })
@@ -769,17 +817,19 @@ export function sourceLabel(source: PricelistSource): string {
 }
 
 export function describeRule(rule: WorkbenchRule): string {
-  const conds = rule.conditions
-    .map((c) => {
-      if (c.op === 'sku_appears_in_name') return 'SKU appears in name'
-      if (c.op === 'unassigned') return 'category is unassigned'
-      if (c.op === 'empty') return `${c.field} is empty`
-      if (c.op === 'not_empty') return `${c.field} has value`
-      if (c.op === 'greater_than') return `${c.field} > ${c.value}`
-      if (c.op === 'less_than') return `${c.field} < ${c.value}`
-      return `${c.field} ${c.op} "${c.value}"`
-    })
-    .join(rule.matchMode === 'any' ? ' OR ' : ' AND ')
+  const condText = rule.conditions.length
+    ? rule.conditions
+        .map((c) => {
+          if (c.op === 'sku_appears_in_name') return 'SKU appears in name'
+          if (c.op === 'unassigned') return 'category is unassigned'
+          if (c.op === 'empty') return `${c.field} is empty`
+          if (c.op === 'not_empty') return `${c.field} has value`
+          if (c.op === 'greater_than') return `${c.field} > ${c.value}`
+          if (c.op === 'less_than') return `${c.field} < ${c.value}`
+          return `${c.field} ${c.op} "${c.value}"`
+        })
+        .join(rule.matchMode === 'any' ? ' OR ' : ' AND ')
+    : 'all rows in scope'
   const param = rule.actionParam ? ` → ${rule.actionParam}` : ''
-  return `${rule.action}${param}: ${conds}`
+  return `${rule.action}${param}: ${condText}`
 }

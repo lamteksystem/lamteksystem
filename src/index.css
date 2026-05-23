@@ -6667,6 +6667,60 @@ button.ordering-wizard-card {
   margin-bottom: 0.35rem;
 }
 .admin-pricelist-simulation-save input { max-width: 24rem; }
+.admin-pricelist-simulation-troubleshoot {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--lamtek-gray-light);
+}
+.admin-pricelist-simulation-troubleshoot h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.88rem;
+  color: var(--lamtek-warning-text, #92400e);
+}
+.admin-pricelist-simulation-diagnosis {
+  margin: 0 0 0.65rem;
+  padding-left: 1.15rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--lamtek-text, inherit);
+}
+.admin-pricelist-simulation-fix-card {
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--lamtek-gray-light);
+  background: var(--lamtek-surface, #fff);
+  margin-bottom: 0.65rem;
+}
+.admin-pricelist-simulation-fix-card--primary {
+  border-color: color-mix(in srgb, var(--lamtek-gold) 45%, var(--lamtek-gray-light));
+  background: color-mix(in srgb, var(--lamtek-surface) 92%, var(--lamtek-gold) 8%);
+}
+.admin-pricelist-simulation-fix-title {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.admin-pricelist-simulation-fix-stats {
+  margin: 0.35rem 0 0.5rem;
+  font-size: 0.84rem;
+}
+.admin-pricelist-simulation-fix-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.admin-pricelist-simulation-fix-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+  font-size: 0.82rem;
+}
+.admin-pricelist-simulation-fix-list li:last-child { border-bottom: none; }
+.admin-pricelist-simulation-fix-list p { margin: 0.15rem 0 0; }
 .admin-pricelist-preset-list {
   list-style: none;
   margin: 0;

@@ -5400,6 +5400,29 @@ button.ordering-wizard-card {
   z-index: 10100;
   background: rgba(0, 0, 0, 0.55);
 }
+.admin-modal-backdrop--notice {
+  z-index: 10150;
+}
+.admin-modal--notice {
+  max-width: min(420px, calc(100vw - 2rem));
+  padding: 1.35rem 1.5rem 1.25rem;
+  padding-right: 2.25rem;
+  text-align: left;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+}
+.admin-modal--notice-success .admin-notice-modal-title {
+  color: var(--lamtek-success, #15803d);
+}
+.admin-notice-modal-body {
+  margin: 0 0 1.1rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--lamtek-text, inherit);
+}
+.admin-notice-modal-actions {
+  margin: 0;
+  justify-content: flex-end;
+}
 .admin-modal-backdrop--preloaded {
   visibility: hidden;
   pointer-events: none;

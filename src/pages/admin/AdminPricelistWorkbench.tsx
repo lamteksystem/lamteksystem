@@ -17,6 +17,7 @@ import { parseTealburyPricelistWorkbookAsync } from '@/lib/tealburyPricelistPars
 import PricelistSourceImportProgress, {
   type PricelistSourceImportProgressState,
 } from '@/components/admin/PricelistSourceImportProgress'
+import AdminNoticeModal from '@/components/admin/AdminNoticeModal'
 import { useListPagination } from '@/lib/listPagination'
 import { deleteRowsByIds } from '@/lib/pricelistWorkbenchRules'
 import PricelistWorkbenchSmartPanel from '@/components/admin/PricelistWorkbenchSmartPanel'
@@ -37,7 +38,14 @@ export default function AdminPricelistWorkbench() {
     Partial<Record<PricelistSource, PricelistSourceImportProgressState>>
   >({})
   const [message, setMessage] = useState<string | null>(null)
+  const [messageTitle, setMessageTitle] = useState('Done')
   const [error, setError] = useState<string | null>(null)
+
+  function showSuccess(title: string, text: string) {
+    setMessageTitle(title)
+    setMessage(text)
+    setError(null)
+  }
 
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
   const [doorFilter, setDoorFilter] = useState('')
@@ -181,7 +189,8 @@ export default function AdminPricelistWorkbench() {
       const workbench = parsed.map((p) => parsedToWorkbenchRow(p, source, cats))
       setRows((prev) => [...prev.filter((r) => r.source !== source), ...workbench])
       setWarnings((prev) => [...prev, ...w.map((line) => `[${source}] ${line}`)])
-      setMessage(
+      showSuccess(
+        'Import complete',
         `Loaded ${workbench.length} ${source === 'tealbury' ? 'Tealbury' : 'Lamtek trade'} row(s) from ${file.name}. ` +
           (source === 'tealbury'
             ? 'Each door/range sheet is imported separately; accessories are mapped to Cornice, Plinth, Panels, etc. where possible.'
@@ -224,13 +233,13 @@ export default function AdminPricelistWorkbench() {
       return
     }
     setRows((prev) => applyCategoryToRows(prev, ids, cat))
-    setMessage(`Assigned “${cat.name}” to ${ids.size} row(s).`)
-    setError(null)
+    showSuccess('Category assigned', `Assigned “${cat.name}” to ${ids.size} row(s).`)
   }
 
   function runAutoMap(scope: 'all' | 'unassigned') {
     setRows((prev) => autoMapWorkbenchCategories(prev, categories, scope === 'unassigned'))
-    setMessage(
+    showSuccess(
+      'Auto-map complete',
       scope === 'unassigned'
         ? 'Auto-mapped categories for rows without an assigned category.'
         : 'Auto-mapped categories for all rows (matched section names to existing categories).'
@@ -242,8 +251,7 @@ export default function AdminPricelistWorkbench() {
     if (!row) return
     if (!window.confirm(`Remove “${row.sku || row.name}” from the workbench?`)) return
     setRows((prev) => deleteRowsByIds(prev, new Set([id])))
-    setMessage('Row removed from workbench.')
-    setError(null)
+    showSuccess('Row removed', 'Row removed from workbench.')
   }
 
   function deleteBulk(scope: 'selected' | 'filtered') {
@@ -261,14 +269,17 @@ export default function AdminPricelistWorkbench() {
     }
     const ids = new Set(targets.map((r) => r.id))
     setRows((prev) => deleteRowsByIds(prev, ids))
-    setMessage(`Removed ${targets.length} row(s) from workbench.`)
-    setError(null)
+    showSuccess('Rows removed', `Removed ${targets.length} row(s) from workbench.`)
   }
 
   function notifySmart(message: string, err?: string | null) {
-    if (err) setError(err)
-    else setError(null)
-    if (message) setMessage(message)
+    if (err) {
+      setError(err)
+      setMessage(null)
+      return
+    }
+    setError(null)
+    if (message) showSuccess('Command complete', message)
   }
 
   async function runPublish(scope: 'all' | 'selected') {
@@ -286,7 +297,8 @@ export default function AdminPricelistWorkbench() {
     setMessage(null)
     try {
       const res = await publishWorkbenchRows(rows, { onlySelected: scope === 'selected' })
-      setMessage(
+      showSuccess(
+        'Publish complete',
         `Publish complete: ${res.inserted} inserted, ${res.updated} updated, ${res.skipped} skipped.` +
           (res.errors.length ? ` ${res.errors.length} message(s) — see details below.` : '')
       )
@@ -733,7 +745,13 @@ export default function AdminPricelistWorkbench() {
         </>
       )}
 
-      {message && <p className="admin-message-ok">{message}</p>}
+      <AdminNoticeModal
+        open={!!message}
+        title={messageTitle}
+        message={message ?? ''}
+        variant="success"
+        onClose={() => setMessage(null)}
+      />
       {error && (
         <pre className="admin-error admin-pricelist-error" style={{ whiteSpace: 'pre-wrap' }}>
           {error}

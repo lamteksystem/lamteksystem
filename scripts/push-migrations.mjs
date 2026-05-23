@@ -49,7 +49,20 @@ function tryReadDbUrlFile() {
 }
 
 const e = { ...process.env, ...loadEnv() }
-const dbUrl = e.DATABASE_URL || e.DATABASE_POOLER_URL || e.SUPABASE_DB_URL || tryReadDbUrlFile()
+const rawDbUrl = e.DATABASE_URL || e.DATABASE_POOLER_URL || e.SUPABASE_DB_URL || tryReadDbUrlFile()
+
+/** Transaction pooler (:6543) breaks `supabase db push` (prepared statement errors). Use session pooler. */
+function dbUrlForMigrations(url) {
+  if (!url) return url
+  if (/:6543\//.test(url)) {
+    const session = url.replace(/:6543\//, ':5432/')
+    console.log('Using session pooler (:5432) for migrations (transaction pooler :6543 is unsupported).')
+    return session
+  }
+  return url
+}
+
+const dbUrl = dbUrlForMigrations(rawDbUrl)
 if (!dbUrl) {
   console.error(
     'Missing database URL. Add one of:\n' +
@@ -59,7 +72,7 @@ if (!dbUrl) {
   process.exit(1)
 }
 
-const r = spawnSync('npx', ['supabase', 'db', 'push', '--db-url', dbUrl], {
+const r = spawnSync('npx', ['supabase', 'db', 'push', '--db-url', dbUrl, '--yes'], {
   cwd: root,
   stdio: 'inherit',
   shell: true,

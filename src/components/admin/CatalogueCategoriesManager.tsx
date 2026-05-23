@@ -143,23 +143,30 @@ export default function CatalogueCategoriesManager({
   async function remove(c: CategoryRow) {
     const productCount = productCountByCategory.get(c.id) ?? 0
     const childCount = childCountByParent.get(c.id) ?? 0
-    if (productCount > 0 || childCount > 0) {
-      setMessage({
-        type: 'err',
-        text: `Cannot delete "${c.name}" — ${productCount} product(s) and ${childCount} sub-categor(y/ies) still reference it. Re-categorise them first.`,
-      })
-      return
-    }
-    if (!window.confirm(`Delete category "${c.name}"? This cannot be undone.`)) return
+    const impact =
+      productCount > 0 || childCount > 0
+        ? `\n\n• ${productCount} product(s) will lose this category (uncategorised unless they have another).\n• ${childCount} sub-categor${childCount === 1 ? 'y' : 'ies'} will move to top level.`
+        : ''
+    if (!window.confirm(`Delete category "${c.name}"? This cannot be undone.${impact}`)) return
     setBusyId(c.id)
     setMessage(null)
-    const { error } = await deleteCategory(c.id)
+    const result = await deleteCategory(c.id)
     setBusyId(null)
-    if (error) {
-      setMessage({ type: 'err', text: error })
+    if (result.error) {
+      setMessage({ type: 'err', text: result.error })
       return
     }
-    setMessage({ type: 'ok', text: `Deleted "${c.name}".` })
+    const parts = [`Deleted "${c.name}".`]
+    if ((result.productsUncategorised ?? 0) > 0) {
+      parts.push(`${result.productsUncategorised} product(s) uncategorised.`)
+    }
+    if ((result.productsRepointed ?? 0) > 0) {
+      parts.push(`${result.productsRepointed} product(s) kept another category as primary.`)
+    }
+    if ((result.subcategoriesPromoted ?? 0) > 0) {
+      parts.push(`${result.subcategoriesPromoted} sub-categor${result.subcategoriesPromoted === 1 ? 'y' : 'ies'} moved to top level.`)
+    }
+    setMessage({ type: 'ok', text: parts.join(' ') })
     await onChanged()
   }
 
@@ -298,8 +305,8 @@ export default function CatalogueCategoriesManager({
                 const kind = c.category_kind ?? inferCategoryKindFromName(c.name)
                 const productCount = productCountByCategory.get(c.id) ?? 0
                 const childCount = childCountByParent.get(c.id) ?? 0
-                const deletable = productCount === 0 && childCount === 0
                 const isBusy = busyId === c.id
+                const hasReferences = productCount > 0 || childCount > 0
                 return (
                   <tr
                     key={c.id}
@@ -367,12 +374,12 @@ export default function CatalogueCategoriesManager({
                       <button
                         type="button"
                         className="admin-link-button admin-danger"
-                        disabled={isBusy || !deletable}
+                        disabled={isBusy}
                         onClick={() => void remove(c)}
                         title={
-                          deletable
-                            ? 'Delete this category — only available when it has no products and no sub-categories'
-                            : 'Move products & sub-categories out before deleting'
+                          hasReferences
+                            ? `Delete "${c.name}" — ${productCount} product(s) and ${childCount} sub-categor(y/ies) will be updated`
+                            : `Delete "${c.name}"`
                         }
                       >
                         Delete

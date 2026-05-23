@@ -72,17 +72,24 @@ export async function updateCategory(
   return { category: data as CategoryRow, error: null }
 }
 
-/**
- * Delete a category. Returns an error message instead of throwing.
- *
- * Safety: the DB will refuse to delete if products or child categories still reference it, unless
- * those FKs are set to `on delete set null/cascade`. Surface the constraint error to the user so
- * they can move products first.
- */
-export async function deleteCategory(id: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('categories').delete().eq('id', id)
+export type DeleteCategoryResult = {
+  error: string | null
+  productsUncategorised?: number
+  productsRepointed?: number
+  subcategoriesPromoted?: number
+}
+
+/** Delete a category (staff). Products lose this assignment; sole primary becomes uncategorised. */
+export async function deleteCategory(id: string): Promise<DeleteCategoryResult> {
+  const { data, error } = await supabase.rpc('delete_category_admin', { p_category_id: id })
   if (error) return { error: error.message }
-  return { error: null }
+  const row = (data ?? {}) as Record<string, number>
+  return {
+    error: null,
+    productsUncategorised: row.products_uncategorised ?? 0,
+    productsRepointed: row.products_repointed ?? 0,
+    subcategoriesPromoted: row.subcategories_promoted ?? 0,
+  }
 }
 
 /** Product count per category (junction assignments + primary-only products). */

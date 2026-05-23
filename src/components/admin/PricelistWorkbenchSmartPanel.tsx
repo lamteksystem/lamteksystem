@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import PricelistWorkbenchQuickCommand, {
+  type SmartApplyScope,
+} from '@/components/admin/PricelistWorkbenchQuickCommand'
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
 import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
@@ -7,7 +10,6 @@ import {
   applyRuleToRows,
   describeRule,
   filterRowsByRule,
-  parseSmartCommandPrompt,
   WORKBENCH_RULE_PRESETS,
   type WorkbenchActionType,
   type WorkbenchCondition,
@@ -18,7 +20,7 @@ import {
 
 const RULES_PREF_KEY = 'pricelist_workbench_rules_v1'
 
-export type SmartApplyScope = 'all' | 'filtered' | 'selected'
+export type { SmartApplyScope } from '@/components/admin/PricelistWorkbenchQuickCommand'
 
 const FIELD_OPTIONS: { value: WorkbenchMatchField; label: string }[] = [
   { value: 'source', label: 'Source (tealbury/lamtek)' },
@@ -87,7 +89,6 @@ export default function PricelistWorkbenchSmartPanel({
   onNotify,
 }: Props) {
   const [scope, setScope] = useState<SmartApplyScope>('filtered')
-  const [prompt, setPrompt] = useState('')
   const [savedRules, setSavedRules] = useState<WorkbenchRule[]>([])
   const [builderName, setBuilderName] = useState('')
   const [builderMode, setBuilderMode] = useState<'all' | 'any'>('all')
@@ -153,15 +154,6 @@ export default function PricelistWorkbenchSmartPanel({
     onRowsChange(next)
     setLastPreview(describeRule(rule))
     onNotify(result.message)
-  }
-
-  function runPrompt() {
-    const { rule, error } = parseSmartCommandPrompt(prompt)
-    if (!rule || error) {
-      onNotify('', error ?? 'Could not parse command.')
-      return
-    }
-    runRule(rule)
   }
 
   function saveBuilderRule() {
@@ -235,29 +227,14 @@ export default function PricelistWorkbenchSmartPanel({
       </div>
 
       <div className="admin-pricelist-smart-grid">
-        <div className="admin-pricelist-smart-card">
-          <h3>
-            Quick command
-            <AdminHelpTip text="Plain English: say which rows (Tealbury, range, section, unassigned, price) and what to do (delete, assign category, clean names, select, activate)." />
-          </h3>
-          <p className="admin-muted">
-            Describe filters and action in one sentence. Examples: delete all Tealbury &quot;No Doors&quot; rows; assign
-            category &quot;Base units&quot; to unassigned Tealbury rows in section HIGHLINE; remove SKU from Tealbury
-            names where SKU is duplicated; select Lamtek rows with list price over 100.
-          </p>
-          <textarea
-            className="admin-pricelist-prompt"
-            rows={4}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder='e.g. For all unassigned Tealbury rows in section "HIGHLINE BASE UNITS", assign category "Base units"'
-          />
-          <div className="admin-pricelist-smart-actions">
-            <button type="button" className="btn btn-small" onClick={runPrompt}>
-              Run command
-            </button>
-          </div>
-        </div>
+        <PricelistWorkbenchQuickCommand
+          rows={rows}
+          filtered={filtered}
+          categories={categories}
+          scope={scope}
+          onRunRule={runRule}
+          onNotify={onNotify}
+        />
 
         <div className="admin-pricelist-smart-card">
           <h3>Presets</h3>

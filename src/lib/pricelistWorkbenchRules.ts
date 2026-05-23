@@ -354,6 +354,145 @@ export function deleteRowsByIds(rows: PricelistWorkbenchRow[], ids: Set<string>)
   return rows.filter((r) => !ids.has(r.id))
 }
 
+export type RuleSimulationSample = {
+  sku: string
+  name: string
+  detail: string
+}
+
+export type RuleSimulationResult = {
+  rule: WorkbenchRule
+  interpretedAs: string
+  poolSize: number
+  matched: number
+  wouldChange: number
+  message: string
+  samples: RuleSimulationSample[]
+  warnings: string[]
+}
+
+function simulationSampleDetail(
+  before: PricelistWorkbenchRow,
+  after: PricelistWorkbenchRow | undefined,
+  rule: WorkbenchRule
+): string | null {
+  if (rule.action === 'delete') return 'Would remove from workbench draft'
+  if (!after) return null
+
+  switch (rule.action) {
+    case 'assign_category': {
+      if (before.category_id === after.category_id) return null
+      const label = after.category_name || rule.actionParam || 'category'
+      return `Category → ${label}`
+    }
+    case 'remove_sku_from_name': {
+      if (before.name === after.name) return null
+      return `Name: "${before.name}" → "${after.name}"`
+    }
+    case 'strip_text_from_field': {
+      const strip = parseStripTextActionParam(rule.actionParam)
+      if (!strip) return null
+      const b = before[strip.field] as string
+      const a = after[strip.field] as string
+      if (b === a) return null
+      return `${strip.field}: "${b}" → "${a}"`
+    }
+    case 'select':
+      return before.selected === after.selected ? null : 'Would select row'
+    case 'deselect':
+      return before.selected === after.selected ? null : 'Would deselect row'
+    case 'set_active':
+      return before.active === after.active ? null : 'Would set active'
+    case 'set_inactive':
+      return before.active === after.active ? null : 'Would set inactive'
+    default:
+      return null
+  }
+}
+
+/** Dry-run a rule on the current draft (no mutations). */
+export function simulateRuleOnRows(
+  rows: PricelistWorkbenchRow[],
+  rule: WorkbenchRule,
+  targetIds: Set<string> | undefined,
+  categories: CategoryRow[],
+  options?: { sampleLimit?: number }
+): RuleSimulationResult {
+  const sampleLimit = options?.sampleLimit ?? 12
+  const pool = targetIds ? rows.filter((r) => targetIds.has(r.id)) : rows
+  const matched = filterRowsByRule(pool, rule)
+  const warnings: string[] = []
+
+  if (!pool.length) {
+    return {
+      rule,
+      interpretedAs: describeRule(rule),
+      poolSize: 0,
+      matched: 0,
+      wouldChange: 0,
+      message: 'No rows in the chosen scope.',
+      samples: [],
+      warnings,
+    }
+  }
+
+  if (rule.action === 'assign_category' && matched.length) {
+    const cat = findCategoryForRule(categories, rule.actionParam)
+    if (!cat) {
+      warnings.push(
+        `No category matched “${rule.actionParam ?? ''}”. Create or rename the category before running.`
+      )
+    }
+  }
+
+  if (rule.action === 'delete' && matched.length === pool.length && pool.length > 20) {
+    warnings.push('This would delete every row in scope — check filters carefully.')
+  } else if (matched.length > 0 && matched.length >= pool.length * 0.85 && pool.length > 30) {
+    warnings.push(`Matches ${matched.length} of ${pool.length} rows in scope (${Math.round((matched.length / pool.length) * 100)}%).`)
+  }
+
+  const draftCopy = rows.map((r) => ({ ...r }))
+  const { rows: afterRows, result } = applyRuleToRows(draftCopy, rule, targetIds, categories)
+  const afterById = new Map(afterRows.map((r) => [r.id, r]))
+  const samples: RuleSimulationSample[] = []
+
+  for (const row of matched) {
+    if (samples.length >= sampleLimit) break
+    const after = afterById.get(row.id)
+    const detail = simulationSampleDetail(row, after, rule)
+    if (!detail) continue
+    samples.push({ sku: row.sku, name: row.name, detail })
+  }
+
+  if (matched.length > sampleLimit && samples.length < sampleLimit) {
+    for (const row of matched) {
+      if (samples.length >= sampleLimit) break
+      if (samples.some((s) => s.sku === row.sku && s.name === row.name)) continue
+      const detail = simulationSampleDetail(row, afterById.get(row.id), rule)
+      samples.push({
+        sku: row.sku,
+        name: row.name,
+        detail: detail ?? 'Matched (no field change)',
+      })
+    }
+  }
+
+  if (matched.length > 0 && result.changed === 0 && rule.action !== 'delete') {
+    warnings.push('Rows match but nothing would change — check action parameters or field values.')
+  }
+
+  return {
+    rule,
+    interpretedAs: describeRule(rule),
+    poolSize: pool.length,
+    matched: matched.length,
+    wouldChange: result.changed,
+    message: result.message,
+    samples,
+    warnings,
+  }
+}
+
 /** Built-in rules users can run or clone. */
 export const WORKBENCH_RULE_PRESETS: WorkbenchRule[] = [
   {

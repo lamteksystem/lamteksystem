@@ -3,6 +3,7 @@ import {
   applyRuleToRows,
   parseSmartCommandPrompt,
   removeSkuFromName,
+  simulateRuleOnRows,
   WORKBENCH_RULE_PRESETS,
 } from '@/lib/pricelistWorkbenchRules'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
@@ -101,6 +102,34 @@ describe('pricelistWorkbenchRules', () => {
     expect(next[0].description).toBe('HIGHLINE BASE')
     expect(next[1].description).toBe('No prefix here')
     expect(result.changed).toBe(1)
+  })
+
+  it('simulates strip without mutating source rows', () => {
+    const rows = [row({ id: 'a', description: 'Section: HIGHLINE BASE' })]
+    const rule = {
+      id: 'strip',
+      name: 'strip',
+      conditions: [],
+      matchMode: 'all' as const,
+      action: 'strip_text_from_field' as const,
+      actionParam: 'description:Section:',
+    }
+    const sim = simulateRuleOnRows(rows, rule, undefined, [])
+    expect(rows[0].description).toBe('Section: HIGHLINE BASE')
+    expect(sim.wouldChange).toBe(1)
+    expect(sim.samples[0]?.detail).toContain('HIGHLINE BASE')
+  })
+
+  it('simulates delete counts without removing rows', () => {
+    const rows = [
+      row({ id: 'a', door_range: 'No Doors' }),
+      row({ id: 'b', door_range: 'Dawson' }),
+    ]
+    const sim = simulateRuleOnRows(rows, WORKBENCH_RULE_PRESETS[0], undefined, [])
+    expect(rows).toHaveLength(2)
+    expect(sim.matched).toBe(1)
+    expect(sim.wouldChange).toBe(1)
+    expect(sim.samples[0]?.detail).toMatch(/remove/i)
   })
 
   it('parses assign category to unassigned tealbury', () => {

@@ -6567,6 +6567,90 @@ button.ordering-wizard-card {
   resize: vertical;
 }
 .admin-pricelist-smart-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.55rem; }
+.admin-pricelist-quick-command { grid-column: 1 / -1; }
+.admin-pricelist-prompt-presets-bar { margin-bottom: 0.45rem; }
+.admin-pricelist-prompt-presets-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.admin-pricelist-prompt-presets-select { max-width: 22rem; }
+.admin-pricelist-prompt-presets-details { margin-top: 0.65rem; }
+.admin-pricelist-prompt--refine { margin-top: 0.35rem; min-height: 3rem; }
+.admin-pricelist-simulation {
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--lamtek-radius, 8px);
+  border: 1px solid color-mix(in srgb, var(--lamtek-gold) 35%, var(--lamtek-gray-light));
+  background: color-mix(in srgb, var(--lamtek-surface) 94%, var(--lamtek-gold) 6%);
+}
+.admin-pricelist-simulation h4 { margin: 0 0 0.45rem; font-size: 0.88rem; }
+.admin-pricelist-simulation-parse { margin: 0 0 0.5rem; font-size: 0.82rem; }
+.admin-pricelist-simulation-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.25rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+.admin-pricelist-simulation-stats span {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--lamtek-text-muted, #666);
+  font-weight: 600;
+}
+.admin-pricelist-simulation-message { margin: 0 0 0.35rem; font-size: 0.84rem; }
+.admin-pricelist-simulation-warning {
+  margin: 0.25rem 0;
+  font-size: 0.82rem;
+  color: var(--lamtek-warning-text, #92400e);
+}
+.admin-pricelist-simulation-samples-title { margin: 0.5rem 0 0.35rem; font-size: 0.8rem; font-weight: 600; }
+.admin-pricelist-simulation-samples {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 14rem;
+  overflow: auto;
+  font-size: 0.8rem;
+}
+.admin-pricelist-simulation-samples li {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) minmax(8rem, 2fr);
+  gap: 0.2rem 0.5rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+}
+.admin-pricelist-simulation-samples li em {
+  grid-column: 1 / -1;
+  font-style: normal;
+  color: var(--lamtek-text-muted, #555);
+}
+.admin-pricelist-simulation-outcome,
+.admin-pricelist-simulation-followup,
+.admin-pricelist-simulation-refine,
+.admin-pricelist-simulation-save {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--lamtek-gray-light);
+}
+.admin-pricelist-simulation-outcome p,
+.admin-pricelist-simulation-followup p { margin: 0 0 0.45rem; font-size: 0.85rem; font-weight: 600; }
+.admin-pricelist-simulation-save label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.admin-pricelist-simulation-save input { max-width: 24rem; }
 .admin-pricelist-preset-list {
   list-style: none;
   margin: 0;

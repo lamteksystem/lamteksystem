@@ -1,8 +1,10 @@
 import { supabase } from '@/lib/supabase'
 import type { CategoryRow, ProductRow } from '@/types/database'
 import {
+  categoriesForSmartProductAssignment,
   getCategoryKind,
   inferCategoryKindFromName,
+  isCompleteUnitsCategoryName,
   type CategoryKind,
 } from '@/lib/categoryTaxonomy'
 import { saveProductCategories } from '@/lib/productCategories'
@@ -119,11 +121,13 @@ export function suggestCategoryForProduct(
   options?: SuggestOptions,
 ): SmartCategorySuggestion | null {
   const mode = options?.browseMode ?? 'category'
-  const pool = categories.filter((c) => {
-    const kind = getCategoryKind(c)
-    if (mode === 'range') return kind === 'door_range' || kind === 'universal'
-    return kind !== 'door_range'
-  })
+  const pool =
+    mode === 'range'
+      ? categories.filter((c) => {
+          const kind = getCategoryKind(c)
+          return kind === 'door_range' || kind === 'universal'
+        })
+      : categoriesForSmartProductAssignment(categories)
   if (pool.length === 0) return null
 
   const haystack = [product.name, product.description, product.sku].filter(Boolean).join(' ')
@@ -272,6 +276,7 @@ export function suggestCategoryKind(category: CategoryRow): CategoryKind {
 export async function syncInferredCategoryKinds(categories: CategoryRow[]): Promise<number> {
   let updated = 0
   for (const c of categories) {
+    if (isCompleteUnitsCategoryName(c.name)) continue
     const row = c as CategoryRow & { category_kind?: string }
     if (row.category_kind && row.category_kind !== 'product_type') continue
     const inferred = suggestCategoryKind(c)

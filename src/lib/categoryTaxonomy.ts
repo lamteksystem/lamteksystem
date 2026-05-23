@@ -33,7 +33,13 @@ export const KNOWN_DOOR_RANGE_PATTERNS: RegExp[] = [
   /\bhamilton\b/i,
 ]
 
+/** Product-type buckets that must never be inferred as kitchen ranges or cross-range. */
+export function isCompleteUnitsCategoryName(name: string): boolean {
+  return /^complete(\s+units?)?$/i.test(name.trim())
+}
+
 export function inferCategoryKindFromName(name: string): CategoryKind {
+  if (isCompleteUnitsCategoryName(name)) return 'product_type'
   const n = name.toLowerCase()
   if (
     KNOWN_DOOR_RANGE_PATTERNS.some((re) => re.test(n)) ||
@@ -56,6 +62,33 @@ export function categoryKindLabel(kind: CategoryKind): string {
   if (kind === 'door_range') return 'Kitchen range'
   if (kind === 'universal') return 'Cross-range'
   return 'Product category'
+}
+
+/** True when smart categorise may assign products to this category (kitchen ranges excluded). */
+export function isAssignableProductCategory(category: CategoryRow): boolean {
+  const kind = getCategoryKind(category)
+  if (kind !== 'door_range') return true
+  return isCompleteUnitsCategoryName(category.name)
+}
+
+/** Categories shown in smart categorise pickers and used for suggestion scoring. */
+export function categoriesForSmartProductAssignment(categories: CategoryRow[]): CategoryRow[] {
+  return [...categories]
+    .filter(isAssignableProductCategory)
+    .sort((a, b) => {
+      const order: Record<CategoryKind, number> = { product_type: 0, universal: 1, door_range: 2 }
+      const ka = order[getCategoryKind(a)]
+      const kb = order[getCategoryKind(b)]
+      if (ka !== kb) return ka - kb
+      return a.name.localeCompare(b.name)
+    })
+}
+
+export function formatSmartCategoryOptionLabel(category: CategoryRow): string {
+  const kind = getCategoryKind(category)
+  if (kind === 'universal') return `${category.name} (cross-range)`
+  if (kind === 'door_range') return `${category.name} (kitchen range)`
+  return category.name
 }
 
 /** Category id plus all direct child category ids. */

@@ -13,7 +13,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
-import { getCategoryKind } from '@/lib/categoryTaxonomy'
+import {
+  categoriesForSmartProductAssignment,
+  formatSmartCategoryOptionLabel,
+} from '@/lib/categoryTaxonomy'
 import {
   applySmartCategorySuggestions,
   buildSmartCategorizationSuggestions,
@@ -326,15 +329,20 @@ function SmartSection({
               await refreshLearning()
               await loadAll()
             }}
+            onRefreshCatalogue={loadAll}
             setResult={setResult}
           />
         ) : tab === 'history' ? (
           <HistoryTab
             history={history}
+            categories={categories}
             categoryById={categoryById}
             userStopWords={userStopWords}
             ambiguousThreshold={settings.autoAmbiguousThreshold}
-            onChange={refreshLearning}
+            onChange={async () => {
+              await refreshLearning()
+              await loadAll()
+            }}
             setResult={setResult}
           />
         ) : (
@@ -367,6 +375,7 @@ export interface SuggestionsTabProps {
   /** Settings drive band labels/descriptions used on chips + table badges. */
   settings: SmartCategorySettings
   onApplied: () => Promise<void>
+  onRefreshCatalogue?: () => Promise<void>
   setResult: (r: ResultInfo) => void
 }
 
@@ -377,6 +386,7 @@ export function SuggestionsTab({
   learning,
   settings,
   onApplied,
+  onRefreshCatalogue,
   setResult,
 }: SuggestionsTabProps) {
   const [confidenceFilter, setConfidenceFilter] = useState<Record<ConfidenceLevel, boolean>>({
@@ -402,11 +412,10 @@ export function SuggestionsTab({
     return map
   }, [products])
 
-  const overrideCategoryOptions = useMemo(() => {
-    return [...categories]
-      .filter((c) => getCategoryKind(c) !== 'door_range')
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [categories])
+  const overrideCategoryOptions = useMemo(
+    () => categoriesForSmartProductAssignment(categories),
+    [categories],
+  )
 
   const allSuggestions = useMemo(
     () => buildSmartCategorizationSuggestions(products, categories, learning),
@@ -687,6 +696,18 @@ export function SuggestionsTab({
           />
         </label>
 
+        {onRefreshCatalogue && (
+          <button
+            type="button"
+            className="btn btn-outline btn-small"
+            disabled={applying}
+            onClick={() => void onRefreshCatalogue()}
+            title="Reload categories and products (use after adding a new category on the Categories page)"
+          >
+            Refresh catalogue
+          </button>
+        )}
+
         <button
           type="button"
           className="btn btn-outline btn-small"
@@ -891,7 +912,9 @@ export function SuggestionsTab({
                           )}
                           {overrideCategoryOptions.map((c) => (
                             <option key={c.id} value={c.id}>
-                              {c.id === s.suggestedCategoryId ? `${c.name} (suggested)` : c.name}
+                              {c.id === s.suggestedCategoryId
+                                ? `${formatSmartCategoryOptionLabel(c)} (suggested)`
+                                : formatSmartCategoryOptionLabel(c)}
                             </option>
                           ))}
                         </select>
@@ -949,7 +972,7 @@ export function SuggestionsTab({
                             )
                             .map((c) => (
                               <option key={c.id} value={c.id}>
-                                {c.name}
+                                {formatSmartCategoryOptionLabel(c)}
                               </option>
                             ))}
                         </select>
@@ -1048,6 +1071,7 @@ export function SuggestionsTab({
 
 function HistoryTab({
   history,
+  categories,
   categoryById,
   userStopWords,
   ambiguousThreshold,
@@ -1055,6 +1079,7 @@ function HistoryTab({
   setResult,
 }: {
   history: LearningRow[]
+  categories: CategoryRow[]
   categoryById: Map<string, CategoryRow>
   userStopWords: string[]
   ambiguousThreshold: number
@@ -1098,6 +1123,16 @@ function HistoryTab({
       (a, b) => b.categories - a.categories || b.totalWeight - a.totalWeight || a.token.localeCompare(b.token),
     )
   }, [history, tokenCategoryCount, ambiguousThreshold])
+
+  const assignableCategories = useMemo(
+    () => categoriesForSmartProductAssignment(categories),
+    [categories],
+  )
+
+  const categoriesWithoutLearning = useMemo(() => {
+    const withLearning = new Set(history.map((r) => r.category_id))
+    return assignableCategories.filter((c) => !withLearning.has(c.id))
+  }, [assignableCategories, history])
 
   const byCategory = useMemo(() => {
     const map = new Map<string, LearningRow[]>()
@@ -1440,6 +1475,27 @@ function HistoryTab({
         </button>
       </div>
 
+      {categoriesWithoutLearning.length > 0 && (
+        <section className="card admin-smart-categorise-ambig-panel">
+          <header className="admin-smart-categorise-ambig-header">
+            <h3>Categories without learned tokens ({categoriesWithoutLearning.length})</h3>
+            <p className="admin-muted">
+              These categories are available in smart categorise but have no learning history yet
+              (for example a new <strong>Complete</strong> bucket). Apply suggestions on the
+              Suggestions tab to teach the system, or re-train from products already in that
+              category.
+            </p>
+          </header>
+          <ul className="admin-smart-categorise-ambig-list">
+            {categoriesWithoutLearning.map((c) => (
+              <li key={c.id}>
+                <span className="admin-smart-categorise-token">{formatSmartCategoryOptionLabel(c)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {byCategory.length === 0 ? (
         <p className="admin-muted">
           {history.length === 0
@@ -1743,7 +1799,10 @@ function SettingsTab({
     }
   }
 
-  const categoryCount = categories.length
+  const assignableCategories = useMemo(
+    () => categoriesForSmartProductAssignment(categories),
+    [categories],
+  )
   const categorisedProducts = products.filter((p) => p.category_id).length
   const uncategorisedProducts = products.length - categorisedProducts
 
@@ -2191,8 +2250,17 @@ function SettingsTab({
         <section className="card admin-smart-categorise-setting-card">
           <h3>Catalogue overview</h3>
           <dl className="admin-smart-categorise-stats-grid">
-            <dt>Categories</dt>
-            <dd>{categoryCount}</dd>
+            <dt>Categories (all)</dt>
+            <dd>{categories.length}</dd>
+            <dt>Assignable in smart categorise</dt>
+            <dd>
+              {assignableCategories.length}
+              {assignableCategories.length > 0 ? (
+                <span className="admin-muted" style={{ display: 'block', marginTop: '0.35rem' }}>
+                  {assignableCategories.map((c) => c.name).join(', ')}
+                </span>
+              ) : null}
+            </dd>
             <dt>Categorised products</dt>
             <dd>
               {categorisedProducts}{' '}

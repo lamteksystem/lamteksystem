@@ -279,9 +279,17 @@ export default function AdminProductModal({
 
     let payload: Record<string, unknown>
     switch (field) {
-      case 'name':
-        payload = { name: String(value).trim() || liveProduct.name }
+      case 'name': {
+        const trimmed = String(value).trim()
+        if (!trimmed) {
+          setSaveError('Product name is required.')
+          setInlineSaving(false)
+          setEditingField('name')
+          return
+        }
+        payload = { name: trimmed }
         break
+      }
       case 'sku':
         payload = { sku: value === '' || value == null ? null : String(value).trim() }
         break
@@ -421,7 +429,7 @@ export default function AdminProductModal({
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            liveProduct.name
+            liveProduct.name.trim() || '(No product name)'
           )}
         </h2>
         {(liveProduct.image_url || canEditCatalogue) && (
@@ -627,6 +635,25 @@ export default function AdminProductModal({
             <div className="admin-modal-form-section admin-modal-card">
               <h3 className="admin-modal-form-section-title">Product details</h3>
               <dl className="admin-product-modal-meta">
+                <dt>Product name</dt>
+                <dd {...editableMetaProps('name')}>
+                  {editingField === 'name' ? (
+                    <input
+                      className="admin-inline-edit-input admin-product-modal-name-input"
+                      autoFocus
+                      defaultValue={liveProduct.name}
+                      placeholder="Product name"
+                      onBlur={(e) => void saveInlineField('name', e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void saveInlineField('name', (e.target as HTMLInputElement).value)
+                        if (e.key === 'Escape') cancelInlineEdit()
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    liveProduct.name.trim() || '—'
+                  )}
+                </dd>
                 <dt>SKU</dt>
                 <dd {...editableMetaProps('sku')}>
                   {editingField === 'sku' ? (

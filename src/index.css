@@ -5402,6 +5402,22 @@ button.ordering-wizard-card {
 }
 .admin-modal-backdrop--notice {
   z-index: 10150;
+  /* Dialog is position:fixed — avoids flex+overflow mis-centering on long pages */
+  display: block;
+  overflow: hidden;
+  padding: 0;
+}
+.admin-modal-backdrop--notice > .admin-modal--notice {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 2rem));
+  max-width: min(420px, calc(100vw - 2rem));
+  max-height: min(85vh, 520px);
+  margin: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 .admin-modal--notice {
   max-width: min(420px, calc(100vw - 2rem));

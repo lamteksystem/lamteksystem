@@ -31,11 +31,14 @@ export type WorkbenchConditionOp =
 export type WorkbenchActionType =
   | 'delete'
   | 'remove_sku_from_name'
+  | 'strip_text_from_field'
   | 'select'
   | 'deselect'
   | 'set_active'
   | 'set_inactive'
   | 'assign_category'
+
+export type StripTextField = 'description' | 'name' | 'sku'
 
 export interface WorkbenchCondition {
   field: WorkbenchMatchField
@@ -156,7 +159,7 @@ export function filterRowsByRule(
   rows: PricelistWorkbenchRow[],
   rule: Pick<WorkbenchRule, 'conditions' | 'matchMode'>
 ): PricelistWorkbenchRow[] {
-  if (!rule.conditions.length) return []
+  if (!rule.conditions.length) return rows
   return rows.filter((row) => {
     const checks = rule.conditions.map((c) => rowMatchesCondition(row, c))
     return rule.matchMode === 'any' ? checks.some(Boolean) : checks.every(Boolean)
@@ -189,6 +192,26 @@ export function removeSkuFromName(row: PricelistWorkbenchRow): string {
   }
 
   return name.slice(0, 300)
+}
+
+export function parseStripTextActionParam(
+  param: string | undefined
+): { field: StripTextField; text: string } | null {
+  if (!param?.trim()) return null
+  const idx = param.indexOf(':')
+  if (idx < 1) return null
+  const field = param.slice(0, idx).trim() as StripTextField
+  const text = param.slice(idx + 1)
+  if (field !== 'description' && field !== 'name' && field !== 'sku') return null
+  if (!text) return null
+  return { field, text }
+}
+
+export function stripTextFromFieldValue(value: string, text: string): string {
+  const needle = text.trim()
+  if (!needle) return value
+  const re = new RegExp(escapeRegex(needle), 'gi')
+  return value.replace(re, '').replace(/\s{2,}/g, ' ').trim()
 }
 
 export function findCategoryForRule(
@@ -265,6 +288,8 @@ export function applyRuleToRows(
     }
   }
 
+  const stripParam = rule.action === 'strip_text_from_field' ? parseStripTextActionParam(rule.actionParam) : null
+
   const next = rows.map((row) => {
     if (!matchedIds.has(row.id)) return row
     changed++
@@ -276,6 +301,19 @@ export function applyRuleToRows(
           return row
         }
         return { ...row, name }
+      }
+      case 'strip_text_from_field': {
+        if (!stripParam) {
+          changed--
+          return row
+        }
+        const current = row[stripParam.field] as string
+        const cleaned = stripTextFromFieldValue(current, stripParam.text)
+        if (cleaned === current) {
+          changed--
+          return row
+        }
+        return { ...row, [stripParam.field]: cleaned }
       }
       case 'select':
         return { ...row, selected: true }
@@ -293,6 +331,7 @@ export function applyRuleToRows(
   const actionLabel: Record<WorkbenchActionType, string> = {
     delete: 'deleted',
     remove_sku_from_name: 'cleaned names on',
+    strip_text_from_field: 'updated text on',
     select: 'selected',
     deselect: 'deselected',
     set_active: 'activated',
@@ -367,7 +406,16 @@ type ParsedAction =
   | { error: string }
   | null
 
-function parseAction(lower: string, _raw: string, quoted: string[]): ParsedAction {
+function parseStripFieldFromPrompt(lower: string, raw: string): StripTextField {
+  if (/\bdescription\b/.test(lower)) return 'description'
+  if (/\bname\b/.test(lower) && !/\bdescription\b/.test(lower)) return 'name'
+  if (/\bsku\b/.test(lower)) return 'sku'
+  const m = raw.match(/\bfrom\s+(?:the\s+)?(description|name|sku)\b/i)
+  if (m) return m[1].toLowerCase() as StripTextField
+  return 'description'
+}
+
+function parseAction(lower: string, raw: string, quoted: string[]): ParsedAction {
   const assignMatch =
     lower.match(
       /\b(?:assign(?:\s+category)?|categor(?:y|ise|ize)(?:\s+as)?|put\s+in(?:to)?)\s+(?:to\s+)?(?:"([^"]+)"|([a-z][\w\s&/-]{2,40}))/
@@ -383,6 +431,29 @@ function parseAction(lower: string, _raw: string, quoted: string[]): ParsedActio
   if (/\b(remove|strip|clean)\b/.test(lower) && /\bsku\b/.test(lower) && /\bname\b/.test(lower)) {
     return { action: 'remove_sku_from_name' }
   }
+
+  const removeFromFieldQuoted = raw.match(
+    /\b(?:remove|strip|delete)\s+(?:the\s+)?(?:word|text|phrase)?\s*"([^"]+)"\s+from\s+(?:the\s+)?(description|name|sku)\b/i
+  )
+  if (removeFromFieldQuoted) {
+    const field = removeFromFieldQuoted[2].toLowerCase() as StripTextField
+    return {
+      action: 'strip_text_from_field',
+      actionParam: `${field}:${removeFromFieldQuoted[1]}`,
+    }
+  }
+
+  if (isStripTextCommand(lower)) {
+    const field = parseStripFieldFromPrompt(lower, raw)
+    const text =
+      quoted[0] ??
+      raw.match(/\b(?:word|text|phrase)\s+"([^"]+)"/i)?.[1] ??
+      raw.match(/\b(?:remove|strip|delete)\s+(?:the\s+)?(?:word|text|phrase)?\s+([A-Za-z][\w\s:.-]{0,40}?)\s+from\b/i)?.[1]?.trim()
+    if (text) {
+      return { action: 'strip_text_from_field', actionParam: `${field}:${text}` }
+    }
+  }
+
   if (/\b(deactivate|mark\s+inactive|set\s+inactive)\b/.test(lower)) {
     return { action: 'set_inactive' }
   }
@@ -411,8 +482,22 @@ function pushUniqueCondition(conditions: WorkbenchCondition[], cond: WorkbenchCo
   conditions.push(cond)
 }
 
+function isStripTextCommand(lower: string): boolean {
+  const scrubbed = lower
+    .replace(/\beach\s+product\b/g, ' ')
+    .replace(/\bevery\s+product\b/g, ' ')
+    .replace(/\ball\s+products?\b/g, ' ')
+  return (
+    /\b(remove|strip|delete)\b/.test(lower) &&
+    /\b(description|name|sku)\b/.test(lower) &&
+    !/\bfrom\s+(?:the\s+)?(?:workbench|list|draft)\b/.test(lower) &&
+    !/\b(remove|delete)\s+(?:all\s+)?(?:row|product|item|line)s?\b/.test(scrubbed)
+  )
+}
+
 function parseFieldConditions(lower: string, raw: string, quoted: string[]): WorkbenchCondition[] {
   const conditions: WorkbenchCondition[] = []
+  const stripCommand = isStripTextCommand(lower)
 
   if (/\btealbury\b/.test(lower)) {
     pushUniqueCondition(conditions, { field: 'source', op: 'equals', value: 'tealbury' })
@@ -462,12 +547,14 @@ function parseFieldConditions(lower: string, raw: string, quoted: string[]): Wor
     pushUniqueCondition(conditions, { field: 'door_range', op: 'contains', value: noDoors })
   }
 
-  for (const q of quoted) {
-    if (/no doors/i.test(q)) continue
-    if (/\bsection\b/.test(lower) && !conditions.some((c) => c.field === 'section' && c.value === q)) {
-      pushUniqueCondition(conditions, { field: 'section', op: 'contains', value: q })
-    } else if (!conditions.some((c) => c.field === 'door_range' && c.value === q)) {
-      pushUniqueCondition(conditions, { field: 'door_range', op: 'contains', value: q })
+  if (!stripCommand) {
+    for (const q of quoted) {
+      if (/no doors/i.test(q)) continue
+      if (/\bsection\b/.test(lower) && !conditions.some((c) => c.field === 'section' && c.value === q)) {
+        pushUniqueCondition(conditions, { field: 'section', op: 'contains', value: q })
+      } else if (!conditions.some((c) => c.field === 'door_range' && c.value === q)) {
+        pushUniqueCondition(conditions, { field: 'door_range', op: 'contains', value: q })
+      }
     }
   }
 
@@ -496,7 +583,7 @@ export function parseSmartCommandPrompt(prompt: string): { rule: WorkbenchRule |
     return {
       rule: null,
       error:
-        'Could not detect an action. Try: delete, assign category "Base units", remove SKU from name, select, activate, or deactivate.',
+        'Could not detect an action. Try: delete, assign category "Base units", remove "Section:" from description, remove SKU from name, select, activate, or deactivate.',
     }
   }
   if ('error' in actionParsed) {
@@ -510,11 +597,17 @@ export function parseSmartCommandPrompt(prompt: string): { rule: WorkbenchRule |
     pushUniqueCondition(conditions, { field: 'name', op: 'sku_appears_in_name', value: '' })
   }
 
-  if (!conditions.length) {
+  const matchAll =
+    !conditions.length &&
+    (action === 'strip_text_from_field' ||
+      /\b(each|every|all)\s+(product|row|item|line)s?\b/.test(lower) ||
+      /\ball\s+rows\b/.test(lower))
+
+  if (!conditions.length && !matchAll) {
     return {
       rule: null,
       error:
-        'Could not detect filters. Mention Tealbury/Lamtek, a range like "No Doors", section contains "…", unassigned, or SKU-in-name.',
+        'Could not detect filters. Mention Tealbury/Lamtek, a range like "No Doors", section contains "…", unassigned, SKU-in-name, or say "each product" / "all rows".',
     }
   }
 

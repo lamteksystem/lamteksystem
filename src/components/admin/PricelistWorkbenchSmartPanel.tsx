@@ -50,6 +50,7 @@ const ACTION_OPTIONS: { value: WorkbenchActionType; label: string }[] = [
   { value: 'delete', label: 'Delete from workbench' },
   { value: 'assign_category', label: 'Assign category' },
   { value: 'remove_sku_from_name', label: 'Remove SKU from name' },
+  { value: 'strip_text_from_field', label: 'Remove text from field' },
   { value: 'select', label: 'Select rows' },
   { value: 'deselect', label: 'Deselect rows' },
   { value: 'set_active', label: 'Set active' },
@@ -92,6 +93,8 @@ export default function PricelistWorkbenchSmartPanel({
   const [builderMode, setBuilderMode] = useState<'all' | 'any'>('all')
   const [builderAction, setBuilderAction] = useState<WorkbenchActionType>('delete')
   const [builderActionParam, setBuilderActionParam] = useState('')
+  const [builderStripField, setBuilderStripField] = useState<'description' | 'name' | 'sku'>('description')
+  const [builderStripText, setBuilderStripText] = useState('')
   const [builderConditions, setBuilderConditions] = useState<WorkbenchCondition[]>([
     { field: 'source', op: 'equals', value: 'tealbury' },
     newCondition(),
@@ -138,6 +141,10 @@ export default function PricelistWorkbenchSmartPanel({
       onNotify('', 'Assign category needs a category name (use the rule builder or quote it in the command).')
       return
     }
+    if (rule.action === 'strip_text_from_field' && !rule.actionParam?.includes(':')) {
+      onNotify('', 'Remove text needs a field and phrase (e.g. description:Section:).')
+      return
+    }
     finishRun(rule, targetIds)
   }
 
@@ -165,23 +172,37 @@ export default function PricelistWorkbenchSmartPanel({
       matchMode: builderMode,
       action: builderAction,
     })
+    const filteredConditions = builderConditions.filter(
+      (c) =>
+        c.op === 'sku_appears_in_name' ||
+        c.op === 'unassigned' ||
+        c.value.trim() ||
+        c.op === 'empty' ||
+        c.op === 'not_empty'
+    )
+    const stripParam =
+      builderAction === 'strip_text_from_field' && builderStripText.trim()
+        ? `${builderStripField}:${builderStripText.trim()}`
+        : undefined
     const rule: WorkbenchRule = {
       id: `saved-${Date.now()}`,
       name: name.slice(0, 120),
-      conditions: builderConditions.filter(
-        (c) =>
-          c.op === 'sku_appears_in_name' ||
-          c.op === 'unassigned' ||
-          c.value.trim() ||
-          c.op === 'empty' ||
-          c.op === 'not_empty'
-      ),
+      conditions: filteredConditions,
       matchMode: builderMode,
       action: builderAction,
-      actionParam: builderAction === 'assign_category' ? builderActionParam.trim() : undefined,
+      actionParam:
+        builderAction === 'assign_category'
+          ? builderActionParam.trim()
+          : builderAction === 'strip_text_from_field'
+            ? stripParam
+            : undefined,
     }
-    if (!rule.conditions.length) {
-      onNotify('', 'Add at least one condition.')
+    if (!rule.conditions.length && builderAction !== 'strip_text_from_field') {
+      onNotify('', 'Add at least one condition (or use strip text on all rows with no conditions).')
+      return
+    }
+    if (builderAction === 'strip_text_from_field' && !stripParam) {
+      onNotify('', 'Enter the text to remove from the field.')
       return
     }
     void persistRules([...savedRules, rule])
@@ -296,6 +317,29 @@ export default function PricelistWorkbenchSmartPanel({
               </datalist>
             </label>
           )}
+          {builderAction === 'strip_text_from_field' && (
+            <>
+              <label>
+                Field
+                <select
+                  value={builderStripField}
+                  onChange={(e) => setBuilderStripField(e.target.value as 'description' | 'name' | 'sku')}
+                >
+                  <option value="description">Description</option>
+                  <option value="name">Name</option>
+                  <option value="sku">SKU</option>
+                </select>
+              </label>
+              <label>
+                Text to remove
+                <input
+                  value={builderStripText}
+                  onChange={(e) => setBuilderStripText(e.target.value)}
+                  placeholder='e.g. Section:'
+                />
+              </label>
+            </>
+          )}
         </div>
         <div className="admin-pricelist-conditions">
           {builderConditions.map((c, i) => (
@@ -368,7 +412,12 @@ export default function PricelistWorkbenchSmartPanel({
                 conditions: builderConditions,
                 matchMode: builderMode,
                 action: builderAction,
-                actionParam: builderAction === 'assign_category' ? builderActionParam : undefined,
+                actionParam:
+                  builderAction === 'assign_category'
+                    ? builderActionParam
+                    : builderAction === 'strip_text_from_field' && builderStripText.trim()
+                      ? `${builderStripField}:${builderStripText.trim()}`
+                      : undefined,
               })
             }
           >

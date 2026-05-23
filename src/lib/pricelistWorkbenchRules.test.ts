@@ -73,6 +73,36 @@ describe('pricelistWorkbenchRules', () => {
     expect(rule?.conditions.some((c) => c.op === 'sku_appears_in_name')).toBe(true)
   })
 
+  it('parses remove Section: from description for each product', () => {
+    const { rule, error } = parseSmartCommandPrompt(
+      'remove the word "Section:" from the description of each product'
+    )
+    expect(error).toBeUndefined()
+    expect(rule?.action).toBe('strip_text_from_field')
+    expect(rule?.actionParam).toBe('description:Section:')
+    expect(rule?.conditions).toHaveLength(0)
+  })
+
+  it('strips Section: prefix from descriptions', () => {
+    const { rows: next, result } = applyRuleToRows(
+      [
+        row({ id: 'a', description: 'Section: HIGHLINE BASE' }),
+        row({ id: 'b', description: 'No prefix here' }),
+      ],
+      {
+        id: 'strip',
+        name: 'strip section',
+        conditions: [],
+        matchMode: 'all',
+        action: 'strip_text_from_field',
+        actionParam: 'description:Section:',
+      }
+    )
+    expect(next[0].description).toBe('HIGHLINE BASE')
+    expect(next[1].description).toBe('No prefix here')
+    expect(result.changed).toBe(1)
+  })
+
   it('parses assign category to unassigned tealbury', () => {
     const { rule, error } = parseSmartCommandPrompt(
       'Assign category "Base units" to all unassigned Tealbury rows'

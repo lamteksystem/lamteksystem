@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import type { ColumnDef } from '@/hooks/useColumnVisibility'
 
 interface ColumnSettingsProps {
@@ -25,6 +26,8 @@ export function ColumnSettings({
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dropIndicator, setDropIndicator] = useState<{ targetId: string; position: 'above' | 'below' } | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const cogRef = useRef<HTMLButtonElement>(null)
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(null)
 
   const orderedDefs = order
     ? order
@@ -33,13 +36,41 @@ export function ColumnSettings({
     : columnDefs
   const canReorder = Boolean(setColumnOrder && order && order.length > 0)
 
+  useLayoutEffect(() => {
+    if (!open || !cogRef.current) {
+      setPanelPos(null)
+      return
+    }
+    const rect = cogRef.current.getBoundingClientRect()
+    const panelWidth = 260
+    let left = rect.right - panelWidth
+    left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8))
+    setPanelPos({ top: rect.bottom + 6, left })
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     function handleClickOutside(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (panelRef.current?.contains(target) || cogRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    function onReposition() {
+      if (!cogRef.current) return
+      const rect = cogRef.current.getBoundingClientRect()
+      const panelWidth = 260
+      let left = rect.right - panelWidth
+      left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8))
+      setPanelPos({ top: rect.bottom + 6, left })
     }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    window.addEventListener('scroll', onReposition, true)
+    window.addEventListener('resize', onReposition)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      window.removeEventListener('scroll', onReposition, true)
+      window.removeEventListener('resize', onReposition)
+    }
   }, [open])
 
   function handleDragStart(e: React.DragEvent, id: string) {
@@ -91,6 +122,7 @@ export function ColumnSettings({
   return (
     <div className="admin-column-settings" ref={panelRef}>
       <button
+        ref={cogRef}
         type="button"
         className="admin-column-settings-cog"
         onClick={() => setOpen((v) => !v)}
@@ -100,63 +132,74 @@ export function ColumnSettings({
       >
         <CogIcon />
       </button>
-      {open && (
-        <div className="admin-column-settings-panel card">
-          <h4 className="admin-column-settings-title">Columns</h4>
-          <p className="admin-muted admin-column-settings-hint">
-            Show or hide columns. {canReorder ? 'Drag to reorder.' : ''}
-          </p>
-          <ul className="admin-column-settings-list admin-column-settings-list--draggable">
-            {orderedDefs.map((col) => (
-              <li key={col.id} className="admin-column-settings-li">
-                {dropIndicator?.targetId === col.id && dropIndicator?.position === 'above' && (
-                  <div className="admin-column-settings-drop-line" aria-hidden title="Drop above" />
-                )}
-                <div
-                  role="listitem"
-                  className={`admin-column-settings-item ${draggedId === col.id ? 'admin-column-settings-item--dragging' : ''} ${dropIndicator?.targetId === col.id ? 'admin-column-settings-item--drop-target' : ''}`}
-                  draggable={canReorder}
-                  onDragStart={(e) => canReorder && handleDragStart(e, col.id)}
-                  onDragOver={(e) => canReorder && handleDragOver(e, col.id)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => canReorder && handleDrop(e, col.id)}
-                  onDragEnd={handleDragEnd}
-                >
-                  {canReorder && (
-                    <span className="admin-column-settings-drag-handle" aria-label="Drag to reorder" title="Drag to reorder">
-                      <DragHandleIcon />
-                    </span>
-                  )}
-                  <label className="admin-column-settings-label">
-                    <input
-                      type="checkbox"
-                      checked={visibleIds.includes(col.id)}
-                      onChange={(e) => setColumnVisible(col.id, e.target.checked)}
-                    />
-                    <span>{col.label}</span>
-                  </label>
+      {open && panelPos
+        ? createPortal(
+            <div
+              ref={panelRef}
+              className="admin-column-settings-panel card admin-column-settings-panel--portal"
+              style={{ top: panelPos.top, left: panelPos.left }}
+            >
+              <h4 className="admin-column-settings-title">Columns</h4>
+              <p className="admin-muted admin-column-settings-hint">
+                Show or hide columns. {canReorder ? 'Drag to reorder.' : ''}
+              </p>
+              <ul className="admin-column-settings-list admin-column-settings-list--draggable">
+                {orderedDefs.map((col) => (
+                  <li key={col.id} className="admin-column-settings-li">
+                    {dropIndicator?.targetId === col.id && dropIndicator?.position === 'above' && (
+                      <div className="admin-column-settings-drop-line" aria-hidden title="Drop above" />
+                    )}
+                    <div
+                      role="listitem"
+                      className={`admin-column-settings-item ${draggedId === col.id ? 'admin-column-settings-item--dragging' : ''} ${dropIndicator?.targetId === col.id ? 'admin-column-settings-item--drop-target' : ''}`}
+                      draggable={canReorder}
+                      onDragStart={(e) => canReorder && handleDragStart(e, col.id)}
+                      onDragOver={(e) => canReorder && handleDragOver(e, col.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => canReorder && handleDrop(e, col.id)}
+                      onDragEnd={handleDragEnd}
+                    >
+                      {canReorder && (
+                        <span
+                          className="admin-column-settings-drag-handle"
+                          aria-label="Drag to reorder"
+                          title="Drag to reorder"
+                        >
+                          <DragHandleIcon />
+                        </span>
+                      )}
+                      <label className="admin-column-settings-label">
+                        <input
+                          type="checkbox"
+                          checked={visibleIds.includes(col.id)}
+                          onChange={(e) => setColumnVisible(col.id, e.target.checked)}
+                        />
+                        <span>{col.label}</span>
+                      </label>
+                    </div>
+                    {dropIndicator?.targetId === col.id && dropIndicator?.position === 'below' && (
+                      <div className="admin-column-settings-drop-line" aria-hidden title="Drop below" />
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {resetToDefault && (
+                <div className="admin-column-settings-actions">
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-small"
+                    onClick={() => {
+                      resetToDefault()
+                    }}
+                  >
+                    Reset to default
+                  </button>
                 </div>
-                {dropIndicator?.targetId === col.id && dropIndicator?.position === 'below' && (
-                  <div className="admin-column-settings-drop-line" aria-hidden title="Drop below" />
-                )}
-              </li>
-            ))}
-          </ul>
-          {resetToDefault && (
-            <div className="admin-column-settings-actions">
-              <button
-                type="button"
-                className="btn btn-outline btn-small"
-                onClick={() => {
-                  resetToDefault()
-                }}
-              >
-                Reset to default
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+              )}
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   )
 }

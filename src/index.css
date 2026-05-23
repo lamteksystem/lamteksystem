@@ -6337,14 +6337,10 @@ button.ordering-wizard-card {
 .admin-help-tip:hover .admin-help-tip-icon {
   background: var(--lamtek-gold, #672732);
 }
-.admin-help-tip-popup {
-  position: absolute;
-  z-index: 120;
-  left: 50%;
-  bottom: calc(100% + 0.4rem);
-  transform: translateX(-50%);
+.admin-help-tip-popup--portal {
+  position: fixed;
+  z-index: 10060;
   width: max-content;
-  max-width: min(22rem, 90vw);
   padding: 0.5rem 0.65rem;
   font-size: 0.78rem;
   font-weight: 400;
@@ -6352,16 +6348,12 @@ button.ordering-wizard-card {
   color: var(--lamtek-surface, #fff);
   background: rgba(30, 30, 30, 0.94);
   border-radius: 8px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
   pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.12s ease, visibility 0.12s ease;
 }
-.admin-help-tip:hover .admin-help-tip-popup,
-.admin-help-tip:focus-visible .admin-help-tip-popup {
-  opacity: 1;
-  visibility: visible;
+.admin-workbench-section-body,
+.admin-pricelist-workbench .admin-workbench-section {
+  overflow: visible;
 }
 .admin-label-with-tip { display: inline-flex; align-items: center; gap: 0.2rem; }
 .admin-page-header h1 .admin-help-tip { margin-left: 0.5rem; }
@@ -6896,6 +6888,15 @@ button.ordering-wizard-card {
 .admin-column-settings-panel {
   position: absolute; top: 100%; right: 0; margin-top: 0.35rem; min-width: 220px;
   padding: 1rem; z-index: 100; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.admin-column-settings-panel--portal {
+  position: fixed;
+  z-index: 10055;
+  min-width: 260px;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: min(70vh, 480px);
+  overflow: auto;
+  margin-top: 0;
 }
 .admin-column-settings-title { margin: 0 0 0.25rem; font-size: 0.95rem; }
 .admin-column-settings-hint { margin: 0 0 0.75rem; font-size: 0.8rem; }

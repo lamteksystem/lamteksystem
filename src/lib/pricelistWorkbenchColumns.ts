@@ -110,8 +110,8 @@ export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
     id: 'actions',
     label: '',
     tip: 'Remove this row from the workbench draft.',
-    minWidth: 72,
-    defaultWidth: 76,
+    minWidth: 88,
+    defaultWidth: 92,
   },
 ]
 

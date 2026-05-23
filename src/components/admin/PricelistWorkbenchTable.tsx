@@ -121,17 +121,18 @@ export default function PricelistWorkbenchTable({
 
   function renderHeader(col: (typeof PRICELIST_WORKBENCH_COLUMNS)[number]) {
     const w = workbenchColumnWidth(col.id, columnWidths)
+    const isActions = col.id === 'actions'
     return (
       <th
         key={col.id}
         style={{ width: w, minWidth: w }}
-        className={col.id === 'actions' ? 'admin-pricelist-th-actions' : undefined}
+        className={isActions ? 'admin-pricelist-th-actions admin-pricelist-col-sticky-end' : undefined}
       >
         <span className="admin-th-label">
           {col.label}
           <AdminHelpTip text={col.tip} className="admin-th-help" />
         </span>
-        {col.id !== 'actions' ? (
+        {!isActions ? (
           <span
             className="admin-th-resizer"
             role="separator"
@@ -410,7 +411,7 @@ export default function PricelistWorkbenchTable({
                     key={col.id}
                     className={
                       col.id === 'actions'
-                        ? 'admin-pricelist-td-actions'
+                        ? 'admin-pricelist-td-actions admin-pricelist-col-sticky-end'
                         : DBL_CLICK_FIELDS.has(col.id as EditableField)
                           ? 'admin-pricelist-td-editable'
                           : undefined

@@ -6378,6 +6378,11 @@ button.ordering-wizard-card {
 .admin-pricelist-workbench .admin-workbench-section {
   overflow: visible;
 }
+.admin-pricelist-workbench .admin-workbench-section-body {
+  overflow-x: auto;
+  overflow-y: visible;
+  max-width: 100%;
+}
 .admin-label-with-tip { display: inline-flex; align-items: center; gap: 0.2rem; }
 .admin-page-header h1 .admin-help-tip { margin-left: 0.5rem; }
 .admin-th-label { display: inline-flex; align-items: center; gap: 0.15rem; flex-wrap: wrap; }
@@ -6604,7 +6609,42 @@ button.ordering-wizard-card {
   align-items: center;
 }
 .admin-pricelist-th-actions,
-.admin-pricelist-td-actions { width: 5.5rem; text-align: right; white-space: nowrap; }
+.admin-pricelist-td-actions {
+  min-width: 5.5rem;
+  text-align: right;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.admin-pricelist-td-actions .btn {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+/* Keep Delete column visible at the right edge of the scroll viewport */
+.admin-pricelist-table .admin-pricelist-col-sticky-end {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: var(--lamtek-surface, #fff);
+  box-shadow: -6px 0 10px rgba(0, 0, 0, 0.06);
+}
+.admin-pricelist-table thead .admin-pricelist-col-sticky-end {
+  z-index: 4;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--lamtek-surface) 92%, var(--lamtek-gold) 8%) 0%,
+    var(--lamtek-surface) 100%
+  );
+}
+.admin-app .admin-pricelist-table thead .admin-pricelist-col-sticky-end {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--lamtek-surface) 92%, var(--lamtek-gold) 8%) 0%,
+    var(--lamtek-surface) 100%
+  );
+}
+.admin-pricelist-row--unassigned .admin-pricelist-col-sticky-end {
+  background: color-mix(in srgb, rgba(202, 138, 4, 0.08) 88%, var(--lamtek-surface) 12%);
+}
 .admin-pricelist-table-section { min-height: 0; }
 .admin-pricelist-table-wrap {
   max-height: min(68vh, calc(100dvh - 16rem));
@@ -6615,6 +6655,10 @@ button.ordering-wizard-card {
   -webkit-overflow-scrolling: touch;
 }
 .admin-pricelist-table { font-size: 0.82rem; }
+.admin-pricelist-table.admin-table--resizable {
+  table-layout: fixed;
+  width: 100%;
+}
 .admin-pricelist-table thead th {
   position: sticky;
   top: 0;
@@ -6723,6 +6767,11 @@ button.ordering-wizard-card {
   width: max-content;
   min-width: 100%;
   box-sizing: border-box;
+  padding-right: 0.25rem;
+}
+.admin-horizontal-scroll-wrap--pricelist-table .admin-pricelist-table-scroll,
+.admin-horizontal-scroll-wrap--pricelist-table .admin-horizontal-scroll-inner.admin-pricelist-table-scroll {
+  padding-inline-end: 2px;
 }
 .admin-app .admin-horizontal-scroll-wrap--pricelist-table .admin-pricelist-table-wrap.admin-table-wrap {
   overflow: visible;

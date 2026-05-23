@@ -279,10 +279,22 @@ export default function PricelistWorkbenchQuickCommand({
               </p>
               <ul className="admin-pricelist-simulation-samples">
                 {simulation.samples.map((s, i) => (
-                  <li key={`${s.sku}-${i}`}>
-                    <strong>{s.sku}</strong>
-                    <span className="admin-muted">{s.name}</span>
-                    <em>{s.detail}</em>
+                  <li key={`${s.sku}-${i}`} className="admin-pricelist-simulation-sample">
+                    <div className="admin-pricelist-simulation-sample-head">
+                      <strong>{s.sku}</strong>
+                      <span className="admin-muted">{s.name}</span>
+                      <span className="admin-pricelist-simulation-sample-field">{s.fieldLabel}</span>
+                    </div>
+                    <div className="admin-pricelist-simulation-diff">
+                      <div className="admin-pricelist-simulation-diff-row admin-pricelist-simulation-diff-row--before">
+                        <span className="admin-pricelist-simulation-diff-label">Before</span>
+                        <span className="admin-pricelist-simulation-diff-value">{s.before}</span>
+                      </div>
+                      <div className="admin-pricelist-simulation-diff-row admin-pricelist-simulation-diff-row--after">
+                        <span className="admin-pricelist-simulation-diff-label">After</span>
+                        <span className="admin-pricelist-simulation-diff-value">{s.after}</span>
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>

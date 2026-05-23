@@ -357,7 +357,24 @@ export function deleteRowsByIds(rows: PricelistWorkbenchRow[], ids: Set<string>)
 export type RuleSimulationSample = {
   sku: string
   name: string
-  detail: string
+  /** Field or aspect being changed (e.g. Description, Name, Row). */
+  fieldLabel: string
+  before: string
+  after: string
+}
+
+const SAMPLE_TEXT_MAX = 160
+
+function truncateSampleText(value: string, max = SAMPLE_TEXT_MAX): string {
+  const t = value.trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, max - 1)}…`
+}
+
+function fieldLabelForStrip(field: StripTextField): string {
+  if (field === 'description') return 'Description'
+  if (field === 'name') return 'Name'
+  return 'SKU'
 }
 
 export type RuleSimulationResult = {
@@ -371,23 +388,44 @@ export type RuleSimulationResult = {
   warnings: string[]
 }
 
-function simulationSampleDetail(
+function buildSimulationSample(
   before: PricelistWorkbenchRow,
   after: PricelistWorkbenchRow | undefined,
   rule: WorkbenchRule
-): string | null {
-  if (rule.action === 'delete') return 'Would remove from workbench draft'
+): RuleSimulationSample | null {
+  if (rule.action === 'delete') {
+    return {
+      sku: before.sku,
+      name: before.name,
+      fieldLabel: 'Row',
+      before: truncateSampleText(`${before.sku} — ${before.name}`),
+      after: '(removed from workbench draft)',
+    }
+  }
   if (!after) return null
 
   switch (rule.action) {
     case 'assign_category': {
       if (before.category_id === after.category_id) return null
-      const label = after.category_name || rule.actionParam || 'category'
-      return `Category → ${label}`
+      const beforeCat = before.category_name || '(unassigned)'
+      const afterCat = after.category_name || rule.actionParam || '(assigned)'
+      return {
+        sku: before.sku,
+        name: before.name,
+        fieldLabel: 'Category',
+        before: truncateSampleText(beforeCat),
+        after: truncateSampleText(afterCat),
+      }
     }
     case 'remove_sku_from_name': {
       if (before.name === after.name) return null
-      return `Name: "${before.name}" → "${after.name}"`
+      return {
+        sku: before.sku,
+        name: before.name,
+        fieldLabel: 'Name',
+        before: truncateSampleText(before.name),
+        after: truncateSampleText(after.name),
+      }
     }
     case 'strip_text_from_field': {
       const strip = parseStripTextActionParam(rule.actionParam)
@@ -395,16 +433,50 @@ function simulationSampleDetail(
       const b = before[strip.field] as string
       const a = after[strip.field] as string
       if (b === a) return null
-      return `${strip.field}: "${b}" → "${a}"`
+      return {
+        sku: before.sku,
+        name: before.name,
+        fieldLabel: fieldLabelForStrip(strip.field),
+        before: truncateSampleText(b || '(empty)'),
+        after: truncateSampleText(a || '(empty)'),
+      }
     }
     case 'select':
-      return before.selected === after.selected ? null : 'Would select row'
+      if (before.selected === after.selected) return null
+      return {
+        sku: before.sku,
+        name: before.name,
+        fieldLabel: 'Selected',
+        before: before.selected ? 'Yes' : 'No',
+        after: after.selected ? 'Yes' : 'No',
+      }
     case 'deselect':
-      return before.selected === after.selected ? null : 'Would deselect row'
+      if (before.selected === after.selected) return null
+      return {
+        sku: before.sku,
+        name: before.name,
+        fieldLabel: 'Selected',
+        before: before.selected ? 'Yes' : 'No',
+        after: after.selected ? 'Yes' : 'No',
+      }
     case 'set_active':
-      return before.active === after.active ? null : 'Would set active'
+      if (before.active === after.active) return null
+      return {
+        sku: before.sku,
+        name: before.name,
+        fieldLabel: 'Active',
+        before: before.active ? 'Yes' : 'No',
+        after: after.active ? 'Yes' : 'No',
+      }
     case 'set_inactive':
-      return before.active === after.active ? null : 'Would set inactive'
+      if (before.active === after.active) return null
+      return {
+        sku: before.sku,
+        name: before.name,
+        fieldLabel: 'Active',
+        before: before.active ? 'Yes' : 'No',
+        after: after.active ? 'Yes' : 'No',
+      }
     default:
       return null
   }
@@ -459,21 +531,17 @@ export function simulateRuleOnRows(
   for (const row of matched) {
     if (samples.length >= sampleLimit) break
     const after = afterById.get(row.id)
-    const detail = simulationSampleDetail(row, after, rule)
-    if (!detail) continue
-    samples.push({ sku: row.sku, name: row.name, detail })
+    const sample = buildSimulationSample(row, after, rule)
+    if (!sample) continue
+    samples.push(sample)
   }
 
   if (matched.length > sampleLimit && samples.length < sampleLimit) {
     for (const row of matched) {
       if (samples.length >= sampleLimit) break
-      if (samples.some((s) => s.sku === row.sku && s.name === row.name)) continue
-      const detail = simulationSampleDetail(row, afterById.get(row.id), rule)
-      samples.push({
-        sku: row.sku,
-        name: row.name,
-        detail: detail ?? 'Matched (no field change)',
-      })
+      if (samples.some((s) => s.sku === row.sku)) continue
+      const sample = buildSimulationSample(row, afterById.get(row.id), rule)
+      if (sample) samples.push(sample)
     }
   }
 

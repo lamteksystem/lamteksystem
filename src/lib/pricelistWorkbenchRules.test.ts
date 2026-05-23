@@ -127,7 +127,8 @@ describe('pricelistWorkbenchRules', () => {
     const sim = simulateRuleOnRows(rows, rule, undefined, [])
     expect(rows[0].description).toBe('Section: HIGHLINE BASE')
     expect(sim.wouldChange).toBe(1)
-    expect(sim.samples[0]?.detail).toContain('HIGHLINE BASE')
+    expect(sim.samples[0]?.before).toContain('Section:')
+    expect(sim.samples[0]?.after).toContain('HIGHLINE BASE')
   })
 
   it('simulates delete counts without removing rows', () => {
@@ -139,7 +140,7 @@ describe('pricelistWorkbenchRules', () => {
     expect(rows).toHaveLength(2)
     expect(sim.matched).toBe(1)
     expect(sim.wouldChange).toBe(1)
-    expect(sim.samples[0]?.detail).toMatch(/remove/i)
+    expect(sim.samples[0]?.after).toMatch(/removed/i)
   })
 
   it('parses assign category to unassigned tealbury', () => {

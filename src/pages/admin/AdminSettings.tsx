@@ -5,7 +5,9 @@ import { ADMIN_SETTINGS_TABS, parseAdminSettingsTab, type AdminSettingsTabId } f
 const SettingsGeneralPanel = lazy(() => import('@/components/admin/settings/SettingsGeneralPanel'))
 const SettingsAppearancePanel = lazy(() => import('@/components/admin/settings/SettingsAppearancePanel'))
 const SettingsMarketingPanel = lazy(() => import('@/components/admin/AdminMarketingCarouselSettings'))
-const SettingsProductsPanel = lazy(() => import('@/components/admin/AdminAssemblyPartTypesSettings'))
+const SettingsProductsPanel = lazy(
+  () => import('@/components/admin/settings/SettingsProductsInventoryPanel'),
+)
 const SettingsCategoriesPanel = lazy(() => import('@/components/admin/settings/SettingsCategoriesPanel'))
 const SettingsDangerPanel = lazy(() => import('@/components/admin/settings/SettingsDangerPanel'))
 
@@ -22,7 +24,7 @@ function renderTabPanel(tab: AdminSettingsTabId) {
     case 'marketing':
       return <SettingsMarketingPanel embedded />
     case 'products':
-      return <SettingsProductsPanel embedded />
+      return <SettingsProductsPanel />
     case 'categories':
       return <SettingsCategoriesPanel />
     case 'danger':

@@ -4883,8 +4883,12 @@ button.ordering-wizard-card {
   background: var(--lamtek-surface, #fff);
 }
 .admin-settings-tab--active {
-  background: var(--lamtek-gold, #c9a227);
-  color: var(--lamtek-black);
+  background: var(--lamtek-burgundy, #672732);
+  color: #fff;
+}
+.admin-settings-tab--active:hover {
+  background: var(--lamtek-burgundy, #672732);
+  color: #fff;
 }
 .admin-settings-tab-panel {
   padding: 1.25rem 1.5rem;
@@ -5051,6 +5055,31 @@ button.ordering-wizard-card {
 .admin-settings-card h2 { margin: 0 0 1rem; font-size: 1.1rem; }
 .admin-settings-list { display: flex; flex-direction: column; gap: 0.75rem; }
 .admin-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.admin-settings-row--indent { padding-left: 0.75rem; }
+.admin-settings-fieldset {
+  margin: 0 0 1.5rem;
+  padding: 0 0 1rem;
+  border: none;
+  border-bottom: 1px solid var(--lamtek-border);
+}
+.admin-settings-fieldset legend {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 0.75rem;
+  padding: 0;
+}
+.admin-settings-link-list {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  line-height: 1.6;
+}
+.admin-settings-taxonomy .admin-taxonomy-section--categories {
+  margin-top: 1.5rem;
+}
+.admin-taxonomy-section-intro {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
 .admin-settings-label { font-weight: 500; font-size: 0.95rem; }
 .admin-settings-select { padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--lamtek-gray-light); background: var(--lamtek-surface, white); color: var(--lamtek-text, var(--lamtek-black)); }
 .admin-settings-hint { font-size: 0.85rem; color: var(--lamtek-gray); margin: 0.25rem 0 0; }

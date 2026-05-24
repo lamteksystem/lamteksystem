@@ -51,8 +51,9 @@ import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productC
 import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 import AdminAssemblyPartTypesSettings from '@/components/admin/AdminAssemblyPartTypesSettings'
 import ListPager from '@/components/admin/ListPager'
+import { useCategoryTypes } from '@/hooks/useCategoryTypes'
 import { useListPagination } from '@/lib/listPagination'
-import type { CategoryRow, ProductRow } from '@/types/database'
+import type { CategoryRow, CategoryTypeRow, ProductRow } from '@/types/database'
 
 type Section = 'general' | 'smart' | 'parts'
 type Tab = 'suggestions' | 'history' | 'settings'
@@ -127,6 +128,7 @@ export default function AdminSmartCategorise({ lockSection }: AdminSmartCategori
   const [settings, setSettings] = useState<SmartCategorySettings>(DEFAULT_SMART_CATEGORY_SETTINGS)
   const [loading, setLoading] = useState(true)
   const [result, setResult] = useState<ResultInfo | null>(null)
+  const { types: categoryTypes } = useCategoryTypes()
 
   const refreshLearning = useCallback(async () => {
     const [idx, hist, stops, opts] = await Promise.all([
@@ -240,6 +242,7 @@ export default function AdminSmartCategorise({ lockSection }: AdminSmartCategori
             onSettingsChanged={setSettings}
             products={products}
             categories={categories}
+            categoryTypes={categoryTypes}
             categoryById={categoryById}
             learning={learning}
             refreshLearning={refreshLearning}
@@ -267,6 +270,7 @@ interface SmartSectionProps {
   onSettingsChanged: (next: SmartCategorySettings) => void
   products: ProductRow[]
   categories: CategoryRow[]
+  categoryTypes: CategoryTypeRow[]
   categoryById: Map<string, CategoryRow>
   learning: LearningIndex
   refreshLearning: () => Promise<void>
@@ -283,6 +287,7 @@ function SmartSection({
   onSettingsChanged,
   products,
   categories,
+  categoryTypes,
   categoryById,
   learning,
   refreshLearning,
@@ -322,6 +327,7 @@ function SmartSection({
           <SuggestionsTab
             products={products}
             categories={categories}
+            categoryTypes={categoryTypes}
             categoryById={categoryById}
             learning={learning}
             settings={settings}
@@ -336,6 +342,7 @@ function SmartSection({
           <HistoryTab
             history={history}
             categories={categories}
+            categoryTypes={categoryTypes}
             categoryById={categoryById}
             userStopWords={userStopWords}
             ambiguousThreshold={settings.autoAmbiguousThreshold}
@@ -348,6 +355,7 @@ function SmartSection({
         ) : (
           <SettingsTab
             categories={categories}
+            categoryTypes={categoryTypes}
             products={products}
             learning={learning}
             settings={settings}
@@ -370,6 +378,7 @@ function SmartSection({
 export interface SuggestionsTabProps {
   products: ProductRow[]
   categories: CategoryRow[]
+  categoryTypes: CategoryTypeRow[]
   categoryById: Map<string, CategoryRow>
   learning: LearningIndex
   /** Settings drive band labels/descriptions used on chips + table badges. */
@@ -382,6 +391,7 @@ export interface SuggestionsTabProps {
 export function SuggestionsTab({
   products,
   categories,
+  categoryTypes,
   categoryById,
   learning,
   settings,
@@ -413,8 +423,8 @@ export function SuggestionsTab({
   }, [products])
 
   const overrideCategoryOptions = useMemo(
-    () => categoriesForSmartProductAssignment(categories),
-    [categories],
+    () => categoriesForSmartProductAssignment(categories, categoryTypes),
+    [categories, categoryTypes],
   )
 
   const allSuggestions = useMemo(
@@ -913,8 +923,8 @@ export function SuggestionsTab({
                           {overrideCategoryOptions.map((c) => (
                             <option key={c.id} value={c.id}>
                               {c.id === s.suggestedCategoryId
-                                ? `${formatSmartCategoryOptionLabel(c)} (suggested)`
-                                : formatSmartCategoryOptionLabel(c)}
+                                ? `${formatSmartCategoryOptionLabel(c, categoryTypes)} (suggested)`
+                                : formatSmartCategoryOptionLabel(c, categoryTypes)}
                             </option>
                           ))}
                         </select>
@@ -972,7 +982,7 @@ export function SuggestionsTab({
                             )
                             .map((c) => (
                               <option key={c.id} value={c.id}>
-                                {formatSmartCategoryOptionLabel(c)}
+                                {formatSmartCategoryOptionLabel(c, categoryTypes)}
                               </option>
                             ))}
                         </select>
@@ -1072,6 +1082,7 @@ export function SuggestionsTab({
 function HistoryTab({
   history,
   categories,
+  categoryTypes,
   categoryById,
   userStopWords,
   ambiguousThreshold,
@@ -1080,6 +1091,7 @@ function HistoryTab({
 }: {
   history: LearningRow[]
   categories: CategoryRow[]
+  categoryTypes: CategoryTypeRow[]
   categoryById: Map<string, CategoryRow>
   userStopWords: string[]
   ambiguousThreshold: number
@@ -1125,8 +1137,8 @@ function HistoryTab({
   }, [history, tokenCategoryCount, ambiguousThreshold])
 
   const assignableCategories = useMemo(
-    () => categoriesForSmartProductAssignment(categories),
-    [categories],
+    () => categoriesForSmartProductAssignment(categories, categoryTypes),
+    [categories, categoryTypes],
   )
 
   const categoriesWithoutLearning = useMemo(() => {
@@ -1489,7 +1501,9 @@ function HistoryTab({
           <ul className="admin-smart-categorise-ambig-list">
             {categoriesWithoutLearning.map((c) => (
               <li key={c.id}>
-                <span className="admin-smart-categorise-token">{formatSmartCategoryOptionLabel(c)}</span>
+                <span className="admin-smart-categorise-token">
+                  {formatSmartCategoryOptionLabel(c, categoryTypes)}
+                </span>
               </li>
             ))}
           </ul>
@@ -1680,6 +1694,7 @@ function HistoryTab({
 
 interface SettingsTabProps {
   categories: CategoryRow[]
+  categoryTypes: CategoryTypeRow[]
   products: ProductRow[]
   /** Learning index — used by the distribution preview to score the catalogue accurately. */
   learning: LearningIndex
@@ -1691,6 +1706,7 @@ interface SettingsTabProps {
 
 function SettingsTab({
   categories,
+  categoryTypes,
   products,
   learning,
   settings,
@@ -1800,8 +1816,8 @@ function SettingsTab({
   }
 
   const assignableCategories = useMemo(
-    () => categoriesForSmartProductAssignment(categories),
-    [categories],
+    () => categoriesForSmartProductAssignment(categories, categoryTypes),
+    [categories, categoryTypes],
   )
   const categorisedProducts = products.filter((p) => p.category_id).length
   const uncategorisedProducts = products.length - categorisedProducts

@@ -25,6 +25,7 @@ import {
   loadSmartCategorySettings,
   type SmartCategorySettings,
 } from '@/lib/smartCategorySettings'
+import { useCategoryTypes } from '@/hooks/useCategoryTypes'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
 interface SmartCategoriseModalProps {
@@ -47,6 +48,7 @@ export default function SmartCategoriseModal({
   const [settings, setSettings] = useState<SmartCategorySettings>(DEFAULT_SMART_CATEGORY_SETTINGS)
   const [loadingLearning, setLoadingLearning] = useState(false)
   const [result, setResult] = useState<ResultInfo | null>(null)
+  const { types: categoryTypes } = useCategoryTypes()
 
   const categoryById = useMemo(() => {
     const map = new Map<string, CategoryRow>()
@@ -127,6 +129,7 @@ export default function SmartCategoriseModal({
             <SuggestionsTab
               products={products}
               categories={categories}
+              categoryTypes={categoryTypes}
               categoryById={categoryById}
               learning={learning}
               settings={settings}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   createAssemblyPartType,
@@ -19,7 +19,7 @@ export default function AdminAssemblyPartTypesSettings({ embedded = false }: { e
 
   const codePreview = newCode.trim() || (newLabel.trim() ? slugifyPartTypeCode(newLabel) : '')
 
-  async function handleAdd(e: React.FormEvent) {
+  async function handleAdd(e: FormEvent) {
     e.preventDefault()
     if (!canEdit) return
     setBusy(true)
@@ -59,14 +59,21 @@ export default function AdminAssemblyPartTypesSettings({ embedded = false }: { e
     else await reload()
   }
 
-  async function handleDelete(code: string) {
+  async function handleDelete(code: string, label: string, isSystem: boolean) {
     if (!canEdit) return
-    if (!window.confirm('Delete this part type? Only unused custom types can be removed.')) return
+    if (isSystem) {
+      setMessage({ type: 'err', text: 'Built-in part types cannot be deleted — use Hide instead.' })
+      return
+    }
+    if (!window.confirm(`Delete part type “${label}”?`)) return
     setBusy(true)
     const { error: err } = await deleteAssemblyPartType(code)
     setBusy(false)
     if (err) setMessage({ type: 'err', text: err })
-    else await reload()
+    else {
+      setMessage({ type: 'ok', text: `Deleted “${label}”.` })
+      await reload()
+    }
   }
 
   const wrapClass = embedded ? 'admin-settings-embedded-panel' : 'card admin-settings-card'
@@ -74,7 +81,7 @@ export default function AdminAssemblyPartTypesSettings({ embedded = false }: { e
   if (permLoading || loading) {
     return (
       <section className={wrapClass}>
-        {!embedded && <h2>Complete-unit part types</h2>}
+        {!embedded && <h2>Products &amp; inventory</h2>}
         <p className="admin-muted">Loading…</p>
       </section>
     )
@@ -82,10 +89,11 @@ export default function AdminAssemblyPartTypesSettings({ embedded = false }: { e
 
   return (
     <section className={wrapClass}>
-      {!embedded && <h2>Complete-unit part types</h2>}
+      {!embedded && <h2>Products &amp; inventory</h2>}
       <p className={embedded ? 'admin-settings-panel-intro' : 'page-intro admin-settings-hint'}>
-        Labels used when defining a <strong>complete unit make-up</strong> (BOM) in the catalogue product modal and stock
-        take. Staff can also add types on the fly when adding a component line.
+        <strong>BOM part types</strong> label each line when defining a complete-unit make-up in the
+        catalogue product modal. Built-in types can be hidden but not deleted; custom types can be
+        removed when unused.
       </p>
       {error && <p className="admin-error">{error}</p>}
       {message && (
@@ -94,52 +102,70 @@ export default function AdminAssemblyPartTypesSettings({ embedded = false }: { e
         </p>
       )}
 
-      <ul className="admin-part-types-list">
-        {types.map((t) => (
-          <li key={t.code} className={`admin-part-types-item${t.active ? '' : ' admin-part-types-item--inactive'}`}>
-            <code className="admin-part-types-code">{t.code}</code>
-            {canEdit ? (
-              <input
-                className="admin-inline-edit-input admin-part-types-label-input"
-                defaultValue={t.label}
-                disabled={busy}
-                onBlur={(e) => {
-                  if (e.target.value.trim() !== t.label) void saveLabel(t.code, e.target.value)
-                }}
-              />
-            ) : (
-              <span>{t.label}</span>
-            )}
-            {t.is_system && <span className="admin-badge admin-badge--muted">Built-in</span>}
-            {!t.active && <span className="admin-badge">Hidden</span>}
-            {canEdit && (
-              <div className="admin-part-types-item-actions">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline"
-                  disabled={busy}
-                  onClick={() => void toggleActive(t.code, t.active)}
-                >
-                  {t.active ? 'Hide' : 'Show'}
-                </button>
-                {!t.is_system && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline"
-                    disabled={busy}
-                    onClick={() => void handleDelete(t.code)}
-                  >
-                    Delete
-                  </button>
+      <div className="admin-registry-table-wrap">
+        <table className="admin-registry-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Display name</th>
+              <th>Status</th>
+              {canEdit && <th>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {types.map((t) => (
+              <tr key={t.code} className={!t.active ? 'admin-registry-row--inactive' : undefined}>
+                <td>
+                  <code>{t.code}</code>
+                </td>
+                <td>
+                  {canEdit ? (
+                    <input
+                      className="admin-inline-edit-input"
+                      defaultValue={t.label}
+                      disabled={busy}
+                      onBlur={(e) => {
+                        if (e.target.value.trim() !== t.label) void saveLabel(t.code, e.target.value)
+                      }}
+                    />
+                  ) : (
+                    t.label
+                  )}
+                </td>
+                <td>
+                  {t.is_system && <span className="admin-badge admin-badge--muted">Built-in</span>}
+                  {!t.active && <span className="admin-badge">Hidden</span>}
+                  {t.active && !t.is_system && <span className="admin-badge admin-badge--ok">Active</span>}
+                </td>
+                {canEdit && (
+                  <td className="admin-registry-actions">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline"
+                      disabled={busy}
+                      onClick={() => void toggleActive(t.code, t.active)}
+                    >
+                      {t.active ? 'Hide' : 'Show'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline admin-danger"
+                      disabled={busy || t.is_system}
+                      onClick={() => void handleDelete(t.code, t.label, t.is_system)}
+                      title={t.is_system ? 'Built-in — hide instead of delete' : 'Delete custom type'}
+                    >
+                      Delete
+                    </button>
+                  </td>
                 )}
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {canEdit ? (
-        <form className="admin-part-types-add-form" onSubmit={(e) => void handleAdd(e)}>
+        <form className="admin-registry-add-form" onSubmit={(e) => void handleAdd(e)}>
           <h3 className="admin-modal-form-section-title">Add part type</h3>
           <div className="admin-part-types-add-fields">
             <label>
@@ -176,9 +202,8 @@ export default function AdminAssemblyPartTypesSettings({ embedded = false }: { e
       )}
 
       <p className="admin-settings-hint" style={{ marginTop: '1rem' }}>
-        Manage BOM lines on <Link to="/admin/catalogue">Catalogue</Link> → open a product → scroll to{' '}
-        <strong>Complete unit make-up</strong> → <strong>Define component breakdown</strong> (if needed) →{' '}
-        <strong>Part type</strong> dropdown includes <em>＋ Add new part type…</em>.
+        Manage BOM lines on <Link to="/admin/catalogue">Catalogue</Link> → open a product →{' '}
+        <strong>Complete unit make-up</strong>.
       </p>
     </section>
   )

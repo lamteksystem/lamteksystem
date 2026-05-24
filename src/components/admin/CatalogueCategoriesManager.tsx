@@ -16,6 +16,7 @@ import {
 } from '@/lib/categoryAdmin'
 import { categoryKindLabel, inferCategoryKindFromName } from '@/lib/categoryTaxonomy'
 import { getProductCategoryIds, type ProductCategoryMap } from '@/lib/productCategories'
+import { useCategoryTypes } from '@/hooks/useCategoryTypes'
 import type { CategoryKind, CategoryRow, ProductRow } from '@/types/database'
 
 interface CatalogueCategoriesManagerProps {
@@ -53,6 +54,8 @@ export default function CatalogueCategoriesManager({
   const [newSlug, setNewSlug] = useState('')
   const [newParentId, setNewParentId] = useState('')
   const [newKind, setNewKind] = useState<CategoryKind>('product_type')
+  const { types: categoryTypes } = useCategoryTypes(false)
+  const activeTypes = categoryTypes.filter((t) => t.active)
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [message, setMessage] = useState<Message | null>(null)
@@ -256,13 +259,15 @@ export default function CatalogueCategoriesManager({
               Type
               <select
                 value={newKind}
-                onChange={(e) => setNewKind(e.target.value as CategoryKind)}
+                onChange={(e) => setNewKind(e.target.value)}
                 disabled={creating}
-                title="Product category = doors/handles/etc. Kitchen range = Oakham/Norwood/etc. Cross-range = wirework, accessories, drawer boxes etc. usable with any range."
+                title="Category type — add more under Settings → Categories → Types"
               >
-                <option value="product_type">Product category</option>
-                <option value="door_range">Kitchen range</option>
-                <option value="universal">Cross-range (wirework, accessories…)</option>
+                {(activeTypes.length ? activeTypes : categoryTypes).map((t) => (
+                  <option key={t.code} value={t.code}>
+                    {t.label}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
@@ -325,7 +330,7 @@ export default function CatalogueCategoriesManager({
                   <tr
                     key={c.id}
                     className={isBusy ? 'admin-catalogue-categories-row--busy' : undefined}
-                    title={`${categoryKindLabel(kind)} · ${productCount} product${productCount === 1 ? '' : 's'}${
+                    title={`${categoryKindLabel(kind, categoryTypes)} · ${productCount} product${productCount === 1 ? '' : 's'}${
                       parent ? ` · sub-category of ${parent.name}` : ' · top level'
                     }`}
                   >
@@ -413,17 +418,18 @@ export default function CatalogueCategoriesManager({
                         <select
                           defaultValue={kind}
                           disabled={isBusy}
-                          onChange={(e) =>
-                            void patch(c.id, { category_kind: e.target.value as CategoryKind })
-                          }
-                          title={`Currently: ${categoryKindLabel(kind)}`}
+                          onChange={(e) => void patch(c.id, { category_kind: e.target.value })}
+                          title={`Currently: ${categoryKindLabel(kind, categoryTypes)}`}
                         >
-                          <option value="product_type">Product category</option>
-                          <option value="door_range">Kitchen range</option>
-                          <option value="universal">Cross-range</option>
+                          {categoryTypes.map((t) => (
+                            <option key={t.code} value={t.code}>
+                              {t.label}
+                              {!t.active ? ' (hidden)' : ''}
+                            </option>
+                          ))}
                         </select>
                       ) : (
-                        categoryKindLabel(kind)
+                        categoryKindLabel(kind, categoryTypes)
                       )}
                     </td>
                     <td className="admin-catalogue-categories-count" title={`${productCount} product(s) in this category`}>

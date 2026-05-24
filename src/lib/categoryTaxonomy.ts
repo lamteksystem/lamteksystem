@@ -1,8 +1,15 @@
-import type { CategoryRow, ProductRow } from '@/types/database'
+import type { CategoryRow, CategoryTypeRow, ProductRow } from '@/types/database'
 import { getDoorRange } from '@/lib/catalogProductDisplay'
+import { categoryTypeBrowseMode } from '@/lib/categoryTypes'
 
-export type CategoryKind = 'product_type' | 'door_range' | 'universal'
+export type CategoryKind = string
 export type CatalogBrowseMode = 'category' | 'range'
+
+const LEGACY_KIND_LABELS: Record<string, string> = {
+  product_type: 'Product category',
+  door_range: 'Kitchen range',
+  universal: 'Cross-range',
+}
 
 export function getCategoryKind(category: CategoryRow): CategoryKind {
   if (category.category_kind) return category.category_kind
@@ -58,23 +65,40 @@ export function inferCategoryKindFromName(name: string): CategoryKind {
   return 'product_type'
 }
 
-export function categoryKindLabel(kind: CategoryKind): string {
-  if (kind === 'door_range') return 'Kitchen range'
-  if (kind === 'universal') return 'Cross-range'
-  return 'Product category'
+export function categoryKindLabel(kind: CategoryKind, types?: CategoryTypeRow[]): string {
+  const fromDb = types?.find((t) => t.code === kind)?.label
+  if (fromDb) return fromDb
+  return LEGACY_KIND_LABELS[kind] ?? kind
+}
+
+export function categoryBrowseModeForRow(
+  category: CategoryRow,
+  types: CategoryTypeRow[],
+): CategoryTypeRow['browse_mode'] {
+  return categoryTypeBrowseMode(types, category.category_kind ?? 'product_type')
 }
 
 /** True when smart categorise may assign products to this category (kitchen ranges excluded). */
-export function isAssignableProductCategory(category: CategoryRow): boolean {
+export function isAssignableProductCategory(
+  category: CategoryRow,
+  types?: CategoryTypeRow[],
+): boolean {
+  if (types?.length) {
+    if (categoryBrowseModeForRow(category, types) !== 'door_range') return true
+    return isCompleteUnitsCategoryName(category.name)
+  }
   const kind = getCategoryKind(category)
   if (kind !== 'door_range') return true
   return isCompleteUnitsCategoryName(category.name)
 }
 
 /** Categories shown in smart categorise pickers and used for suggestion scoring. */
-export function categoriesForSmartProductAssignment(categories: CategoryRow[]): CategoryRow[] {
+export function categoriesForSmartProductAssignment(
+  categories: CategoryRow[],
+  types?: CategoryTypeRow[],
+): CategoryRow[] {
   return [...categories]
-    .filter(isAssignableProductCategory)
+    .filter((c) => isAssignableProductCategory(c, types))
     .sort((a, b) => {
       const order: Record<CategoryKind, number> = { product_type: 0, universal: 1, door_range: 2 }
       const ka = order[getCategoryKind(a)]
@@ -84,7 +108,16 @@ export function categoriesForSmartProductAssignment(categories: CategoryRow[]): 
     })
 }
 
-export function formatSmartCategoryOptionLabel(category: CategoryRow): string {
+export function formatSmartCategoryOptionLabel(
+  category: CategoryRow,
+  types?: CategoryTypeRow[],
+): string {
+  if (types?.length) {
+    const mode = categoryBrowseModeForRow(category, types)
+    if (mode === 'universal') return `${category.name} (cross-range)`
+    if (mode === 'door_range') return `${category.name} (kitchen range)`
+    return category.name
+  }
   const kind = getCategoryKind(category)
   if (kind === 'universal') return `${category.name} (cross-range)`
   if (kind === 'door_range') return `${category.name} (kitchen range)`

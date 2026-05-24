@@ -19,7 +19,20 @@ export interface MarketingSiteSettingsRow {
   updated_at: string
 }
 
-export type CategoryKind = 'product_type' | 'door_range' | 'universal'
+/** Category type code — built-ins: product_type, door_range, universal; custom types allowed. */
+export type CategoryKind = string
+
+export interface CategoryTypeRow {
+  code: string
+  label: string
+  description: string | null
+  sort_order: number
+  browse_mode: 'product' | 'door_range' | 'universal'
+  active: boolean
+  is_system: boolean
+  created_at: string
+  updated_at: string
+}
 
 export interface CategoryRow {
   id: string

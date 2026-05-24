@@ -4,6 +4,7 @@ import { normalizePageSize } from '@/lib/listPagination'
 
 export type TableDensity = 'compact' | 'comfortable' | 'spacious'
 export type DateFormat = 'locale' | 'ddmmyyyy' | 'iso'
+export type CatalogBrowseModePref = 'category' | 'range'
 
 /** How admin order detail sets unit prices when adding catalogue lines (staff). */
 export type AdminOrderLinePricingMode = 'catalogue' | 'customer_rules'
@@ -18,6 +19,16 @@ export interface AdminUiPrefs {
   defaultOrderStatusFilter: string
   /** Default for order detail: list price vs resolve rules + account discount when adding lines. */
   adminOrderLinePricingDefault: AdminOrderLinePricingMode
+  /** Require confirmation before destructive admin actions (delete category, wipe, etc.). */
+  confirmDestructiveActions: boolean
+  /** Show SKU column in catalogue and smart categorise tables where space allows. */
+  showSkuInCatalogueTables: boolean
+  /** Default browse mode when opening the catalogue (category tree vs kitchen ranges). */
+  defaultCatalogBrowseMode: CatalogBrowseModePref
+  /** Include inactive products in admin catalogue list filters by default. */
+  showInactiveProductsInCatalogue: boolean
+  /** Expand high-confidence smart categorise suggestions on first load. */
+  expandSmartSuggestionsByDefault: boolean
 }
 
 const defaults: AdminUiPrefs = {
@@ -34,6 +45,11 @@ const defaults: AdminUiPrefs = {
   rowsPerPage: 50,
   defaultOrderStatusFilter: '',
   adminOrderLinePricingDefault: 'catalogue',
+  confirmDestructiveActions: true,
+  showSkuInCatalogueTables: true,
+  defaultCatalogBrowseMode: 'category',
+  showInactiveProductsInCatalogue: false,
+  expandSmartSuggestionsByDefault: false,
 }
 
 const PREF_KEY = 'admin_ui_prefs'
@@ -45,6 +61,11 @@ type AdminUiContextValue = AdminUiPrefs & {
   setRowsPerPage: (v: number) => void
   setDefaultOrderStatusFilter: (v: string) => void
   setAdminOrderLinePricingDefault: (v: AdminOrderLinePricingMode) => void
+  setConfirmDestructiveActions: (v: boolean) => void
+  setShowSkuInCatalogueTables: (v: boolean) => void
+  setDefaultCatalogBrowseMode: (v: CatalogBrowseModePref) => void
+  setShowInactiveProductsInCatalogue: (v: boolean) => void
+  setExpandSmartSuggestionsByDefault: (v: boolean) => void
   updatePrefs: (partial: Partial<AdminUiPrefs>) => void
   resetPrefs: () => void
 }
@@ -102,6 +123,11 @@ export function AdminUiProvider({ children }: { children: ReactNode }) {
     setRowsPerPage: (v) => setPrefs({ rowsPerPage: normalizePageSize(v) }),
     setDefaultOrderStatusFilter: (v) => setPrefs({ defaultOrderStatusFilter: v }),
     setAdminOrderLinePricingDefault: (v) => setPrefs({ adminOrderLinePricingDefault: v }),
+    setConfirmDestructiveActions: (v) => setPrefs({ confirmDestructiveActions: v }),
+    setShowSkuInCatalogueTables: (v) => setPrefs({ showSkuInCatalogueTables: v }),
+    setDefaultCatalogBrowseMode: (v) => setPrefs({ defaultCatalogBrowseMode: v }),
+    setShowInactiveProductsInCatalogue: (v) => setPrefs({ showInactiveProductsInCatalogue: v }),
+    setExpandSmartSuggestionsByDefault: (v) => setPrefs({ expandSmartSuggestionsByDefault: v }),
     updatePrefs: setPrefs,
     resetPrefs,
   }

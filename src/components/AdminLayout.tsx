@@ -283,6 +283,7 @@ export default function AdminLayout() {
         orders: groupId === 'orders',
         customers: groupId === 'customers',
         catalogue: groupId === 'catalogue',
+        finance: groupId === 'finance',
         users: groupId === 'users',
       },
     })
@@ -304,11 +305,10 @@ export default function AdminLayout() {
       path === '/admin/stock' ||
       path === '/admin/locations' ||
       path === '/admin/delivery-windows' ||
-      path === '/admin/uploads' ||
-      path === '/admin/pricing' ||
-      path === '/admin/reports' ||
-      path === '/admin/accounting'
-    ) return 'catalogue'
+      path === '/admin/uploads'
+    )
+      return 'catalogue'
+    if (path === '/admin/pricing' || path === '/admin/reports' || path === '/admin/accounting') return 'finance'
     if (path.startsWith('/admin/users') || path.startsWith('/admin/tickets') || path === '/admin/permissions') return 'users'
     return null
   }, [location.pathname])
@@ -497,7 +497,7 @@ export default function AdminLayout() {
             )
           })()}
 
-          {(canViewCatalogue || canViewStock || canViewUploads || canViewPricing || canViewReports || canViewAccounting) && (() => {
+          {(canViewCatalogue || canViewStock || canViewUploads) && (() => {
             const groupId = 'catalogue'
             const forceOpen =
               location.pathname.startsWith('/admin/catalogue') ||
@@ -505,10 +505,7 @@ export default function AdminLayout() {
               location.pathname === '/admin/stock' ||
               location.pathname === '/admin/locations' ||
               location.pathname === '/admin/delivery-windows' ||
-              location.pathname === '/admin/uploads' ||
-              location.pathname === '/admin/pricing' ||
-              location.pathname === '/admin/reports' ||
-              location.pathname === '/admin/accounting'
+              location.pathname === '/admin/uploads'
             const open = groupIsOpen(groupId, forceOpen)
             return (
               <div className={`admin-nav-group ${open ? 'admin-nav-group--open' : ''}`}>
@@ -519,7 +516,7 @@ export default function AdminLayout() {
                     aria-expanded={open}
                     onClick={() => setGroupOpen(groupId, !open)}
                   >
-                    <span>Catalogue, Stock & Finance</span>
+                    <span>Catalogue</span>
                     <span className="admin-nav-group-chevron" aria-hidden>
                       {open ? <ChevronDown size={14} strokeWidth={2} /> : <ChevronRight size={14} strokeWidth={2} />}
                     </span>
@@ -596,6 +593,42 @@ export default function AdminLayout() {
                       {!sidebarCollapsed && <span>Brochure & files</span>}
                     </NavLink>
                   )}
+                </div>
+              </div>
+            )
+          })()}
+
+          {(canViewPricing || canViewReports || canViewAccounting) && (() => {
+            const groupId = 'finance'
+            const forceOpen =
+              location.pathname === '/admin/pricing' ||
+              location.pathname === '/admin/reports' ||
+              location.pathname === '/admin/accounting'
+            const open = groupIsOpen(groupId, forceOpen)
+            return (
+              <div className={`admin-nav-group ${open ? 'admin-nav-group--open' : ''}`}>
+                {!sidebarCollapsed && (
+                  <button
+                    type="button"
+                    className="admin-nav-group-toggle"
+                    aria-expanded={open}
+                    onClick={() => setGroupOpen(groupId, !open)}
+                  >
+                    <span>Finance</span>
+                    <span className="admin-nav-group-chevron" aria-hidden>
+                      {open ? <ChevronDown size={14} strokeWidth={2} /> : <ChevronRight size={14} strokeWidth={2} />}
+                    </span>
+                  </button>
+                )}
+                <div className={`admin-nav-children ${open ? 'open' : ''}`}>
+                  {canViewAccounting && (
+                    <NavLink to="/admin/accounting" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+                      <span className="admin-nav-icon">
+                        <Landmark size={16} strokeWidth={2} aria-hidden />
+                      </span>
+                      {!sidebarCollapsed && <span>Accounting</span>}
+                    </NavLink>
+                  )}
                   {canViewPricing && (
                     <NavLink to="/admin/pricing" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
                       <span className="admin-nav-icon">
@@ -610,14 +643,6 @@ export default function AdminLayout() {
                         <BarChart3 size={16} strokeWidth={2} aria-hidden />
                       </span>
                       {!sidebarCollapsed && <span>Reports</span>}
-                    </NavLink>
-                  )}
-                  {canViewAccounting && (
-                    <NavLink to="/admin/accounting" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <Landmark size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Accounting</span>}
                     </NavLink>
                   )}
                 </div>
@@ -776,6 +801,8 @@ export default function AdminLayout() {
                 {canViewCatalogue && <option value="/admin/catalogue/categories">Categories</option>}
                 {canEditCatalogue && <option value={CATALOGUE_TOOLS.hub}>Product &amp; category tools</option>}
                 {canViewStock && <option value="/admin/stock">Stock take</option>}
+                {canViewAccounting && <option value="/admin/accounting">Accounting</option>}
+                {canViewPricing && <option value="/admin/pricing">Pricing &amp; margin</option>}
                 {canViewReports && <option value="/admin/reports">Reports</option>}
                 {canViewTickets && <option value="/admin/tickets">Support tickets</option>}
                 {canViewUsers && <option value="/admin/users">Team users</option>}

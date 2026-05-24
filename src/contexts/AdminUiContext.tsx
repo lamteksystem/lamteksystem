@@ -38,6 +38,7 @@ const defaults: AdminUiPrefs = {
     orders: false,
     customers: false,
     catalogue: false,
+    finance: false,
     users: false,
   },
   tableDensity: 'comfortable',

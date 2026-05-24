@@ -70,6 +70,7 @@ export default function SettingsAppearancePanel() {
               ['orders', 'Orders'],
               ['customers', 'Customers'],
               ['catalogue', 'Catalogue'],
+              ['finance', 'Finance'],
               ['users', 'Users & access'],
             ] as const
           ).map(([key, label]) => (

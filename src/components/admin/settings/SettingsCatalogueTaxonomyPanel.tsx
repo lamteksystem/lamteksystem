@@ -5,12 +5,14 @@ import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesMa
 import CategoryTypesManager from '@/components/admin/CategoryTypesManager'
 import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productCategories'
 import { LIVE_CATALOGUE } from '@/lib/catalogueToolsPaths'
+import { useCategoryTypes } from '@/hooks/useCategoryTypes'
 import { usePermission } from '@/hooks/usePermission'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
 /** Settings → Catalogue taxonomy: types + categories in one tidy layout. */
 export default function SettingsCatalogueTaxonomyPanel() {
   const { allowed: canEdit } = usePermission('admin.settings', 'edit')
+  const { types: categoryTypes, reload: reloadCategoryTypes } = useCategoryTypes(false)
   const [products, setProducts] = useState<ProductRow[]>([])
   const [categories, setCategories] = useState<CategoryRow[]>([])
   const [productCategoryMap, setProductCategoryMap] = useState<ProductCategoryMap>(new Map())
@@ -42,10 +44,14 @@ export default function SettingsCatalogueTaxonomyPanel() {
         <Link to={LIVE_CATALOGUE.categories}>Manage categories</Link>.
       </p>
 
-      <CategoryTypesManager embedded />
+      <CategoryTypesManager
+        embedded
+        editScope="any"
+        onTypesChanged={() => reloadCategoryTypes()}
+      />
 
       <section className="admin-taxonomy-section admin-taxonomy-section--categories card admin-card">
-        <h3 className="admin-modal-form-section-title">Categories</h3>
+        <h2 className="admin-modal-form-section-title">Categories</h2>
         <p className="admin-muted admin-taxonomy-section-intro">
           Add parent categories (leave Parent empty) or sub-categories under a parent. Double-click a
           slug to edit.
@@ -57,6 +63,7 @@ export default function SettingsCatalogueTaxonomyPanel() {
             categories={categories}
             products={products}
             productCategoryMap={productCategoryMap}
+            categoryTypes={categoryTypes}
             onChanged={loadAll}
             variant="embedded"
             canEdit={canEdit}

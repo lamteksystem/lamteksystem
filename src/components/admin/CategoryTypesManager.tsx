@@ -15,8 +15,33 @@ const BROWSE_MODE_LABELS: Record<CategoryTypeRow['browse_mode'], string> = {
   universal: 'Cross-range',
 }
 
-export default function CategoryTypesManager({ embedded = false }: { embedded?: boolean }) {
-  const { allowed: canEdit, loading: permLoading } = usePermission('admin.settings', 'edit')
+export type CategoryTypesEditScope = 'settings' | 'catalogue' | 'any'
+
+export default function CategoryTypesManager({
+  embedded = false,
+  /** Who may add/edit types: settings admins, catalogue editors, or either. */
+  editScope = 'settings',
+  onTypesChanged,
+}: {
+  embedded?: boolean
+  editScope?: CategoryTypesEditScope
+  /** Called after types are added/updated so category Type dropdowns can refresh. */
+  onTypesChanged?: () => void | Promise<void>
+}) {
+  const { allowed: settingsEdit, loading: settingsPermLoading } = usePermission('admin.settings', 'edit')
+  const { allowed: catalogueEdit, loading: cataloguePermLoading } = usePermission('admin.catalogue', 'edit')
+  const canEdit =
+    editScope === 'catalogue'
+      ? catalogueEdit
+      : editScope === 'settings'
+        ? settingsEdit
+        : settingsEdit || catalogueEdit
+  const permLoading =
+    editScope === 'catalogue'
+      ? cataloguePermLoading
+      : editScope === 'settings'
+        ? settingsPermLoading
+        : settingsPermLoading && cataloguePermLoading
   const { types, loading, error, reload } = useCategoryTypes(false)
   const [newLabel, setNewLabel] = useState('')
   const [newCode, setNewCode] = useState('')
@@ -49,6 +74,7 @@ export default function CategoryTypesManager({ embedded = false }: { embedded?: 
     setNewBrowseMode('product')
     setMessage({ type: 'ok', text: `Added type “${categoryType.label}”.` })
     await reload()
+    await onTypesChanged?.()
   }
 
   async function saveLabel(code: string, label: string) {
@@ -59,7 +85,10 @@ export default function CategoryTypesManager({ embedded = false }: { embedded?: 
     const { error: err } = await updateCategoryType(code, { label: trimmed })
     setBusy(false)
     if (err) setMessage({ type: 'err', text: err })
-    else await reload()
+    else {
+      await reload()
+      await onTypesChanged?.()
+    }
   }
 
   async function saveDescription(code: string, description: string) {
@@ -68,7 +97,10 @@ export default function CategoryTypesManager({ embedded = false }: { embedded?: 
     const { error: err } = await updateCategoryType(code, { description: description.trim() || null })
     setBusy(false)
     if (err) setMessage({ type: 'err', text: err })
-    else await reload()
+    else {
+      await reload()
+      await onTypesChanged?.()
+    }
   }
 
   async function saveBrowseMode(code: string, browse_mode: CategoryTypeRow['browse_mode']) {
@@ -77,7 +109,10 @@ export default function CategoryTypesManager({ embedded = false }: { embedded?: 
     const { error: err } = await updateCategoryType(code, { browse_mode })
     setBusy(false)
     if (err) setMessage({ type: 'err', text: err })
-    else await reload()
+    else {
+      await reload()
+      await onTypesChanged?.()
+    }
   }
 
   async function toggleActive(row: CategoryTypeRow) {
@@ -86,7 +121,10 @@ export default function CategoryTypesManager({ embedded = false }: { embedded?: 
     const { error: err } = await updateCategoryType(row.code, { active: !row.active })
     setBusy(false)
     if (err) setMessage({ type: 'err', text: err })
-    else await reload()
+    else {
+      await reload()
+      await onTypesChanged?.()
+    }
   }
 
   async function handleDelete(row: CategoryTypeRow) {
@@ -103,6 +141,7 @@ export default function CategoryTypesManager({ embedded = false }: { embedded?: 
     else {
       setMessage({ type: 'ok', text: `Deleted “${row.label}”.` })
       await reload()
+      await onTypesChanged?.()
     }
   }
 
@@ -111,12 +150,15 @@ export default function CategoryTypesManager({ embedded = false }: { embedded?: 
   }
 
   return (
-    <section className={embedded ? 'admin-taxonomy-section' : 'card admin-card admin-taxonomy-section'}>
-      {!embedded && <h3 className="admin-modal-form-section-title">Category types</h3>}
-      {embedded && <h3 className="admin-modal-form-section-title">Types</h3>}
+    <section
+      id="category-types"
+      className={embedded ? 'admin-taxonomy-section card admin-card' : 'card admin-card admin-taxonomy-section'}
+    >
+      <h2 className="admin-modal-form-section-title">Category types</h2>
       <p className="admin-muted admin-taxonomy-section-intro">
-        Types control how categories behave in the catalogue, ordering flow, and smart categorise
-        (product groups vs kitchen ranges vs cross-range). Assign a type to each category below.
+        These are the options in the <strong>Type</strong> dropdown when you add or edit a category
+        (Product category, Kitchen range, Cross-range, plus any custom types you add). Built-in types
+        can be hidden but not deleted.
       </p>
       {error && <p className="admin-error">{error}</p>}
       {message && (
@@ -277,7 +319,9 @@ export default function CategoryTypesManager({ embedded = false }: { embedded?: 
           </button>
         </form>
       ) : (
-        <p className="admin-muted">You do not have permission to edit settings.</p>
+        <p className="admin-muted">
+          You need catalogue or settings edit permission to add category types.
+        </p>
       )}
     </section>
   )

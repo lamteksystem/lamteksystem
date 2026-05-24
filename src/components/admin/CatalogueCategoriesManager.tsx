@@ -17,13 +17,15 @@ import {
 import { categoryKindLabel, inferCategoryKindFromName } from '@/lib/categoryTaxonomy'
 import { getProductCategoryIds, type ProductCategoryMap } from '@/lib/productCategories'
 import { useCategoryTypes } from '@/hooks/useCategoryTypes'
-import type { CategoryKind, CategoryRow, ProductRow } from '@/types/database'
+import type { CategoryKind, CategoryRow, CategoryTypeRow, ProductRow } from '@/types/database'
 
 interface CatalogueCategoriesManagerProps {
   categories: CategoryRow[]
   products: ProductRow[]
   productCategoryMap: ProductCategoryMap
   onChanged: () => void | Promise<void>
+  /** When provided (e.g. from parent page), Type dropdowns use this list and stay in sync after new types are added. */
+  categoryTypes?: CategoryTypeRow[]
   /**
    * `inline` (default) renders the manager as a collapsible `<details>` card — used
    * when embedded under the catalogue browse table as a quick-edit panel.
@@ -45,6 +47,7 @@ export default function CatalogueCategoriesManager({
   products,
   productCategoryMap,
   onChanged,
+  categoryTypes: categoryTypesProp,
   variant = 'inline',
   canEdit = true,
 }: CatalogueCategoriesManagerProps) {
@@ -54,7 +57,8 @@ export default function CatalogueCategoriesManager({
   const [newSlug, setNewSlug] = useState('')
   const [newParentId, setNewParentId] = useState('')
   const [newKind, setNewKind] = useState<CategoryKind>('product_type')
-  const { types: categoryTypes } = useCategoryTypes(false)
+  const { types: categoryTypesFromHook } = useCategoryTypes(false)
+  const categoryTypes = categoryTypesProp ?? categoryTypesFromHook
   const activeTypes = categoryTypes.filter((t) => t.active)
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -261,7 +265,7 @@ export default function CatalogueCategoriesManager({
                 value={newKind}
                 onChange={(e) => setNewKind(e.target.value)}
                 disabled={creating}
-                title="Category type — add more under Settings → Categories → Types"
+                title="Category type — add custom options in the Category types section above"
               >
                 {(activeTypes.length ? activeTypes : categoryTypes).map((t) => (
                   <option key={t.code} value={t.code}>

@@ -49,6 +49,7 @@ import {
 import { rebucketTealburyAccessories } from '@/lib/tealburyAccessoryRebucket'
 import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productCategories'
 import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
+import CategoryTypesManager from '@/components/admin/CategoryTypesManager'
 import AdminAssemblyPartTypesSettings from '@/components/admin/AdminAssemblyPartTypesSettings'
 import ListPager from '@/components/admin/ListPager'
 import { useCategoryTypes } from '@/hooks/useCategoryTypes'
@@ -128,7 +129,7 @@ export default function AdminSmartCategorise({ lockSection }: AdminSmartCategori
   const [settings, setSettings] = useState<SmartCategorySettings>(DEFAULT_SMART_CATEGORY_SETTINGS)
   const [loading, setLoading] = useState(true)
   const [result, setResult] = useState<ResultInfo | null>(null)
-  const { types: categoryTypes } = useCategoryTypes()
+  const { types: categoryTypes, reload: reloadCategoryTypes } = useCategoryTypes()
 
   const refreshLearning = useCallback(async () => {
     const [idx, hist, stops, opts] = await Promise.all([
@@ -223,13 +224,24 @@ export default function AdminSmartCategorise({ lockSection }: AdminSmartCategori
         {loading ? (
           <p className="admin-muted">Loading catalogue…</p>
         ) : section === 'general' ? (
-          <CatalogueCategoriesManager
-            categories={categories}
-            products={products}
-            productCategoryMap={productCategoryMap}
-            onChanged={loadAll}
-            variant="embedded"
-          />
+          <>
+            <CategoryTypesManager
+              embedded
+              editScope="catalogue"
+              onTypesChanged={() => reloadCategoryTypes()}
+            />
+            <section className="card admin-card" style={{ marginTop: '1.25rem' }}>
+              <h2 className="admin-modal-form-section-title">Categories</h2>
+              <CatalogueCategoriesManager
+                categories={categories}
+                products={products}
+                productCategoryMap={productCategoryMap}
+                categoryTypes={categoryTypes}
+                onChanged={loadAll}
+                variant="embedded"
+              />
+            </section>
+          </>
         ) : section === 'parts' ? (
           <AdminAssemblyPartTypesSettings embedded />
         ) : (

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { CATALOGUE_TOOLS } from '@/lib/catalogueToolsPaths'
-import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 import SmartCategoriseModal from '@/components/admin/SmartCategoriseModal'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { supabase } from '@/lib/supabase'
@@ -421,9 +420,12 @@ export default function AdminCatalogue() {
       </p>
 
       {canEditCatalogue && (
-        <p style={{ marginBottom: '1rem' }}>
+        <p className="admin-catalogue-quick-links" style={{ marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <Link to="/admin/catalogue/categories" className="btn btn-small">
+            Manage categories
+          </Link>
           <Link to={CATALOGUE_TOOLS.hub} className="btn btn-small btn-outline">
-            Open product &amp; category tools
+            Product &amp; category tools
           </Link>
         </p>
       )}
@@ -1240,15 +1242,6 @@ export default function AdminCatalogue() {
           }}
         />
       )}
-
-      <CatalogueCategoriesManager
-        categories={categories}
-        products={products}
-        productCategoryMap={productCategoryMap}
-        onChanged={() => {
-          void load()
-        }}
-      />
 
       {smartCategoriseOpen && (
         <SmartCategoriseModal

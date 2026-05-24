@@ -66,7 +66,9 @@ export default function AdminLiveCategories() {
         <div>
           <h1>Categories</h1>
           <p className="admin-muted">
-            Active category tree used by the live catalogue. For smart categorisation, imports, and parsers, use{' '}
+            Add and edit categories here: <strong>parent</strong> (top level vs sub-category),{' '}
+            <strong>type</strong> (product / kitchen range / cross-range), and <strong>slug</strong>{' '}
+            (double-click in the list). Smart categorisation and imports live under{' '}
             <Link to={CATALOGUE_TOOLS.hub}>Product &amp; category tools</Link>.
           </p>
           {canEditCatalogue && (
@@ -94,6 +96,7 @@ export default function AdminLiveCategories() {
           productCategoryMap={productCategoryMap}
           onChanged={loadAll}
           variant="embedded"
+          canEdit={canEditCatalogue}
         />
       )}
     </section>

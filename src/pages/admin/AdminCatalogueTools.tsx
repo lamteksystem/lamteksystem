@@ -7,6 +7,18 @@ const TOOL_GROUPS: {
   tools: { to: string; title: string; description: string; tone?: 'danger' }[]
 }[] = [
   {
+    title: 'Category tree',
+    intro: 'Live taxonomy used by the catalogue and ordering — not import parsers.',
+    tools: [
+      {
+        to: LIVE_CATALOGUE.categories,
+        title: 'Manage categories',
+        description:
+          'Add parent and sub-categories, set type (product / kitchen range / cross-range), edit slugs, and delete.',
+      },
+    ],
+  },
+  {
     title: 'Pricelist & parser',
     intro: 'Parse supplier workbooks, map rows, and publish into the live catalogue.',
     tools: [

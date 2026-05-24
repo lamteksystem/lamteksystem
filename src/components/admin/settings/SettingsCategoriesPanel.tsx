@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   createCategory,
   fetchAllCategories,
+  normalizeCategorySlug,
   slugifyCategoryName,
   updateCategory,
 } from '@/lib/categoryAdmin'
@@ -18,6 +19,7 @@ export default function SettingsCategoriesPanel() {
   const [newParentId, setNewParentId] = useState('')
   const [newKind, setNewKind] = useState<CategoryKind>('product_type')
   const [creating, setCreating] = useState(false)
+  const [editingSlugId, setEditingSlugId] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   const refresh = useCallback(async () => {
@@ -117,7 +119,7 @@ export default function SettingsCategoriesPanel() {
           <label>
             Parent <span className="admin-muted">(sub-category)</span>
             <select value={newParentId} onChange={(e) => setNewParentId(e.target.value)} disabled={creating}>
-              <option value="">Top level</option>
+              <option value="">Top level (parent category)</option>
               {parents.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -179,7 +181,31 @@ export default function SettingsCategoriesPanel() {
                     }}
                   />
                 </label>
-                <code className="admin-categories-list-slug">{c.slug}</code>
+                {editingSlugId === c.id ? (
+                  <input
+                    type="text"
+                    className="admin-catalogue-categories-slug-input"
+                    defaultValue={c.slug}
+                    autoFocus
+                    onBlur={(e) => {
+                      setEditingSlugId(null)
+                      const next = normalizeCategorySlug(e.target.value)
+                      if (next && next !== c.slug) void patchCategory(c.id, { slug: next })
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                      if (e.key === 'Escape') setEditingSlugId(null)
+                    }}
+                  />
+                ) : (
+                  <code
+                    className="admin-categories-list-slug admin-catalogue-categories-slug--editable"
+                    onDoubleClick={() => setEditingSlugId(c.id)}
+                    title="Double-click to edit slug"
+                  >
+                    {c.slug}
+                  </code>
+                )}
                 <label>
                   Parent
                   <select
@@ -188,7 +214,7 @@ export default function SettingsCategoriesPanel() {
                       void patchCategory(c.id, { parent_id: e.target.value || null })
                     }
                   >
-                    <option value="">Top level</option>
+                    <option value="">Top level (parent category)</option>
                     {parents
                       .filter((p) => p.id !== c.id)
                       .map((p) => (

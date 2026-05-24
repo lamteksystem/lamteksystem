@@ -63,11 +63,30 @@ export async function createCategory(params: {
   return { category: data as CategoryRow, error: null }
 }
 
+export function normalizeCategorySlug(raw: string): string {
+  return slugifyCategoryName(raw.trim().slice(0, 80))
+}
+
 export async function updateCategory(
   id: string,
   patch: Partial<Pick<CategoryRow, 'name' | 'slug' | 'sort_order' | 'parent_id' | 'category_kind'>>,
 ): Promise<{ category: CategoryRow | null; error: string | null }> {
-  const { data, error } = await supabase.from('categories').update(patch).eq('id', id).select('*').single()
+  const body = { ...patch }
+  if (body.slug !== undefined) {
+    const slug = normalizeCategorySlug(String(body.slug))
+    if (!slug) return { category: null, error: 'Slug is required.' }
+    const { data: clash, error: clashErr } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('slug', slug)
+      .neq('id', id)
+      .maybeSingle()
+    if (clashErr) return { category: null, error: clashErr.message }
+    if (clash) return { category: null, error: `Slug "${slug}" is already used by another category.` }
+    body.slug = slug
+  }
+
+  const { data, error } = await supabase.from('categories').update(body).eq('id', id).select('*').single()
   if (error) return { category: null, error: error.message }
   return { category: data as CategoryRow, error: null }
 }

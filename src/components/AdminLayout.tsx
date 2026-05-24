@@ -547,7 +547,7 @@ export default function AdminLayout() {
                       <span className="admin-nav-icon">
                         <FolderTree size={16} strokeWidth={2} aria-hidden />
                       </span>
-                      {!sidebarCollapsed && <span>Categories</span>}
+                      {!sidebarCollapsed && <span>Manage categories</span>}
                     </NavLink>
                   )}
                   {canEditCatalogue && (

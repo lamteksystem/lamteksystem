@@ -1422,6 +1422,24 @@
   white-space: nowrap;
 }
 
+.admin-catalogue-categories-slug--editable {
+  cursor: pointer;
+}
+
+.admin-catalogue-categories-slug--editable:hover {
+  background: rgba(15, 23, 42, 0.1);
+  color: var(--lamtek-text);
+}
+
+.admin-catalogue-categories-slug-input {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--lamtek-primary, #2563eb);
+  border-radius: 4px;
+  min-width: 8rem;
+}
+
 .admin-catalogue-categories-count {
   text-align: right;
   font-variant-numeric: tabular-nums;

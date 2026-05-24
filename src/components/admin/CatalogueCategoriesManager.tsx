@@ -10,6 +10,7 @@ import { useListPagination } from '@/lib/listPagination'
 import {
   createCategory,
   deleteCategory,
+  normalizeCategorySlug,
   slugifyCategoryName,
   updateCategory,
 } from '@/lib/categoryAdmin'
@@ -29,6 +30,8 @@ interface CatalogueCategoriesManagerProps {
    * on the dedicated Categories hub page's General tab.
    */
   variant?: 'inline' | 'embedded'
+  /** When false, list is read-only (view permission without edit). */
+  canEdit?: boolean
 }
 
 interface Message {
@@ -42,8 +45,10 @@ export default function CatalogueCategoriesManager({
   productCategoryMap,
   onChanged,
   variant = 'inline',
+  canEdit = true,
 }: CatalogueCategoriesManagerProps) {
   const [search, setSearch] = useState('')
+  const [editingSlugId, setEditingSlugId] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
   const [newSlug, setNewSlug] = useState('')
   const [newParentId, setNewParentId] = useState('')
@@ -173,10 +178,17 @@ export default function CatalogueCategoriesManager({
   const body = (
       <div className="admin-catalogue-categories-body">
         <p className="admin-callout admin-callout--info">
-          Categories group products in the catalogue, ordering flow and the customer site. Use
-          <strong> sub-categories</strong> under a parent (e.g. <em>Handles → Knobs</em>). Set
-          <strong> Type</strong> so the catalogue toggle can switch between product categories,
-          kitchen ranges, and cross-range items.{' '}
+          Categories group products in the catalogue, ordering flow and the customer site.{' '}
+          <strong>Add category</strong> below to create a top-level parent (leave Parent empty) or a
+          sub-category under an existing parent. Edit <strong>Parent</strong> and{' '}
+          <strong>Type</strong> in the table; double-click a <strong>slug</strong> to change it.{' '}
+          {canEdit ? (
+            <>
+              Names save when you click away; parent and type save when you change the dropdown.
+            </>
+          ) : (
+            <>You have view-only access — ask an admin with catalogue edit permission to make changes.</>
+          )}{' '}
           {variant === 'inline' ? (
             <>
               Need bulk assignment?{' '}
@@ -199,6 +211,7 @@ export default function CatalogueCategoriesManager({
           </p>
         )}
 
+        {canEdit && (
         <form className="admin-catalogue-categories-add-form" onSubmit={(e) => void handleCreate(e)}>
           <h3 className="admin-modal-form-section-title">Add category</h3>
           <div className="admin-catalogue-categories-add-grid">
@@ -207,7 +220,7 @@ export default function CatalogueCategoriesManager({
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Drawer boxes"
+                placeholder="e.g. Complete, Drawer boxes"
                 required
                 disabled={creating}
                 title="Display name shown in the catalogue, ordering flow, and customer site"
@@ -224,14 +237,14 @@ export default function CatalogueCategoriesManager({
               />
             </label>
             <label>
-              Parent <span className="admin-muted">(sub-category)</span>
+              Parent category
               <select
                 value={newParentId}
                 onChange={(e) => setNewParentId(e.target.value)}
                 disabled={creating}
-                title="Choose a parent if this should be a sub-category"
+                title="Leave as Top level to create a parent category; pick a parent for a sub-category"
               >
-                <option value="">Top level</option>
+                <option value="">Top level (parent category)</option>
                 {parents.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -266,6 +279,7 @@ export default function CatalogueCategoriesManager({
             {creating ? 'Creating…' : 'Add category'}
           </button>
         </form>
+        )}
 
         <div className="admin-catalogue-categories-list-toolbar">
           <h3 className="admin-modal-form-section-title">
@@ -316,53 +330,101 @@ export default function CatalogueCategoriesManager({
                     }`}
                   >
                     <td>
-                      <input
-                        type="text"
-                        defaultValue={c.name}
-                        disabled={isBusy}
-                        onBlur={(e) => {
-                          const v = e.target.value.trim()
-                          if (v && v !== c.name) void patch(c.id, { name: v })
-                        }}
-                        title="Rename this category. Saved when you click away."
-                        aria-label={`Rename ${c.name}`}
-                      />
+                      {canEdit ? (
+                        <input
+                          type="text"
+                          defaultValue={c.name}
+                          disabled={isBusy}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim()
+                            if (v && v !== c.name) void patch(c.id, { name: v })
+                          }}
+                          title="Rename this category. Saved when you click away."
+                          aria-label={`Rename ${c.name}`}
+                        />
+                      ) : (
+                        c.name
+                      )}
                     </td>
                     <td>
-                      <code className="admin-catalogue-categories-slug">{c.slug}</code>
+                      {canEdit && editingSlugId === c.id ? (
+                        <input
+                          type="text"
+                          className="admin-catalogue-categories-slug-input"
+                          defaultValue={c.slug}
+                          autoFocus
+                          disabled={isBusy}
+                          onBlur={(e) => {
+                            setEditingSlugId(null)
+                            const next = normalizeCategorySlug(e.target.value)
+                            if (next && next !== c.slug) void patch(c.id, { slug: next })
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                            if (e.key === 'Escape') setEditingSlugId(null)
+                          }}
+                          aria-label={`Edit slug for ${c.name}`}
+                        />
+                      ) : (
+                        <code
+                          className={`admin-catalogue-categories-slug${canEdit ? ' admin-catalogue-categories-slug--editable' : ''}`}
+                          onDoubleClick={
+                            canEdit && !isBusy
+                              ? () => setEditingSlugId(c.id)
+                              : undefined
+                          }
+                          title={
+                            canEdit
+                              ? 'Double-click to edit slug'
+                              : c.slug
+                          }
+                        >
+                          {c.slug}
+                        </code>
+                      )}
                     </td>
                     <td>
-                      <select
-                        defaultValue={c.parent_id ?? ''}
-                        disabled={isBusy}
-                        onChange={(e) =>
-                          void patch(c.id, { parent_id: e.target.value || null })
-                        }
-                        title="Move under a parent category, or set to Top level"
-                      >
-                        <option value="">Top level</option>
-                        {parents
-                          .filter((p) => p.id !== c.id)
-                          .map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                      </select>
+                      {canEdit ? (
+                        <select
+                          defaultValue={c.parent_id ?? ''}
+                          disabled={isBusy}
+                          onChange={(e) =>
+                            void patch(c.id, { parent_id: e.target.value || null })
+                          }
+                          title="Move under a parent category, or set to Top level (parent category)"
+                        >
+                          <option value="">Top level (parent)</option>
+                          {parents
+                            .filter((p) => p.id !== c.id)
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                        </select>
+                      ) : parent ? (
+                        parent.name
+                      ) : (
+                        <span className="admin-muted">Top level</span>
+                      )}
                     </td>
                     <td>
-                      <select
-                        defaultValue={kind}
-                        disabled={isBusy}
-                        onChange={(e) =>
-                          void patch(c.id, { category_kind: e.target.value as CategoryKind })
-                        }
-                        title={`Currently: ${categoryKindLabel(kind)}`}
-                      >
-                        <option value="product_type">Product category</option>
-                        <option value="door_range">Kitchen range</option>
-                        <option value="universal">Cross-range</option>
-                      </select>
+                      {canEdit ? (
+                        <select
+                          defaultValue={kind}
+                          disabled={isBusy}
+                          onChange={(e) =>
+                            void patch(c.id, { category_kind: e.target.value as CategoryKind })
+                          }
+                          title={`Currently: ${categoryKindLabel(kind)}`}
+                        >
+                          <option value="product_type">Product category</option>
+                          <option value="door_range">Kitchen range</option>
+                          <option value="universal">Cross-range</option>
+                        </select>
+                      ) : (
+                        categoryKindLabel(kind)
+                      )}
                     </td>
                     <td className="admin-catalogue-categories-count" title={`${productCount} product(s) in this category`}>
                       {productCount}
@@ -371,19 +433,21 @@ export default function CatalogueCategoriesManager({
                       {childCount}
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className="admin-link-button admin-danger"
-                        disabled={isBusy}
-                        onClick={() => void remove(c)}
-                        title={
-                          hasReferences
-                            ? `Delete "${c.name}" — ${productCount} product(s) and ${childCount} sub-categor(y/ies) will be updated`
-                            : `Delete "${c.name}"`
-                        }
-                      >
-                        Delete
-                      </button>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          className="admin-link-button admin-danger"
+                          disabled={isBusy}
+                          onClick={() => void remove(c)}
+                          title={
+                            hasReferences
+                              ? `Delete "${c.name}" — ${productCount} product(s) and ${childCount} sub-categor(y/ies) will be updated`
+                              : `Delete "${c.name}"`
+                          }
+                        >
+                          Delete
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 )

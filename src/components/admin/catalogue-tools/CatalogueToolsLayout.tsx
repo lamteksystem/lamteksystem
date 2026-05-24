@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { CATALOGUE_TOOLS, LIVE_CATALOGUE } from '@/lib/catalogueToolsPaths'
+import { CATALOGUE_TOOLS } from '@/lib/catalogueToolsPaths'
 
 const TOOL_NAV: { to: string; label: string; match: (path: string) => boolean }[] = [
   {
@@ -50,14 +50,6 @@ export default function CatalogueToolsLayout() {
 
   return (
     <div className="admin-catalogue-tools-layout">
-      {onHub && (
-        <p className="admin-muted page-intro">
-          Import, parse, categorise, and maintain the catalogue — separate from the live{' '}
-          <Link to={LIVE_CATALOGUE.products}>Catalogue</Link> and{' '}
-          <Link to={LIVE_CATALOGUE.categories}>Categories</Link> views.
-        </p>
-      )}
-
       {!onHub && (
         <nav className="admin-catalogue-tools-subnav" aria-label="Catalogue tools">
           <Link to={CATALOGUE_TOOLS.hub} className="btn btn-ghost btn-small">

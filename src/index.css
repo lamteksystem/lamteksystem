@@ -8646,45 +8646,146 @@ button.ordering-wizard-card {
 .help-answer { margin-top: 0.5rem; color: var(--lamtek-text-muted, var(--lamtek-gray)); line-height: 1.6; }
 
 /* Product & category tools hub */
+.admin-catalogue-tools-layout {
+  max-width: 1120px;
+}
+.admin-catalogue-tools-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.admin-catalogue-tools-hub-callout {
+  margin: 0 0 1.5rem;
+}
+.admin-catalogue-tools-hub-callout p {
+  margin: 0;
+  line-height: 1.5;
+}
 .admin-catalogue-tools-subnav {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
-  margin: 0 0 1rem;
+  margin: 0 0 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--lamtek-border);
+}
+.admin-catalogue-tools-section {
+  padding: 1.35rem 0;
+  border-bottom: 1px solid var(--lamtek-border);
+}
+.admin-catalogue-tools-section:first-of-type {
+  padding-top: 0;
+}
+.admin-catalogue-tools-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.admin-catalogue-tools-section-header {
+  margin-bottom: 1rem;
+}
+.admin-catalogue-tools-section-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--lamtek-text);
+  padding-left: 0.65rem;
+  border-left: 3px solid var(--lamtek-burgundy, #672732);
+}
+.admin-catalogue-tools-section-intro {
+  margin: 0;
+  padding-left: 0.65rem;
+  font-size: 0.9rem;
+  color: var(--lamtek-gray);
+  line-height: 1.45;
+  max-width: 52rem;
 }
 .admin-catalogue-tools-grid {
   list-style: none;
-  margin: 0.75rem 0 0;
+  margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.85rem;
 }
 .admin-catalogue-tools-card {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--admin-border, #e5e7eb);
-  border-radius: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-height: 5.25rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--lamtek-border);
+  border-radius: 12px;
   text-decoration: none;
-  color: inherit;
-  background: var(--admin-surface, #fff);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  color: var(--lamtek-text);
+  background: var(--lamtek-surface, #fff);
+  box-shadow: 0 1px 3px rgba(103, 39, 50, 0.05);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+.admin-catalogue-tools-card,
+.admin-catalogue-tools-card:hover,
+.admin-catalogue-tools-card:focus-visible {
+  text-decoration: none;
 }
 .admin-catalogue-tools-card:hover {
-  border-color: var(--lamtek-gold, #c9a227);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-color: color-mix(in srgb, var(--lamtek-burgundy, #672732) 35%, var(--lamtek-border) 65%);
+  box-shadow: 0 6px 18px rgba(103, 39, 50, 0.08);
+  transform: translateY(-1px);
 }
-.admin-catalogue-tools-card--danger {
-  border-color: rgba(185, 28, 28, 0.35);
+.admin-catalogue-tools-card:focus-visible {
+  outline: 2px solid var(--lamtek-burgundy, #672732);
+  outline-offset: 2px;
+}
+.admin-catalogue-tools-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1;
 }
 .admin-catalogue-tools-card-title {
   font-weight: 650;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  color: var(--lamtek-text);
+  text-decoration: none;
 }
-.admin-catalogue-tools-group + .admin-catalogue-tools-group {
-  margin-top: 1rem;
+.admin-catalogue-tools-card:hover .admin-catalogue-tools-card-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.admin-catalogue-tools-card-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--lamtek-gray);
+  text-decoration: none;
+}
+.admin-catalogue-tools-card-chevron {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--lamtek-gray);
+  opacity: 0.55;
+  transition: transform 0.15s ease, opacity 0.15s ease, color 0.15s ease;
+}
+.admin-catalogue-tools-card:hover .admin-catalogue-tools-card-chevron {
+  opacity: 1;
+  color: var(--lamtek-burgundy, #672732);
+  transform: translateX(2px);
+}
+.admin-catalogue-tools-card--danger {
+  border-color: color-mix(in srgb, #b91c1c 28%, var(--lamtek-border) 72%);
+  background: color-mix(in srgb, #fef2f2 40%, var(--lamtek-surface) 60%);
+}
+.admin-catalogue-tools-card--danger:hover {
+  border-color: color-mix(in srgb, #b91c1c 45%, var(--lamtek-border) 55%);
+}
+.admin-catalogue-tools-card--danger .admin-catalogue-tools-card-title {
+  color: #991b1b;
 }
 
 

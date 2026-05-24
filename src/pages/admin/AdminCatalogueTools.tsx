@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 import { CATALOGUE_TOOLS, LIVE_CATALOGUE } from '@/lib/catalogueToolsPaths'
 
 const TOOL_GROUPS: {
@@ -94,18 +95,21 @@ const TOOL_GROUPS: {
 export default function AdminCatalogueTools() {
   return (
     <div className="admin-catalogue-tools-hub">
-      <p className="admin-muted">
-        Open the live{' '}
-        <Link to={LIVE_CATALOGUE.products}>Catalogue</Link> to browse and edit products, or{' '}
-        <Link to={LIVE_CATALOGUE.categories}>Categories</Link> for the active category tree.
-      </p>
+      <div className="admin-catalogue-tools-hub-callout admin-callout admin-callout--info">
+        <p>
+          Day-to-day edits: open the live{' '}
+          <Link to={LIVE_CATALOGUE.products}>Catalogue</Link> or{' '}
+          <Link to={LIVE_CATALOGUE.categories}>Categories</Link>. Use the tools below for imports,
+          parsers, and bulk maintenance.
+        </p>
+      </div>
 
       {TOOL_GROUPS.map((group) => (
-        <section key={group.title} className="admin-catalogue-tools-group card admin-card">
-          <h2 className="admin-card-subtitle" style={{ marginTop: 0 }}>
-            {group.title}
-          </h2>
-          <p className="admin-muted">{group.intro}</p>
+        <section key={group.title} className="admin-catalogue-tools-section">
+          <header className="admin-catalogue-tools-section-header">
+            <h2 className="admin-catalogue-tools-section-title">{group.title}</h2>
+            <p className="admin-catalogue-tools-section-intro">{group.intro}</p>
+          </header>
           <ul className="admin-catalogue-tools-grid">
             {group.tools.map((tool) => (
               <li key={tool.to}>
@@ -113,8 +117,16 @@ export default function AdminCatalogueTools() {
                   to={tool.to}
                   className={`admin-catalogue-tools-card${tool.tone === 'danger' ? ' admin-catalogue-tools-card--danger' : ''}`}
                 >
-                  <span className="admin-catalogue-tools-card-title">{tool.title}</span>
-                  <span className="admin-muted admin-catalogue-tools-card-desc">{tool.description}</span>
+                  <span className="admin-catalogue-tools-card-body">
+                    <span className="admin-catalogue-tools-card-title">{tool.title}</span>
+                    <span className="admin-catalogue-tools-card-desc">{tool.description}</span>
+                  </span>
+                  <ChevronRight
+                    size={18}
+                    strokeWidth={2}
+                    className="admin-catalogue-tools-card-chevron"
+                    aria-hidden
+                  />
                 </Link>
               </li>
             ))}

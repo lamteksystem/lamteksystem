@@ -57,6 +57,7 @@ export default function AdminOrderProcessing() {
         .from('pick_lists')
         .select('*')
         .in('order_id', orderIds)
+        .eq('is_archived', false)
         .in('status', ['generated', 'picking', 'picked'])
         .order('created_at', { ascending: false })
       const byOrder: Record<string, PickListRow> = {}

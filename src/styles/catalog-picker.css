@@ -111,48 +111,67 @@
   color: var(--lamtek-text-muted);
 }
 
-/* Workbench inside modal: fit shell height; panels scroll internally */
-.catalog-picker-body .tb-workbench,
-.catalog-picker-body .kq-build-workspace {
+/* Pass-through wrapper on full-page embedded workbench (no layout change) */
+.tb-workbench-panes--layout-pass-through {
+  display: contents;
+}
+
+/* —— Product search modal: flex shell + scrollable columns —— */
+.catalog-picker-body .kq-build-workspace,
+.catalog-picker-body .tb-workbench--in-modal {
   flex: 1 1 auto;
   min-height: 0 !important;
   height: 100%;
   max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: none;
   border-radius: 0;
   box-shadow: none;
 }
 
-.catalog-picker-body .kq-build-workspace {
+.catalog-picker-body .tb-workbench-toast,
+.catalog-picker-body .tb-workbench-setup-banner {
+  flex-shrink: 0;
+}
+
+.catalog-picker-body .tb-workbench-panes {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(280px, 360px);
+  gap: 0;
   overflow: hidden;
 }
 
-.catalog-picker-body .tb-workbench {
-  overflow: hidden;
-  grid-template-rows: auto minmax(0, 1fr);
+.catalog-picker-body .tb-workbench--filters-collapsed .tb-workbench-panes {
+  grid-template-columns: 52px minmax(0, 1fr) minmax(280px, 360px);
 }
 
-.catalog-picker-body .tb-workbench-filters,
-.catalog-picker-body .tb-workbench-main,
-.catalog-picker-body .tb-workbench-right {
-  grid-row: -1;
-  align-self: stretch;
+.catalog-picker-body .tb-workbench--right-hidden .tb-workbench-panes {
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+}
+
+.catalog-picker-body .tb-workbench--filters-collapsed.tb-workbench--right-hidden .tb-workbench-panes {
+  grid-template-columns: 52px minmax(0, 1fr);
+}
+
+.catalog-picker-body .tb-workbench-panes > * {
   min-height: 0;
   max-height: 100%;
 }
 
-.catalog-picker-body .tb-workbench-toast,
-.catalog-picker-body .tb-workbench-setup-banner {
-  min-height: 0;
-  max-height: none;
-}
-
 .catalog-picker-body .tb-workbench-filters {
   overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 
 .catalog-picker-body .tb-workbench-main {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
@@ -161,19 +180,27 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 
 .catalog-picker-body .tb-workbench-right {
-  min-height: 0;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .catalog-picker-body .tb-right-pane-order {
+  flex: 1 1 auto;
   min-height: 0;
+  max-height: none;
   overflow: hidden;
+}
+
+.catalog-picker-body .tb-workbench-right--detail-open .tb-right-pane-order {
+  flex: 0 1 38%;
+  max-height: min(42%, 320px);
 }
 
 .catalog-picker-body .tb-order-lines {
@@ -183,17 +210,16 @@
 
 .catalog-picker-body .tb-order-lines-list {
   overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 
 .catalog-picker-body .tb-right-pane-detail {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-}
-
-.catalog-picker-body .tb-workbench-setup-banner {
-  flex-shrink: 0;
 }
 
 .tb-workbench--embedded {

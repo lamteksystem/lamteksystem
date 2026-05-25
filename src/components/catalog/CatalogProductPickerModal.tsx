@@ -89,6 +89,7 @@ export default function CatalogProductPickerModal({
             addButtonLabel={commitLabel}
             onCommit={onCommit}
             embedded
+            inModal
           />
         </div>
       </div>

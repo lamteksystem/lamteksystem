@@ -69,6 +69,8 @@ interface CatalogProductWorkbenchProps {
   linePersistence?: CatalogLinePersistence
   showCatalogueSwitcher?: boolean
   embedded?: boolean
+  /** Product search opened in a fixed-height modal (enables scrollable pane layout). */
+  inModal?: boolean
   initialCategoryId?: string | null
   /** When set, section filters and product-kind tabs follow Tealbury kitchen setup. */
   tealburySetup?: TealburyOrderSetup | null
@@ -93,6 +95,7 @@ export default function CatalogProductWorkbench({
   linePersistence = 'staged',
   showCatalogueSwitcher = false,
   embedded = false,
+  inModal = false,
   initialCategoryId = null,
   tealburySetup = null,
   onCommit,
@@ -540,6 +543,7 @@ export default function CatalogProductWorkbench({
   const workbenchClass = [
     'tb-workbench',
     embedded ? 'tb-workbench--embedded' : '',
+    inModal ? 'tb-workbench--in-modal' : '',
     leftCollapsed ? 'tb-workbench--filters-collapsed' : '',
     !rightPaneOpen ? 'tb-workbench--right-hidden' : '',
   ]
@@ -563,6 +567,11 @@ export default function CatalogProductWorkbench({
         </p>
       )}
 
+      <div
+        className={
+          inModal ? 'tb-workbench-panes' : 'tb-workbench-panes tb-workbench-panes--layout-pass-through'
+        }
+      >
       <aside className="tb-workbench-filters" aria-label="Product filters">
         <div className="tb-pane-toolbar tb-pane-toolbar--filters">
           <div className="tb-filters-head">
@@ -1222,6 +1231,7 @@ export default function CatalogProductWorkbench({
         )}
       </aside>
       )}
+      </div>
 
       {canEditCatalogue && editingProduct && (
         <AdminProductModal

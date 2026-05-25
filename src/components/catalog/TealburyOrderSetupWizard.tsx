@@ -4,13 +4,14 @@ import { getProductFinishLabels } from '@/lib/catalogProductDisplay'
 import { CARCASS_FINISH_OPTIONS } from '@/lib/orderRangeFinish'
 import {
   BUILD_STYLE_OPTIONS,
+  HINGE_BRAND_OPTIONS,
   LINE_STYLE_OPTIONS,
   saveTealburyOrderSetup,
   type TealburyOrderSetup,
 } from '@/lib/tealburyOrderSetup'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
-type WizardStep = 'build-style' | 'range' | 'door-finish' | 'line-style' | 'carcass'
+type WizardStep = 'build-style' | 'range' | 'door-finish' | 'line-style' | 'hinge' | 'carcass'
 
 type Props = {
   orderId: string
@@ -18,6 +19,7 @@ type Props = {
   categories: CategoryRow[]
   products: ProductRow[]
   initial?: TealburyOrderSetup | null
+  variant?: 'admin' | 'customer'
   onComplete: (setup: TealburyOrderSetup) => void
 }
 
@@ -27,6 +29,7 @@ export default function TealburyOrderSetupWizard({
   categories,
   products,
   initial,
+  variant = 'admin',
   onComplete,
 }: Props) {
   const [step, setStep] = useState<WizardStep>('build-style')
@@ -36,9 +39,13 @@ export default function TealburyOrderSetupWizard({
   const [lineStyle, setLineStyle] = useState<TealburyOrderSetup['line_style_preference']>(
     initial?.line_style_preference ?? null,
   )
+  const [hingeBrand, setHingeBrand] = useState<TealburyOrderSetup['hinge_brand']>(initial?.hinge_brand ?? null)
   const [carcassFinish, setCarcassFinish] = useState<string | null>(initial?.carcass_finish ?? null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const isCustomer = variant === 'customer'
+  const wrapClass = isCustomer ? 'ordering-wizard tealbury-setup-wizard' : 'card admin-card tealbury-setup-wizard'
 
   useEffect(() => {
     if (!initial) return
@@ -46,6 +53,7 @@ export default function TealburyOrderSetupWizard({
     if (initial.kitchen_range_id) setRangeId(initial.kitchen_range_id)
     if (initial.door_finish) setDoorFinish(initial.door_finish)
     if (initial.line_style_preference) setLineStyle(initial.line_style_preference)
+    if (initial.hinge_brand) setHingeBrand(initial.hinge_brand)
     if (initial.carcass_finish) setCarcassFinish(initial.carcass_finish)
   }, [initial])
 
@@ -64,7 +72,7 @@ export default function TealburyOrderSetupWizard({
   const docLabel = isQuote ? 'quote' : 'order'
 
   async function finish(finalCarcass: string) {
-    if (!buildStyle || !rangeId || !doorFinish || !lineStyle) {
+    if (!buildStyle || !rangeId || !doorFinish || !lineStyle || !hingeBrand) {
       setError('Complete each step before continuing.')
       return
     }
@@ -75,6 +83,7 @@ export default function TealburyOrderSetupWizard({
       kitchen_range_id: rangeId,
       door_finish: doorFinish,
       line_style_preference: lineStyle,
+      hinge_brand: hingeBrand,
       carcass_finish: finalCarcass,
     }
     const { error: saveErr } = await saveTealburyOrderSetup(orderId, setup)
@@ -87,18 +96,19 @@ export default function TealburyOrderSetupWizard({
   }
 
   return (
-    <div className="card admin-card tealbury-setup-wizard">
-      <h2 className="admin-modal-form-section-title" style={{ marginTop: 0 }}>
-        Tealbury kitchen setup
+    <div className={wrapClass}>
+      <h2 className={isCustomer ? undefined : 'admin-modal-form-section-title'} style={{ marginTop: 0 }}>
+        {isCustomer ? 'New order — choose your kitchen' : 'Tealbury kitchen setup'}
       </h2>
-      <p className="admin-muted page-intro" style={{ marginTop: 0 }}>
-        Configure this {docLabel} before adding products. Complete units (base, wall, tall) use a BOM of carcass,
-        doors, hinges, and fittings; accessories such as plinth and cornice are added separately.
+      <p className={isCustomer ? 'ordering-wizard-intro' : 'admin-muted page-intro'} style={{ marginTop: 0 }}>
+        Configure this {docLabel} before adding products. Complete units (base, wall, tall) add as a BOM (carcass,
+        doors, hinges, fittings). Accessories such as plinth and cornice are added separately.
       </p>
-      <p className="admin-muted">
-        <strong>{isQuote ? 'Quote' : 'Order'}</strong> — you are building a {docLabel}. Change type from the admin menu
-        if needed.
-      </p>
+      {!isCustomer && (
+        <p className="admin-muted">
+          <strong>{isQuote ? 'Quote' : 'Order'}</strong> — you are building a {docLabel}.
+        </p>
+      )}
 
       {step === 'build-style' && (
         <div className="tealbury-setup-step">
@@ -153,7 +163,19 @@ export default function TealburyOrderSetupWizard({
         <div className="tealbury-setup-step">
           <h3>Door / range finish</h3>
           {doorFinishOptions.length === 0 ? (
-            <p className="admin-muted">No finishes found for this range — check catalogue data.</p>
+            <>
+              <p className="admin-muted">No finishes found for this range — check catalogue data.</p>
+              <button
+                type="button"
+                className="btn btn-outline btn-small"
+                onClick={() => {
+                  setDoorFinish('— none recorded —')
+                  setStep('line-style')
+                }}
+              >
+                Continue without door finish
+              </button>
+            </>
           ) : (
             <div className="tealbury-setup-options tealbury-setup-options--grid">
               {doorFinishOptions.map((f) => (
@@ -181,7 +203,7 @@ export default function TealburyOrderSetupWizard({
       {step === 'line-style' && (
         <div className="tealbury-setup-step">
           <h3>Predominant line style</h3>
-          <p className="admin-muted">You can still add other unit types later; this sets the default browse filter.</p>
+          <p className="admin-muted">You can still add other unit types later; this sets the default category filter.</p>
           <div className="tealbury-setup-options">
             {LINE_STYLE_OPTIONS.map((opt) => (
               <button
@@ -190,7 +212,7 @@ export default function TealburyOrderSetupWizard({
                 className={`tealbury-setup-option${lineStyle === opt.value ? ' tealbury-setup-option--active' : ''}`}
                 onClick={() => {
                   setLineStyle(opt.value)
-                  setStep('carcass')
+                  setStep('hinge')
                   setError(null)
                 }}
               >
@@ -200,6 +222,34 @@ export default function TealburyOrderSetupWizard({
             ))}
           </div>
           <button type="button" className="btn btn-outline btn-small" onClick={() => setStep('door-finish')}>
+            ← Back
+          </button>
+        </div>
+      )}
+
+      {step === 'hinge' && (
+        <div className="tealbury-setup-step">
+          <h3>Hinge brand</h3>
+          <p className="admin-muted">
+            Complete units will use hinges and hinge plates from this brand when added to your {docLabel}.
+          </p>
+          <div className="tealbury-setup-options tealbury-setup-options--grid">
+            {HINGE_BRAND_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`tealbury-setup-option${hingeBrand === opt.value ? ' tealbury-setup-option--active' : ''}`}
+                onClick={() => {
+                  setHingeBrand(opt.value)
+                  setStep('carcass')
+                  setError(null)
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="btn btn-outline btn-small" onClick={() => setStep('line-style')}>
             ← Back
           </button>
         </div>
@@ -221,7 +271,7 @@ export default function TealburyOrderSetupWizard({
               </button>
             ))}
           </div>
-          <button type="button" className="btn btn-outline btn-small" onClick={() => setStep('line-style')}>
+          <button type="button" className="btn btn-outline btn-small" onClick={() => setStep('hinge')}>
             ← Back
           </button>
         </div>

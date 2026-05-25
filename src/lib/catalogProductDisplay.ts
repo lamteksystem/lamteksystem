@@ -4,7 +4,6 @@ import {
   productMatchesBrowseFilter,
   type CatalogBrowseMode,
 } from '@/lib/categoryTaxonomy'
-import { categoryTypeOrderingBehaviour } from '@/lib/categoryTypes'
 import type { ProductCategoryMap } from '@/lib/productCategories'
 import { lineStyleMatchesCategoryName } from '@/lib/tealburyOrderSetup'
 import type { CategoryRow, CategoryTypeRow, OrderRow, ProductRow } from '@/types/database'
@@ -17,7 +16,7 @@ export interface WorkbenchFilterState {
   browseMode: CatalogBrowseMode
   categoryId: string | null
   doorRange: string | null
-  /** System category id (product_type) or legacy import section label. */
+  /** System category id (`categories.id`) from product_categories assignments. */
   section: string | null
   productKind: CatalogProductKindFilter
   inStockOnly: boolean
@@ -41,7 +40,6 @@ export const EMPTY_WORKBENCH_FILTERS: WorkbenchFilterState = {
 export interface CatalogSectionOption {
   id: string
   name: string
-  legacyImport?: boolean
 }
 
 export interface CatalogFacets {
@@ -88,18 +86,14 @@ export function formatProductDimensions(product: ProductRow): string | null {
   return `${parts.join(' × ')} mm`
 }
 
-function productInSystemSection(
+/** Product is assigned to a system category (junction or legacy single category_id). */
+export function productHasSystemCategory(
   product: ProductRow,
-  sectionCategoryId: string,
-  categories: CategoryRow[],
+  categoryId: string,
   productCategoryMap: ProductCategoryMap,
 ): boolean {
   const catIds = productCategoryMap.get(product.id) ?? (product.category_id ? [product.category_id] : [])
-  if (catIds.includes(sectionCategoryId)) return true
-  const legacy = getProductSections(product)
-  const sectionCat = categories.find((c) => c.id === sectionCategoryId)
-  if (sectionCat && legacy.some((l) => l.toLowerCase() === sectionCat.name.toLowerCase())) return true
-  return false
+  return catIds.includes(categoryId)
 }
 
 export function buildCatalogFacets(
@@ -123,33 +117,16 @@ export function buildCatalogFacets(
   const pcMap = options?.productCategoryMap
   const linePref = options?.lineStylePreference
 
-  let sections: CatalogSectionOption[] = []
+  const sections: CatalogSectionOption[] = []
   if (categories.length > 0 && pcMap) {
     const productTypeCats = categories.filter((c) => {
       if (categoryBrowseModeForRow(c, types) !== 'product') return false
       if (linePref && !lineStyleMatchesCategoryName(linePref, c.name)) return false
-      const behaviour = categoryTypeOrderingBehaviour(types, c.category_kind)
-      if (behaviour === 'accessory') return true
-      if (behaviour === 'tealbury_complete' || behaviour === 'component_only' || behaviour === 'standard') {
-        return products.some((p) => productInSystemSection(p, c.id, categories, pcMap))
-      }
-      return products.some((p) => productInSystemSection(p, c.id, categories, pcMap))
+      return products.some((p) => productHasSystemCategory(p, c.id, pcMap))
     })
-    sections = productTypeCats
-      .map((c) => ({ id: c.id, name: c.name }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }
-
-  if (sections.length === 0) {
-    const sectionSet = new Set<string>()
-    for (const p of products) {
-      for (const s of getProductSections(p)) sectionSet.add(s)
+    for (const c of productTypeCats.sort((a, b) => a.name.localeCompare(b.name))) {
+      sections.push({ id: c.id, name: c.name })
     }
-    sections = [...sectionSet].sort((a, b) => a.localeCompare(b)).map((name) => ({
-      id: name,
-      name,
-      legacyImport: true,
-    }))
   }
 
   return {
@@ -263,9 +240,8 @@ export function filterCatalogProducts(
     if (filters.categoryId && categories.length === 0 && p.category_id !== filters.categoryId) return false
     if (filters.doorRange && getDoorRange(p) !== filters.doorRange) return false
     if (filters.section) {
-      if (pcMap && categories.length > 0) {
-        if (!productInSystemSection(p, filters.section, categories, pcMap)) return false
-      } else if (!getProductSections(p).includes(filters.section)) return false
+      if (!pcMap) return false
+      if (!productHasSystemCategory(p, filters.section, pcMap)) return false
     }
     if (filters.productKind !== 'all' && completeIds) {
       const isComplete = completeIds.has(p.id)

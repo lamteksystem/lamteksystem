@@ -38,6 +38,7 @@ import { useAssemblyPartTypes } from '@/hooks/useAssemblyPartTypes'
 import { supabase } from '@/lib/supabase'
 import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productCategories'
 import { fetchCompleteProductIds } from '@/lib/productAssembly'
+import { resolveAssemblyForHingeBrand } from '@/lib/tealburyBomResolve'
 import { useCategoryTypes } from '@/hooks/useCategoryTypes'
 import type { TealburyOrderSetup } from '@/lib/tealburyOrderSetup'
 import AdminProductModal from '@/components/admin/AdminProductModal'
@@ -367,19 +368,23 @@ export default function CatalogProductWorkbench({
 
   const addAssemblyToBasket = useCallback(
     (assembly: AssemblyWithLines, quantity: number) => {
+      const resolved =
+        tealburySetup?.hinge_brand != null
+          ? resolveAssemblyForHingeBrand(assembly, tealburySetup.hinge_brand, scopeProducts)
+          : assembly
       if (linePersistence === 'immediate') {
         void persistPayload(
-          { products: [], assemblies: [{ assembly, quantity }] },
+          { products: [], assemblies: [{ assembly: resolved, quantity }] },
           `Added ${quantity} × ${assembly.name} (complete unit BOM) to order`,
         )
         return
       }
-      const unitPrice = (assembly.assembly_lines ?? []).reduce((sum, line) => {
+      const unitPrice = (resolved.assembly_lines ?? []).reduce((sum, line) => {
         const product = line.product as ProductRow | undefined
         return sum + (product ? line.quantity * Number(product.unit_price) : 0)
       }, 0)
       setStaged((prev) => {
-        const existing = prev.find((l) => l.kind === 'assembly' && l.assembly.id === assembly.id)
+        const existing = prev.find((l) => l.kind === 'assembly' && l.assembly.id === resolved.id)
         if (existing && existing.kind === 'assembly') {
           return prev.map((l) =>
             l.id === existing.id ? { ...l, quantity: Math.min(99, l.quantity + quantity) } : l,
@@ -387,12 +392,12 @@ export default function CatalogProductWorkbench({
         }
         return [
           ...prev,
-          { kind: 'assembly', id: `a-${assembly.id}`, assembly, quantity, unitPrice },
+          { kind: 'assembly', id: `a-${resolved.id}`, assembly: resolved, quantity, unitPrice },
         ]
       })
       setStatusMessage(`Added ${quantity} × ${assembly.name} to selection — confirm below`)
     },
-    [linePersistence, persistPayload],
+    [linePersistence, persistPayload, tealburySetup?.hinge_brand, scopeProducts],
   )
 
   const addProductToBasket = useCallback(
@@ -652,11 +657,6 @@ export default function CatalogProductWorkbench({
                   onChange={() => updateFilter({ section: s.id })}
                 />
                 {s.name}
-                {s.legacyImport ? (
-                  <span className="admin-muted" style={{ marginLeft: '0.35rem' }}>
-                    (import)
-                  </span>
-                ) : null}
               </label>
             ))}
           </fieldset>

@@ -2,20 +2,44 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PageNav } from '@/components/PageNav'
 import CatalogProductWorkbench from '@/components/catalog/CatalogProductWorkbench'
+import TealburyOrderSetupWizard from '@/components/catalog/TealburyOrderSetupWizard'
 import { useCatalogWorkbenchData } from '@/hooks/useCatalogWorkbenchData'
 import { useDraftOrder } from '@/hooks/useDraftOrder'
 import { useEffectiveUserId } from '@/contexts/ImpersonationContext'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { insertAssemblyOrderLines, insertProductOrderLines } from '@/lib/orderLineInsert'
+import { resolveAssemblyForHingeBrand } from '@/lib/tealburyBomResolve'
+import {
+  loadTealburyOrderSetup,
+  orderNeedsTealburySetup,
+  type TealburyOrderSetup,
+} from '@/lib/tealburyOrderSetup'
 import { supabase } from '@/lib/supabase'
 import type { CatalogPickerCommitPayload } from '@/components/catalog/CatalogProductPickerModal'
+import type { AssemblyWithLines } from '@/types/database'
 
 export default function TealburyOrdering() {
   const { draftOrder, ensureDraftOrder, refresh } = useDraftOrder()
   const effectiveUserId = useEffectiveUserId()
-  const { products, categories, loading } = useCatalogWorkbenchData([CATALOG_PROGRAM.TEALBURY])
+  const { products, categories, assemblies, loading } = useCatalogWorkbenchData([CATALOG_PROGRAM.TEALBURY])
   const [lineCount, setLineCount] = useState(0)
   const [orderLinesRefreshToken, setOrderLinesRefreshToken] = useState(0)
+  const [tealburySetup, setTealburySetup] = useState<TealburyOrderSetup | null>(null)
+  const [setupOpen, setSetupOpen] = useState(false)
+
+  useEffect(() => {
+    if (!draftOrder?.id) return
+    let cancelled = false
+    void loadTealburyOrderSetup(draftOrder.id).then((s) => {
+      if (!cancelled) {
+        setTealburySetup(s)
+        setSetupOpen(orderNeedsTealburySetup(s))
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [draftOrder?.id])
 
   useEffect(() => {
     let cancelled = false
@@ -34,20 +58,25 @@ export default function TealburyOrdering() {
     return () => {
       cancelled = true
     }
-  }, [draftOrder?.id])
+  }, [draftOrder?.id, orderLinesRefreshToken])
 
   const commitPicker = useCallback(
     async (payload: CatalogPickerCommitPayload) => {
       const orderId = await ensureDraftOrder()
+      const setup = await loadTealburyOrderSetup(orderId)
       await insertProductOrderLines({
         orderId,
         lines: payload.products,
         customerUserId: effectiveUserId,
       })
       for (const line of payload.assemblies) {
+        let assembly: AssemblyWithLines = line.assembly
+        if (setup?.hinge_brand) {
+          assembly = resolveAssemblyForHingeBrand(assembly, setup.hinge_brand, products)
+        }
         await insertAssemblyOrderLines({
           orderId,
-          assembly: line.assembly,
+          assembly,
           quantity: line.quantity,
           customerUserId: effectiveUserId,
         })
@@ -60,7 +89,7 @@ export default function TealburyOrdering() {
       setLineCount(count ?? 0)
       setOrderLinesRefreshToken((t) => t + 1)
     },
-    [effectiveUserId, ensureDraftOrder, refresh],
+    [effectiveUserId, ensureDraftOrder, products, refresh],
   )
 
   if (loading) return <div className="app-loading">Loading Tealbury catalogue…</div>
@@ -80,6 +109,28 @@ export default function TealburyOrdering() {
     )
   }
 
+  const orderId = draftOrder?.id
+
+  if (orderId && setupOpen) {
+    return (
+      <div className="page ordering-page tealbury-ordering-page">
+        <PageNav backTo="/ordering/start" backLabel="Ordering" />
+        <TealburyOrderSetupWizard
+          orderId={orderId}
+          isQuote={false}
+          categories={categories}
+          products={products}
+          initial={tealburySetup}
+          variant="customer"
+          onComplete={(complete) => {
+            setTealburySetup(complete)
+            setSetupOpen(false)
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="page ordering-page tealbury-ordering-page tealbury-ordering-page--workbench">
       <PageNav backTo="/ordering/start" backLabel="Ordering" />
@@ -92,6 +143,11 @@ export default function TealburyOrdering() {
           </p>
         </div>
         <div className="ordering-header-actions">
+          {orderId && (
+            <button type="button" className="btn btn-outline btn-small" onClick={() => setSetupOpen(true)}>
+              Change kitchen setup
+            </button>
+          )}
           <Link to="/ordering/cart" className="btn btn-outline">
             View order{lineCount > 0 ? ` (${lineCount})` : ''} →
           </Link>
@@ -107,16 +163,18 @@ export default function TealburyOrdering() {
       <CatalogProductWorkbench
         products={products}
         categories={categories}
+        assemblies={assemblies}
         allowedCatalogPrograms={[CATALOG_PROGRAM.TEALBURY]}
         customerUserId={effectiveUserId}
         preferencesScope="ordering_tealbury"
-        orderId={draftOrder?.id ?? null}
+        orderId={orderId ?? null}
         orderLinesRefreshToken={orderLinesRefreshToken}
         cartLineCount={lineCount}
         cartHref="/ordering/cart"
         commitLabel="Add to order"
         linePersistence="immediate"
         addButtonLabel="Add to order"
+        tealburySetup={tealburySetup}
         onCommit={commitPicker}
       />
     </div>

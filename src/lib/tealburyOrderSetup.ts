@@ -14,6 +14,19 @@ export const BUILD_STYLE_OPTIONS = [
   },
 ]
 
+export const HINGE_BRAND_OPTIONS = [
+  { value: 'blum' as const, label: 'Blum' },
+  { value: 'titus' as const, label: 'Titus' },
+  { value: 'hafele' as const, label: 'Hafele' },
+] as const
+
+export type HingeBrand = (typeof HINGE_BRAND_OPTIONS)[number]['value']
+
+export function hingeBrandLabel(code: string | null | undefined): string | null {
+  if (!code) return null
+  return HINGE_BRAND_OPTIONS.find((o) => o.value === code)?.label ?? code
+}
+
 export const LINE_STYLE_OPTIONS = [
   {
     value: 'high_line' as const,
@@ -38,6 +51,7 @@ export type TealburyOrderSetup = {
   carcass_finish: string | null
   build_style: OrderRow['build_style']
   line_style_preference: OrderRow['line_style_preference']
+  hinge_brand: OrderRow['hinge_brand']
 }
 
 export function orderNeedsTealburySetup(order: Pick<OrderRow, keyof TealburyOrderSetup> | null): boolean {
@@ -47,14 +61,17 @@ export function orderNeedsTealburySetup(order: Pick<OrderRow, keyof TealburyOrde
     !order.door_finish ||
     !order.carcass_finish ||
     !order.build_style ||
-    !order.line_style_preference
+    !order.line_style_preference ||
+    !order.hinge_brand
   )
 }
 
 export async function loadTealburyOrderSetup(orderId: string): Promise<TealburyOrderSetup | null> {
   const { data, error } = await supabase
     .from('orders')
-    .select('kitchen_range_id, door_finish, carcass_finish, build_style, line_style_preference')
+    .select(
+      'kitchen_range_id, door_finish, carcass_finish, build_style, line_style_preference, hinge_brand',
+    )
     .eq('id', orderId)
     .maybeSingle()
   if (error || !data) return null
@@ -73,6 +90,7 @@ export async function saveTealburyOrderSetup(
       carcass_finish: setup.carcass_finish,
       build_style: setup.build_style,
       line_style_preference: setup.line_style_preference,
+      hinge_brand: setup.hinge_brand,
     })
     .eq('id', orderId)
   return { error: error?.message ?? null }

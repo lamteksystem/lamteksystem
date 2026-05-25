@@ -17,6 +17,9 @@ import {
   type TealburyOrderSetup,
 } from '@/lib/tealburyOrderSetup'
 import { carcassFinishLabel } from '@/lib/orderRangeFinish'
+import { resolveAssemblyForHingeBrand } from '@/lib/tealburyBomResolve'
+import { hingeBrandLabel } from '@/lib/tealburyOrderSetup'
+import type { AssemblyWithLines } from '@/types/database'
 
 const PARENT_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -221,9 +224,13 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
         })
       }
       for (const line of payload.assemblies) {
+        let assembly: AssemblyWithLines = line.assembly
+        if (tealburySetup?.hinge_brand) {
+          assembly = resolveAssemblyForHingeBrand(assembly, tealburySetup.hinge_brand, products)
+        }
         await insertAssemblyOrderLines({
           orderId,
-          assembly: line.assembly,
+          assembly,
           quantity: line.quantity,
           customerUserId: selectedUserId,
           repriceCustomer: useCustomerPricing,
@@ -237,7 +244,7 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
         added === 1 ? `Line saved to ${label}` : `${added} lines saved to ${label}`,
       )
     },
-    [isQuote, orderId, refreshLineCount, selectedUserId],
+    [isQuote, orderId, refreshLineCount, selectedUserId, tealburySetup?.hinge_brand, products],
   )
 
   const showTealburyWizard =
@@ -395,7 +402,8 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
                     {tealburySetup.build_style === 'flat_pack' ? 'Flat pack' : 'Rigid'} ·{' '}
                     {rangeName ?? 'Range'} · {tealburySetup.door_finish} ·{' '}
                     {carcassFinishLabel(tealburySetup.carcass_finish)} carcass ·{' '}
-                    {tealburySetup.line_style_preference?.replace('_', ' ')}
+                    {tealburySetup.line_style_preference?.replace('_', ' ')} ·{' '}
+                    {hingeBrandLabel(tealburySetup.hinge_brand) ?? '—'} hinges
                     <button
                       type="button"
                       className="btn btn-outline btn-small"

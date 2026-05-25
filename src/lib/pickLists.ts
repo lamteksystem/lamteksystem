@@ -14,6 +14,7 @@ export async function createPickListFromOrder(opts: CreatePickListOpts): Promise
     .from('pick_lists')
     .select('id, status')
     .eq('order_id', opts.orderId)
+    .eq('is_archived', false)
     .in('status', ['generated', 'picking'])
     .order('created_at', { ascending: false })
     .limit(1)
@@ -48,6 +49,7 @@ export async function createPickListFromOrder(opts: CreatePickListOpts): Promise
         .from('pick_lists')
         .select('id')
         .eq('order_id', opts.orderId)
+        .eq('is_archived', false)
         .in('status', ['generated', 'picking'])
         .order('created_at', { ascending: false })
         .limit(1)
@@ -120,4 +122,33 @@ export async function setPickListStatus(
       note: `Pick list ${pickList.id.slice(0, 8)} marked picked${options?.forceComplete ? ' (override)' : ''}`,
     }).catch(() => {})
   }
+}
+
+export async function setPickListArchived(pickListId: string, isArchived: boolean): Promise<void> {
+  const now = new Date().toISOString()
+  const { error } = await supabase
+    .from('pick_lists')
+    .update({ is_archived: isArchived, updated_at: now })
+    .eq('id', pickListId)
+  if (error) throw new Error(error.message || 'Could not update pick list archive state.')
+}
+
+export async function deletePickList(pickListId: string): Promise<void> {
+  const { data: row, error: loadErr } = await supabase
+    .from('pick_lists')
+    .select('id, order_id, status')
+    .eq('id', pickListId)
+    .maybeSingle()
+  if (loadErr) throw new Error(loadErr.message || 'Could not load pick list.')
+  if (!row) throw new Error('Pick list not found.')
+
+  const { error } = await supabase.from('pick_lists').delete().eq('id', pickListId)
+  if (error) throw new Error(error.message || 'Could not delete pick list.')
+
+  insertOrderEvent({
+    orderId: row.order_id as string,
+    actorUserId: null,
+    eventType: 'pick_list_deleted',
+    note: `Pick list ${pickListId.slice(0, 8)} deleted (was ${row.status})`,
+  }).catch(() => {})
 }

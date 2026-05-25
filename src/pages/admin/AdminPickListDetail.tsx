@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { isPickListFullyPicked, setPickListStatus } from '@/lib/pickLists'
+import { deletePickList, isPickListFullyPicked, setPickListArchived, setPickListStatus } from '@/lib/pickLists'
+import { usePermission } from '@/hooks/usePermission'
 import { createPackageLabelForPickList, markPackageLabelPrinted, markPackageLabelScannedByCode } from '@/lib/packageLabels'
 import type { PackageLabelRow, PickListItemRow, PickListRow } from '@/types/database'
 
@@ -31,6 +32,9 @@ export default function AdminPickListDetail() {
   const [markingPrintedId, setMarkingPrintedId] = useState<string | null>(null)
   const [scanCodeInput, setScanCodeInput] = useState('')
   const [scanBusy, setScanBusy] = useState(false)
+  const [archiveBusy, setArchiveBusy] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const { allowed: canEdit } = usePermission('admin.orders', 'edit')
   const [scanMessage, setScanMessage] = useState<string | null>(null)
 
   async function load() {
@@ -143,6 +147,40 @@ export default function AdminPickListDetail() {
     }
   }
 
+  async function toggleArchive() {
+    if (!pickList || !canEdit) return
+    setArchiveBusy(true)
+    setError(null)
+    try {
+      await setPickListArchived(pickList.id, !(pickList.is_archived === true))
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not update archive state.')
+    } finally {
+      setArchiveBusy(false)
+    }
+  }
+
+  async function removePickList() {
+    if (!pickList || !canEdit) return
+    if (
+      !window.confirm(
+        `Permanently delete this pick list (${pickList.id.slice(0, 8)})? This cannot be undone.`,
+      )
+    ) {
+      return
+    }
+    setDeleteBusy(true)
+    setError(null)
+    try {
+      await deletePickList(pickList.id)
+      navigate('/admin/pick-lists')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not delete pick list.')
+      setDeleteBusy(false)
+    }
+  }
+
   async function onScanSubmit(e: FormEvent) {
     e.preventDefault()
     if (!pickListId) return
@@ -190,13 +228,41 @@ export default function AdminPickListDetail() {
             Print view
           </Link>
           <Link to={`/admin/orders/${pickList.order_id}`} className="btn btn-outline btn-small">Open order</Link>
+          {canEdit && (
+            <>
+              <button
+                type="button"
+                className="btn btn-outline btn-small"
+                disabled={archiveBusy || deleteBusy}
+                onClick={() => void toggleArchive()}
+              >
+                {archiveBusy ? 'Saving…' : pickList.is_archived ? 'Restore from archive' : 'Archive'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-small admin-btn-danger"
+                disabled={archiveBusy || deleteBusy}
+                onClick={() => void removePickList()}
+              >
+                {deleteBusy ? 'Deleting…' : 'Delete'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       <div className="card admin-card">
         {error && <div className="admin-confirm-box" role="alert"><p>{error}</p></div>}
         <p className="admin-muted" style={{ marginTop: 0 }}>
-          Status: <strong>{STATUS_LABELS[pickList.status]}</strong> · Required {totals.required} · Picked {totals.picked} · Remaining {totals.remaining}
+          Status: <strong>{STATUS_LABELS[pickList.status]}</strong>
+          {pickList.is_archived && (
+            <>
+              {' '}
+              <span className="admin-table-paid-badge">Archived</span>
+            </>
+          )}
+          {' '}
+          · Required {totals.required} · Picked {totals.picked} · Remaining {totals.remaining}
         </p>
         <div className="admin-order-processing-actions" style={{ marginBottom: '0.75rem' }}>
           <button type="button" className="btn btn-small" disabled={statusSaving || pickList.status === 'picking'} onClick={() => changeStatus('picking')}>Mark picking</button>

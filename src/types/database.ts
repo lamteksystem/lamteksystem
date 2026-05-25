@@ -178,6 +178,7 @@ export interface PickListRow {
   started_at: string | null
   completed_at: string | null
   cancelled_at: string | null
+  is_archived?: boolean
   created_at: string
   updated_at: string
 }

@@ -142,7 +142,11 @@ export default function AdminDashboard() {
         supabase.from('orders').select('id', { count: 'exact', head: true }).gte('created_at', todayIso).neq('status', 'cancelled').eq('is_archived', false),
         supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'quotation').eq('is_archived', false),
         supabase.from('tickets').select('id', { count: 'exact', head: true }).neq('status', 'resolved'),
-        supabase.from('pick_lists').select('id', { count: 'exact', head: true }).in('status', ['generated', 'picking']),
+        supabase
+          .from('pick_lists')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_archived', false)
+          .in('status', ['generated', 'picking']),
         supabase
           .from('activities')
           .select('id', { count: 'exact', head: true })

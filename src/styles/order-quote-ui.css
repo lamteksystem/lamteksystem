@@ -577,3 +577,13 @@
     0 4px 6px -1px rgba(15, 23, 42, 0.06),
     0 16px 32px -8px rgba(103, 39, 50, 0.1) !important;
 }
+
+.tb-workbench-setup-banner {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0.55rem 1rem;
+  font-size: 0.82rem;
+  color: var(--lamtek-burgundy, #672332);
+  background: linear-gradient(90deg, rgba(103, 39, 50, 0.08), rgba(184, 134, 11, 0.06));
+  border-bottom: 1px solid rgba(103, 39, 50, 0.12);
+}

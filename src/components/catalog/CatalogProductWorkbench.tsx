@@ -41,7 +41,7 @@ import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productC
 import { fetchCompleteProductIds } from '@/lib/productAssembly'
 import { resolveAssemblyForHingeBrand } from '@/lib/tealburyBomResolve'
 import { useCategoryTypes } from '@/hooks/useCategoryTypes'
-import type { TealburyOrderSetup } from '@/lib/tealburyOrderSetup'
+import { orderNeedsTealburySetup, type TealburyOrderSetup } from '@/lib/tealburyOrderSetup'
 import AdminProductModal from '@/components/admin/AdminProductModal'
 import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 
@@ -215,8 +215,18 @@ export default function CatalogProductWorkbench({
         productCategoryMap,
         completeProductIds,
         categoryTypes,
+        tealburySetup: tealburySetup && !orderNeedsTealburySetup(tealburySetup) ? tealburySetup : null,
       }),
-    [scopeProducts, filters, favouriteSet, effectiveCategories, productCategoryMap, completeProductIds, categoryTypes],
+    [
+      scopeProducts,
+      filters,
+      favouriteSet,
+      effectiveCategories,
+      productCategoryMap,
+      completeProductIds,
+      categoryTypes,
+      tealburySetup,
+    ],
   )
   const browseOptions = useMemo(
     () => buildCategoryTreeOptions(effectiveCategories, filters.browseMode),
@@ -232,7 +242,13 @@ export default function CatalogProductWorkbench({
     for (const opt of browseOptions) {
       counts.set(
         opt.id,
-        countProductsForBrowseOption(scopeProducts, effectiveCategories, filters.browseMode, opt.id),
+        countProductsForBrowseOption(
+          scopeProducts,
+          effectiveCategories,
+          filters.browseMode,
+          opt.id,
+          productCategoryMap,
+        ),
       )
     }
     return counts
@@ -273,14 +289,13 @@ export default function CatalogProductWorkbench({
         loadFilterPresets(preferencesScope),
       ])
       if (cancelled) return
+      const setupReady = tealburySetup && !orderNeedsTealburySetup(tealburySetup)
       setFilters({
         ...EMPTY_WORKBENCH_FILTERS,
         ...savedFilters,
-        browseMode: tealburySetup?.kitchen_range_id
-          ? 'range'
-          : (savedFilters.browseMode ?? 'category'),
-        categoryId: initialCategoryId ?? tealburySetup?.kitchen_range_id ?? null,
-        productKind: savedFilters.productKind ?? 'all',
+        browseMode: setupReady || tealburySetup?.kitchen_range_id ? 'range' : (savedFilters.browseMode ?? 'category'),
+        categoryId: initialCategoryId ?? tealburySetup?.kitchen_range_id ?? savedFilters.categoryId ?? null,
+        productKind: setupReady ? (savedFilters.productKind ?? 'complete') : (savedFilters.productKind ?? 'all'),
       })
       setFavouriteIds(favs)
       setFilterPresets(presets)
@@ -289,7 +304,17 @@ export default function CatalogProductWorkbench({
     return () => {
       cancelled = true
     }
-  }, [preferencesScope, initialCategoryId, tealburySetup?.kitchen_range_id])
+  }, [preferencesScope, initialCategoryId, tealburySetup])
+
+  useEffect(() => {
+    if (!tealburySetup || orderNeedsTealburySetup(tealburySetup)) return
+    setFilters((prev) => ({
+      ...prev,
+      browseMode: 'range',
+      categoryId: tealburySetup.kitchen_range_id,
+      productKind: prev.productKind === 'all' ? 'complete' : prev.productKind,
+    }))
+  }, [tealburySetup])
 
   useEffect(() => {
     if (!prefsReady) return
@@ -494,6 +519,11 @@ export default function CatalogProductWorkbench({
       {statusMessage && (
         <p className="ordering-toast tb-workbench-toast" role="status">
           {statusMessage}
+        </p>
+      )}
+      {tealburySetup && !orderNeedsTealburySetup(tealburySetup) && (
+        <p className="tb-workbench-setup-banner" role="status">
+          Showing products for your kitchen setup (range, finish, and line style). Use filters below to narrow further.
         </p>
       )}
 

@@ -5,7 +5,7 @@ import {
   type CatalogBrowseMode,
 } from '@/lib/categoryTaxonomy'
 import type { ProductCategoryMap } from '@/lib/productCategories'
-import { lineStyleMatchesCategoryName } from '@/lib/tealburyOrderSetup'
+import { lineStyleMatchesCategoryName, type TealburyOrderSetup } from '@/lib/tealburyOrderSetup'
 import type { CategoryRow, CategoryTypeRow, OrderRow, ProductRow } from '@/types/database'
 
 export type CatalogProductKindFilter = 'all' | 'complete' | 'components'
@@ -148,6 +148,47 @@ export function buildCatalogFacets(
  * range?") after the user has picked a kitchen range. Filter `products` to the
  * range first; this helper does not know which range a product belongs to.
  */
+/** True when the product is sold in this door/range finish (finish price keys). */
+export function productHasDoorFinish(product: ProductRow, finishLabel: string): boolean {
+  const target = finishLabel.trim().toLowerCase()
+  if (!target || target === '— none recorded —') return true
+  const opts = getProductOpts(product)
+  for (const src of [opts.tealbury_finish_prices_gbp, opts.lamtek_finish_prices_gbp]) {
+    if (src && typeof src === 'object' && !Array.isArray(src)) {
+      for (const key of Object.keys(src)) {
+        if (key.trim().toLowerCase() === target) return true
+      }
+    }
+  }
+  return false
+}
+
+function isLineStyleNeutralCategoryName(name: string): boolean {
+  return /plinth|cornice|pelmet|wirework|accessor|hinge|handle|panel|post|mould|corbel|worktop|internal|cabinet\s*colour/i.test(
+    name,
+  )
+}
+
+export function productMatchesTealburyLineStyle(
+  product: ProductRow,
+  preference: OrderRow['line_style_preference'],
+  categories: CategoryRow[],
+  categoryTypes: CategoryTypeRow[],
+  productCategoryMap: ProductCategoryMap,
+): boolean {
+  if (!preference || preference === 'mixed') return true
+  const catIds = productCategoryMap.get(product.id) ?? (product.category_id ? [product.category_id] : [])
+  if (catIds.length === 0) return true
+  const assigned = catIds
+    .map((id) => categories.find((c) => c.id === id))
+    .filter((c): c is CategoryRow => Boolean(c))
+  const unitCats = assigned.filter((c) => categoryBrowseModeForRow(c, categoryTypes) === 'product')
+  if (unitCats.length === 0) return true
+  return unitCats.some(
+    (c) => isLineStyleNeutralCategoryName(c.name) || lineStyleMatchesCategoryName(preference, c.name),
+  )
+}
+
 export function getProductFinishLabels(products: ProductRow[]): string[] {
   const finishes = new Set<string>()
   for (const p of products) {
@@ -223,21 +264,35 @@ export function filterCatalogProducts(
     productCategoryMap?: ProductCategoryMap
     completeProductIds?: Set<string>
     categoryTypes?: CategoryTypeRow[]
+    tealburySetup?: TealburyOrderSetup | null
   },
 ): ProductRow[] {
   const pcMap = options?.productCategoryMap
   const completeIds = options?.completeProductIds
+  const setup = options?.tealburySetup
+  const types = options?.categoryTypes ?? []
+
+  const browseMode: CatalogBrowseMode = setup?.kitchen_range_id ? 'range' : filters.browseMode
+  const rangeCategoryId = setup?.kitchen_range_id ?? filters.categoryId
 
   return products.filter((p) => {
     if (filters.catalogProgram && p.catalog_program !== filters.catalogProgram) return false
     if (
-      filters.categoryId &&
+      rangeCategoryId &&
       categories.length > 0 &&
-      !productMatchesBrowseFilter(p, categories, filters.browseMode, filters.categoryId)
+      !productMatchesBrowseFilter(p, categories, browseMode, rangeCategoryId, pcMap)
     ) {
       return false
     }
-    if (filters.categoryId && categories.length === 0 && p.category_id !== filters.categoryId) return false
+    if (rangeCategoryId && categories.length === 0 && p.category_id !== rangeCategoryId) return false
+
+    if (setup?.door_finish && !productHasDoorFinish(p, setup.door_finish)) return false
+
+    if (setup?.line_style_preference && pcMap && types.length > 0) {
+      if (!productMatchesTealburyLineStyle(p, setup.line_style_preference, categories, types, pcMap)) {
+        return false
+      }
+    }
     if (filters.doorRange && getDoorRange(p) !== filters.doorRange) return false
     if (filters.section) {
       if (!pcMap) return false

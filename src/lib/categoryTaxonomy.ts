@@ -1,6 +1,7 @@
 import type { CategoryRow, CategoryTypeRow, ProductRow } from '@/types/database'
 import { getDoorRange } from '@/lib/catalogProductDisplay'
 import { categoryTypeBrowseMode } from '@/lib/categoryTypes'
+import type { ProductCategoryMap } from '@/lib/productCategories'
 
 export type CategoryKind = string
 export type CatalogBrowseMode = 'category' | 'range'
@@ -182,19 +183,34 @@ export function buildCategoryTreeOptions(
   return options
 }
 
+function productCategoryIds(
+  product: ProductRow,
+  productCategoryMap?: ProductCategoryMap,
+): string[] {
+  const fromMap = productCategoryMap?.get(product.id)
+  if (fromMap?.length) return fromMap
+  return product.category_id ? [product.category_id] : []
+}
+
 export function productMatchesBrowseFilter(
   product: ProductRow,
   categories: CategoryRow[],
   browseMode: CatalogBrowseMode,
   categoryId: string | null,
+  productCategoryMap?: ProductCategoryMap,
 ): boolean {
   if (!categoryId) return true
 
   const selected = categories.find((c) => c.id === categoryId)
-  if (!selected) return product.category_id === categoryId
+  if (!selected) {
+    return productCategoryIds(product, productCategoryMap).includes(categoryId)
+  }
 
   const kind = getCategoryKind(selected)
   const idSet = expandCategorySelection(categories, categoryId)
+  const assignedIds = productCategoryIds(product, productCategoryMap)
+
+  if (assignedIds.some((id) => idSet?.has(id))) return true
 
   if (browseMode === 'range' && kind === 'door_range') {
     const door = getDoorRange(product)?.trim().toLowerCase()
@@ -202,6 +218,10 @@ export function productMatchesBrowseFilter(
     if (product.category_id === categoryId) return true
     if (door && name && (door === name || door.includes(name) || name.includes(door))) return true
     return false
+  }
+
+  if (browseMode === 'range' && kind === 'universal') {
+    return assignedIds.includes(categoryId)
   }
 
   if (product.category_id && idSet?.has(product.category_id)) return true
@@ -213,6 +233,9 @@ export function countProductsForBrowseOption(
   categories: CategoryRow[],
   browseMode: CatalogBrowseMode,
   categoryId: string,
+  productCategoryMap?: ProductCategoryMap,
 ): number {
-  return products.filter((p) => productMatchesBrowseFilter(p, categories, browseMode, categoryId)).length
+  return products.filter((p) =>
+    productMatchesBrowseFilter(p, categories, browseMode, categoryId, productCategoryMap),
+  ).length
 }

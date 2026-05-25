@@ -74,21 +74,23 @@ export default function CatalogProductPickerModal({
             </button>
           </div>
         </header>
-        <CatalogProductWorkbench
-          products={products}
-          categories={categories}
-          assemblies={assemblies}
-          allowedCatalogPrograms={catalogPrograms}
-          customerUserId={customerUserId}
-          preferencesScope={preferencesScope}
-          showCatalogueSwitcher={catalogPrograms.length > 1}
-          commitLabel={commitLabel}
-          linePersistence={linePersistence}
-          cartLineCount={cartLineCount}
-          addButtonLabel={commitLabel}
-          onCommit={onCommit}
-          embedded
-        />
+        <div className="catalog-picker-body">
+          <CatalogProductWorkbench
+            products={products}
+            categories={categories}
+            assemblies={assemblies}
+            allowedCatalogPrograms={catalogPrograms}
+            customerUserId={customerUserId}
+            preferencesScope={preferencesScope}
+            showCatalogueSwitcher={catalogPrograms.length > 1}
+            commitLabel={commitLabel}
+            linePersistence={linePersistence}
+            cartLineCount={cartLineCount}
+            addButtonLabel={commitLabel}
+            onCommit={onCommit}
+            embedded
+          />
+        </div>
       </div>
     </div>,
     document.body,

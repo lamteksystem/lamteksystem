@@ -136,6 +136,22 @@ export default function AdminLayout() {
     }
     if (location.pathname === '/admin/orders/processing') return { pageTitle: 'Order processing', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Order processing' }] }
     if (location.pathname === '/admin/orders/reminders') return { pageTitle: 'Order reminders', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Order reminders' }] }
+    if (location.pathname === '/admin/delivery-schedule') {
+      return {
+        pageTitle: 'Delivery schedule',
+        breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Delivery schedule' }],
+      }
+    }
+    if (location.pathname.match(/^\/admin\/pick-lists\/[^/]+\/scan$/)) {
+      return {
+        pageTitle: 'Warehouse scan',
+        breadcrumb: [
+          { to: '/admin', label: 'Today' },
+          { to: '/admin/pick-lists', label: 'Pick lists' },
+          { label: 'Warehouse scan' },
+        ],
+      }
+    }
     if (location.pathname.match(/^\/admin\/orders\/[^/]+\/invoice$/)) return { pageTitle: 'Print invoice', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Invoice' }] }
     if (location.pathname.match(/^\/admin\/orders\/[^/]+\/packing-slip$/)) return { pageTitle: 'Packing slip', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Packing slip' }] }
     if (location.pathname.match(/^\/admin\/orders\/[^/]+\/quote/)) return { pageTitle: 'Print quote', breadcrumb: [{ to: '/admin', label: 'Today' }, { to: '/admin/orders', label: 'Orders' }, { label: 'Quote' }] }
@@ -146,7 +162,9 @@ export default function AdminLayout() {
       const tail = (location.pathname.replace(/^\/admin\/crm\/?/, '') || 'open-orders').split('/')[0]
       const labels: Record<string, string> = {
         'open-orders': 'Open orders',
-        activity: 'Activity',
+        activity: 'Activity list',
+        'sales-board': 'Sales board',
+        calendar: 'Activity calendar',
         pipeline: 'Sales pipeline',
         directory: 'Directory',
       }
@@ -297,7 +315,14 @@ export default function AdminLayout() {
 
   const activeGroup = useMemo(() => {
     const path = location.pathname
-    if (path.startsWith('/admin/orders') || path === '/admin/create-order' || path === '/admin/create-quote') return 'orders'
+    if (
+      path.startsWith('/admin/orders') ||
+      path === '/admin/create-order' ||
+      path === '/admin/create-quote' ||
+      path === '/admin/delivery-schedule'
+    ) {
+      return 'orders'
+    }
     if (path.startsWith('/admin/customers') || path.startsWith('/admin/crm')) return 'customers'
     if (
       path.startsWith('/admin/catalogue') ||
@@ -356,7 +381,8 @@ export default function AdminLayout() {
               location.pathname === '/admin/create-order' ||
               location.pathname === '/admin/create-quote' ||
               location.pathname.startsWith('/admin/pick-lists') ||
-              location.pathname.startsWith('/admin/package-labels')
+              location.pathname.startsWith('/admin/package-labels') ||
+              location.pathname === '/admin/delivery-schedule'
             const open = groupIsOpen(groupId, forceOpen)
             return (
               <div className={`admin-nav-group ${open ? 'admin-nav-group--open' : ''}`}>
@@ -402,6 +428,12 @@ export default function AdminLayout() {
                       <Zap size={16} strokeWidth={2} aria-hidden />
                     </span>
                     {!sidebarCollapsed && <span>Processing</span>}
+                  </NavLink>
+                  <NavLink to="/admin/delivery-schedule" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+                    <span className="admin-nav-icon">
+                      <CalendarClock size={16} strokeWidth={2} aria-hidden />
+                    </span>
+                    {!sidebarCollapsed && <span>Delivery schedule</span>}
                   </NavLink>
                   <NavLink
                     to="/admin/pick-lists"
@@ -477,6 +509,18 @@ export default function AdminLayout() {
                         className={({ isActive }) => `admin-nav-sub-link${isActive ? ' active' : ''}`}
                       >
                         Activity
+                      </NavLink>
+                      <NavLink
+                        to="/admin/crm/sales-board"
+                        className={({ isActive }) => `admin-nav-sub-link${isActive ? ' active' : ''}`}
+                      >
+                        Sales board
+                      </NavLink>
+                      <NavLink
+                        to="/admin/crm/calendar"
+                        className={({ isActive }) => `admin-nav-sub-link${isActive ? ' active' : ''}`}
+                      >
+                        Week calendar
                       </NavLink>
                       <NavLink
                         to="/admin/crm/pipeline"

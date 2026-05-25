@@ -35,6 +35,7 @@ import type { CatalogPickerCommitPayload } from '@/components/catalog/CatalogPro
 import { useCatalogWorkbenchData } from '@/hooks/useCatalogWorkbenchData'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { insertAssemblyOrderLines, insertProductOrderLines } from '@/lib/orderLineInsert'
+import QuoteDocumentOptionsPanel from '@/components/admin/QuoteDocumentOptionsPanel'
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   quotation: 'Quotation',
@@ -59,6 +60,7 @@ interface LineRow {
   product_snapshot: { name?: string; sku?: string }
   quantity: number
   unit_price: number
+  combination_label?: string | null
 }
 
 type LinkedOrderPreview = Pick<OrderRow, 'id' | 'reference' | 'status' | 'created_at' | 'parent_order_id' | 'link_reason'>
@@ -227,7 +229,7 @@ export default function AdminOrderDetail() {
     if (!orderId) return
     const [orderRes, linesRes, eventsRes, locationsRes, shipmentsRes, notificationRulesRes, pickListsRes] = await Promise.all([
       supabase.from('orders').select('*').eq('id', orderId).single(),
-      supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price').eq('order_id', orderId),
+      supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price, combination_label').eq('order_id', orderId),
       supabase.from('order_events').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
       supabase.from('locations').select('*').eq('active', true).order('sort_order').order('name'),
       supabase.from('shipments').select('*').eq('order_id', orderId).order('shipped_at', { ascending: false }),
@@ -978,6 +980,22 @@ export default function AdminOrderDetail() {
     await reloadOrderLinesFromDb()
   }
 
+  async function updateLineCombination(lineId: string, label: string) {
+    if (!orderId || order?.is_archived === true) return
+    const trimmed = label.trim()
+    setSaving(true)
+    await supabase
+      .from('order_lines')
+      .update({ combination_label: trimmed || null })
+      .eq('id', lineId)
+    const { data } = await supabase
+      .from('order_lines')
+      .select('id, product_snapshot, quantity, unit_price, combination_label')
+      .eq('order_id', orderId)
+    setLines((data as LineRow[]) ?? [])
+    setSaving(false)
+  }
+
   async function updateLinePrice(lineId: string, newPrice: number) {
     if (!orderId || newPrice < 0 || order?.is_archived === true) return
     setSaving(true)
@@ -989,7 +1007,10 @@ export default function AdminOrderDetail() {
       eventType: 'line_price_changed',
       note: `Line price updated to £${Number(newPrice).toFixed(2)}`,
     }).catch(() => {})
-    const { data } = await supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price').eq('order_id', orderId)
+    const { data } = await supabase
+      .from('order_lines')
+      .select('id, product_snapshot, quantity, unit_price, combination_label')
+      .eq('order_id', orderId)
     setLines((data as LineRow[]) ?? [])
     const { data: o } = await supabase.from('orders').select('*').eq('id', orderId).single()
     if (o) setOrder(o as OrderRow)
@@ -1034,7 +1055,7 @@ export default function AdminOrderDetail() {
   async function reloadOrderLinesFromDb() {
     if (!orderId) return
     const [{ data: lineData }, { data: orderData }] = await Promise.all([
-      supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price').eq('order_id', orderId),
+      supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price, combination_label').eq('order_id', orderId),
       supabase.from('orders').select('*').eq('id', orderId).single(),
     ])
     setLines((lineData as LineRow[]) ?? [])
@@ -1260,7 +1281,7 @@ export default function AdminOrderDetail() {
         </div>
       </div>
 
-      {isQuotation && (
+          {isQuotation && (
         <div className="card admin-card admin-quote-workflow-card" role="note">
           <h2 style={{ marginTop: 0 }}>Quotation</h2>
           <p style={{ margin: '0 0 0.75rem' }}>
@@ -1276,6 +1297,9 @@ export default function AdminOrderDetail() {
                 Convert to order
               </button>
             </div>
+          )}
+          {orderId && (
+            <QuoteDocumentOptionsPanel orderId={orderId} basePath="/admin/orders" className="admin-quote-doc-options-wrap" />
           )}
         </div>
       )}
@@ -2532,6 +2556,22 @@ export default function AdminOrderDetail() {
         <ul className="admin-order-lines">
           {lines.map((l) => (
             <li key={l.id} className="admin-order-line">
+              {canEdit && (
+                <label className="admin-order-line-combination">
+                  <span className="admin-muted">Combination</span>
+                  <input
+                    type="text"
+                    className="admin-inline-edit-input"
+                    defaultValue={l.combination_label ?? ''}
+                    placeholder="e.g. Kitchen main"
+                    disabled={saving}
+                    onBlur={(e) => void updateLineCombination(l.id, e.target.value)}
+                  />
+                </label>
+              )}
+              {!canEdit && l.combination_label && (
+                <span className="admin-badge admin-order-line-combination-badge">{l.combination_label}</span>
+              )}
               <span className="line-name">{(l.product_snapshot as { name?: string })?.name ?? 'Product'}</span>
               <span className="line-price">
                 {editingPriceLineId === l.id ? (

@@ -355,6 +355,8 @@ export interface OrderLineRow {
   quantity: number
   unit_price: number
   options: Json
+  /** Quote grouping e.g. Kitchen main, Island */
+  combination_label?: string | null
   created_at?: string
 }
 

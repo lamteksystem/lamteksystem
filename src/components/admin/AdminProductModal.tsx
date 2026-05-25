@@ -13,6 +13,7 @@ import {
 import ProductCategoriesAssignModal from '@/components/admin/ProductCategoriesAssignModal'
 import { ProductCategoryMultiSelect } from '@/components/admin/ProductCategoryMultiSelect'
 import ProductCompositionPanel from '@/components/admin/ProductCompositionPanel'
+import ProductPricingBreakdown from '@/components/admin/ProductPricingBreakdown'
 import { usePermission } from '@/hooks/usePermission'
 import type { AssemblyPartTypeRow, CategoryRow, ProductRow } from '@/types/database'
 
@@ -862,6 +863,7 @@ export default function AdminProductModal({
                 </dd>
               </dl>
             </div>
+            <ProductPricingBreakdown product={liveProduct} className="admin-modal-form-section admin-modal-card" />
             <div className="admin-modal-form-section admin-modal-card">
               <h3 className="admin-modal-form-section-title">Image</h3>
               <dl className="admin-product-modal-meta">

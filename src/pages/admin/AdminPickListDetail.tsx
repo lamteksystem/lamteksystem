@@ -183,6 +183,9 @@ export default function AdminPickListDetail() {
           <span>Pick list {pickList.id.slice(0, 8)}</span>
         </span>
         <div className="admin-page-header-actions">
+          <Link to={`/admin/pick-lists/${pickList.id}/scan`} className="btn btn-outline btn-small">
+            Warehouse scan
+          </Link>
           <Link to={`/admin/pick-lists/${pickList.id}/print`} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-small">
             Print view
           </Link>

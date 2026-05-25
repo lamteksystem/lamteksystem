@@ -14,8 +14,14 @@ export default function AdminCrmLayout() {
         <NavLink to="/admin/crm/open-orders" className={tabClass} end>
           Open orders
         </NavLink>
+        <NavLink to="/admin/crm/sales-board" className={tabClass}>
+          Sales board
+        </NavLink>
         <NavLink to="/admin/crm/activity" className={tabClass}>
-          Activity
+          Activity list
+        </NavLink>
+        <NavLink to="/admin/crm/calendar" className={tabClass}>
+          Week calendar
         </NavLink>
         <NavLink to="/admin/crm/pipeline" className={tabClass}>
           Sales pipeline

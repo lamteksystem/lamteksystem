@@ -7931,6 +7931,66 @@ button.ordering-wizard-card {
 .admin-crm-opp-actions { margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .admin-crm-opp-actions select { max-width: 10rem; }
 
+/* CRM sales board (status kanban) */
+.admin-crm-sales-board-intro { margin: 0 0 1rem; max-width: 52rem; }
+.admin-crm-kanban { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; align-items: start; }
+.admin-crm-kanban-col { border: 1px solid var(--lamtek-border); border-radius: 12px; background: var(--lamtek-surface); overflow: hidden; box-shadow: var(--lamtek-shadow-sm); }
+.admin-crm-kanban-col-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--lamtek-border); background: linear-gradient(180deg, rgba(184,134,11,0.08), transparent); }
+.admin-crm-kanban-col-head h3 { margin: 0; font-size: 0.95rem; font-weight: 700; }
+.admin-crm-kanban-cards { list-style: none; margin: 0; padding: 0.5rem; display: grid; gap: 0.5rem; max-height: 420px; overflow-y: auto; }
+.admin-crm-kanban-card { display: grid; gap: 0.2rem; padding: 0.55rem 0.6rem; border: 1px solid var(--lamtek-border); border-radius: 10px; text-decoration: none; color: inherit; background: var(--lamtek-surface); transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.admin-crm-kanban-card:hover { border-color: var(--lamtek-gold); box-shadow: var(--lamtek-shadow-sm); text-decoration: none; }
+.admin-crm-kanban-card-title { font-weight: 650; }
+.admin-crm-kanban-card-value { font-variant-numeric: tabular-nums; font-weight: 700; }
+.admin-crm-kanban-empty { padding: 0.5rem; text-align: center; font-style: italic; }
+
+/* CRM / delivery week calendars */
+.admin-crm-calendar-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.admin-crm-calendar-range { margin-left: auto; font-weight: 600; }
+.admin-crm-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.5rem; }
+@media (max-width: 900px) { .admin-crm-calendar-grid { grid-template-columns: repeat(2, 1fr); } }
+.admin-crm-calendar-day { border: 1px solid var(--lamtek-border); border-radius: 10px; background: var(--lamtek-surface); min-height: 120px; display: flex; flex-direction: column; }
+.admin-crm-calendar-day--today { border-color: var(--lamtek-gold); box-shadow: 0 0 0 1px rgba(184,134,11,0.25); }
+.admin-crm-calendar-day-head { display: flex; justify-content: space-between; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--lamtek-border); font-size: 0.85rem; }
+.admin-crm-calendar-weekday { font-weight: 700; text-transform: uppercase; color: var(--lamtek-text-muted); }
+.admin-crm-calendar-date { font-variant-numeric: tabular-nums; font-weight: 700; }
+.admin-crm-calendar-events { list-style: none; margin: 0; padding: 0.35rem; flex: 1; display: grid; gap: 0.35rem; align-content: start; font-size: 0.85rem; }
+.admin-crm-calendar-events li { padding: 0.35rem; border-radius: 6px; background: rgba(0,0,0,0.03); }
+.admin-crm-calendar-event--done { opacity: 0.55; text-decoration: line-through; }
+.admin-crm-calendar-event-time { display: block; font-size: 0.75rem; color: var(--lamtek-text-muted); }
+.admin-crm-calendar-event-customer { display: block; font-size: 0.8rem; }
+.admin-delivery-schedule-order { display: grid; gap: 0.15rem; text-decoration: none; color: inherit; }
+.admin-delivery-schedule-order:hover { text-decoration: underline; }
+.admin-delivery-unscheduled { margin-top: 1.25rem; }
+.admin-delivery-unscheduled-list { margin: 0; padding-left: 1.25rem; }
+
+/* Quote document display options */
+.admin-quote-doc-options-intro { margin: 0 0 0.75rem; }
+.admin-quote-doc-options-grid { display: grid; gap: 0.35rem; }
+.admin-quote-doc-options-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; align-items: center; }
+
+/* Product pricing breakdown (catalogue modal) */
+.admin-product-pricing-table { width: 100%; border-collapse: collapse; }
+.admin-product-pricing-table th { text-align: left; font-weight: 600; padding: 0.35rem 0.5rem 0.35rem 0; color: var(--lamtek-text-muted); }
+.admin-product-pricing-table td { padding: 0.35rem 0; font-variant-numeric: tabular-nums; }
+.admin-product-pricing-row--margin td { font-weight: 700; color: var(--lamtek-burgundy, #6b1f2a); }
+
+/* Order line combinations */
+.admin-order-line-combination { display: inline-flex; align-items: center; gap: 0.35rem; margin-top: 0.25rem; font-size: 0.85rem; }
+.admin-order-line-combination input { max-width: 10rem; }
+.admin-order-line-combination-badge { margin-left: 0.35rem; }
+
+/* Warehouse pick scan */
+.admin-pick-scan-page .admin-page-header { margin-bottom: 1rem; }
+.admin-pick-scan-panel { max-width: 32rem; }
+.admin-pick-scan-camera-wrap { aspect-ratio: 4/3; background: #111; border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; margin-bottom: 0.75rem; }
+.admin-pick-scan-video { width: 100%; height: 100%; object-fit: cover; }
+.admin-pick-scan-placeholder { padding: 2rem; }
+.admin-pick-scan-actions { margin-bottom: 0.75rem; }
+.admin-pick-scan-form { display: grid; gap: 0.5rem; }
+.admin-pick-scan-form label { display: grid; gap: 0.25rem; font-weight: 600; }
+.admin-pick-scan-form input { padding: 0.5rem; border: 1px solid var(--lamtek-border); border-radius: 8px; }
+
 .admin-quick-links { margin: 0; padding-left: 1.25rem; list-style: none; }
 .admin-quick-links li { margin: 0.35rem 0; }
 .admin-quick-links a { font-weight: 500; }

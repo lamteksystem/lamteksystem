@@ -49,6 +49,7 @@ const WORKFLOW_ACTIONS: { heading: string; items: { to: string; label: string; I
       { to: '/admin/create-quote', label: 'Create quote', Icon: PlusCircle },
       { to: '/admin/create-order', label: 'Create order', Icon: PlusCircle },
       { to: '/admin/pick-lists', label: 'Pick lists', Icon: ScanBarcode },
+      { to: '/admin/delivery-schedule', label: 'Delivery schedule', Icon: Calendar },
       { to: '/admin/orders/reminders', label: 'Reminders', Icon: Bell },
     ],
   },
@@ -57,7 +58,9 @@ const WORKFLOW_ACTIONS: { heading: string; items: { to: string; label: string; I
     items: [
       { to: '/admin/customers', label: 'Customers', Icon: Users },
       { to: '/admin/crm/open-orders', label: 'Open orders', Icon: ShoppingCart },
-      { to: '/admin/crm/activity', label: 'Activity', Icon: Activity },
+      { to: '/admin/crm/sales-board', label: 'Sales board', Icon: Kanban },
+      { to: '/admin/crm/calendar', label: 'Activity calendar', Icon: Calendar },
+      { to: '/admin/crm/activity', label: 'Activity list', Icon: Activity },
       { to: '/admin/crm/pipeline', label: 'Pipeline', Icon: Kanban },
     ],
   },
@@ -99,6 +102,7 @@ export default function AdminDashboard() {
     quotationsCount: 0,
     ticketsOpenCount: 0,
     pickListsOpenCount: 0,
+    overdueActivitiesCount: 0,
     locationsCount: 0,
     customersCount: 0,
     productsCount: 0,
@@ -124,6 +128,7 @@ export default function AdminDashboard() {
         quotationsRes,
         ticketsRes,
         pickListsRes,
+        overdueActivitiesRes,
         locationsRes,
         customersRes,
         productsRes,
@@ -138,6 +143,12 @@ export default function AdminDashboard() {
         supabase.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'quotation').eq('is_archived', false),
         supabase.from('tickets').select('id', { count: 'exact', head: true }).neq('status', 'resolved'),
         supabase.from('pick_lists').select('id', { count: 'exact', head: true }).in('status', ['generated', 'picking']),
+        supabase
+          .from('activities')
+          .select('id', { count: 'exact', head: true })
+          .is('completed_at', null)
+          .not('due_at', 'is', null)
+          .lt('due_at', new Date().toISOString()),
         supabase.from('locations').select('id', { count: 'exact', head: true }).eq('active', true),
         supabase.from('customer_profiles').select('id', { count: 'exact', head: true }),
         supabase.from('products').select('id', { count: 'exact', head: true }).eq('active', true),
@@ -156,6 +167,7 @@ export default function AdminDashboard() {
         quotationsCount: quotationsRes.count ?? 0,
         ticketsOpenCount: ticketsRes.count ?? 0,
         pickListsOpenCount: pickListsRes.count ?? 0,
+        overdueActivitiesCount: overdueActivitiesRes.count ?? 0,
         locationsCount: locationsRes.count ?? 0,
         customersCount: customersRes.count ?? 0,
         productsCount: productsRes.count ?? 0,
@@ -250,6 +262,14 @@ export default function AdminDashboard() {
         <VisualStatCard value={formatDashboardCurrency(stats.revenuePaid)} label="Paid / invoiced" icon={<StatRevenueGlyph />} sparkline={revenueSpark} accent="success" />
         <VisualStatCard value={stats.ticketsOpenCount} label="Open tickets" icon={<Bell size={22} strokeWidth={2} />} to="/admin/tickets" hint="Support →" />
         <VisualStatCard value={stats.pickListsOpenCount} label="Pick lists active" icon={<ScanBarcode size={22} strokeWidth={2} />} to="/admin/pick-lists" hint="Warehouse →" />
+        <VisualStatCard
+          value={stats.overdueActivitiesCount}
+          label="Overdue CRM tasks"
+          icon={<Activity size={22} strokeWidth={2} />}
+          to="/admin/crm/calendar"
+          hint="Calendar →"
+          accent={stats.overdueActivitiesCount > 0 ? 'gold' : undefined}
+        />
         <VisualStatCard value={stats.customersCount} label="Customers" icon={<Users size={22} strokeWidth={2} />} to="/admin/customers" />
         <VisualStatCard value={stats.productsCount} label="Products" icon={<Package size={22} strokeWidth={2} />} to="/admin/catalogue" />
         <VisualStatCard value={stats.assembliesCount} label="Assemblies" icon={<BookOpen size={22} strokeWidth={2} />} to="/admin/catalogue" />
@@ -275,7 +295,8 @@ export default function AdminDashboard() {
       <section className="dashboard-reports-preview" aria-label="Reports">
         <Link to="/admin/reports" className="report-preview-card"><strong>{trendOrders.length}</strong><span>Orders (30d) — full reports</span></Link>
         <Link to="/admin/reports" className="report-preview-card"><strong>{formatDashboardCurrency(revenueTrend.reduce((s, p) => s + p.value, 0))}</strong><span>30-day revenue</span></Link>
-        <Link to="/admin/crm/pipeline" className="report-preview-card"><strong>{stats.ordersPlaced}</strong><span>Awaiting processing</span></Link>
+        <Link to="/admin/crm/sales-board" className="report-preview-card"><strong>{stats.quotationsCount}</strong><span>Open quotations — sales board</span></Link>
+        <Link to="/admin/delivery-schedule" className="report-preview-card"><strong>{stats.ordersPlaced}</strong><span>Placed orders — delivery week</span></Link>
       </section>
       <div className="admin-dashboard-main">
         <section className="admin-dashboard-section admin-dashboard-recent">

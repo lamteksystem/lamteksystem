@@ -65,6 +65,10 @@ import AdminCrmOpenOrders from '@/pages/admin/AdminCrmOpenOrders'
 import AdminCrmActivity from '@/pages/admin/AdminCrmActivity'
 import AdminCrmPipeline from '@/pages/admin/AdminCrmPipeline'
 import AdminCrmDirectory from '@/pages/admin/AdminCrmDirectory'
+import AdminCrmSalesBoard from '@/pages/admin/AdminCrmSalesBoard'
+import AdminCrmCalendar from '@/pages/admin/AdminCrmCalendar'
+import AdminDeliverySchedule from '@/pages/admin/AdminDeliverySchedule'
+import AdminPickListScan from '@/pages/admin/AdminPickListScan'
 import AdminNotifications from '@/pages/admin/AdminNotifications'
 import AdminCatalogue from '@/pages/admin/AdminCatalogue'
 import AdminCatalogueWipe from '@/pages/admin/AdminCatalogueWipe'
@@ -200,8 +204,11 @@ export default function App() {
           <Route path="open-orders" element={<AdminCrmOpenOrders />} />
           <Route path="activity" element={<AdminCrmActivity />} />
           <Route path="pipeline" element={<AdminCrmPipeline />} />
+          <Route path="sales-board" element={<AdminCrmSalesBoard />} />
+          <Route path="calendar" element={<AdminCrmCalendar />} />
           <Route path="directory" element={<AdminCrmDirectory />} />
         </Route>
+        <Route path="delivery-schedule" element={<AdminDeliverySchedule />} />
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="catalogue" element={<AdminCatalogue />} />
         <Route path="catalogue/categories" element={<AdminLiveCategories />} />
@@ -246,6 +253,7 @@ export default function App() {
         <Route path="orders/:orderId/quote" element={<AdminQuotePrint />} />
         <Route path="orders/:orderId" element={<AdminOrderDetail />} />
         <Route path="pick-lists" element={<AdminPickLists />} />
+        <Route path="pick-lists/:pickListId/scan" element={<AdminPickListScan />} />
         <Route path="pick-lists/:pickListId/print" element={<AdminPickListPrint />} />
         <Route path="pick-lists/:pickListId" element={<AdminPickListDetail />} />
         <Route path="package-labels/:labelId/print" element={<AdminPackageLabelPrint />} />

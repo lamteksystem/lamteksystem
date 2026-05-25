@@ -7991,20 +7991,6 @@ button.ordering-wizard-card {
 .admin-pick-scan-form label { display: grid; gap: 0.25rem; font-weight: 600; }
 .admin-pick-scan-form input { padding: 0.5rem; border: 1px solid var(--lamtek-border); border-radius: 8px; }
 
-/* Tealbury quote/order setup wizard */
-.tealbury-setup-wizard { max-width: 52rem; }
-.tealbury-setup-step h3 { margin: 0 0 0.75rem; font-size: 1.05rem; }
-.tealbury-setup-options { display: grid; gap: 0.5rem; margin-bottom: 1rem; }
-.tealbury-setup-options--grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
-.tealbury-setup-option {
-  display: grid; gap: 0.25rem; text-align: left; padding: 0.65rem 0.75rem;
-  border: 1px solid var(--lamtek-border); border-radius: 10px; background: var(--lamtek-surface);
-  cursor: pointer; transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.tealbury-setup-option:hover { border-color: var(--lamtek-gold); }
-.tealbury-setup-option--active { border-color: var(--lamtek-burgundy, #6b1f2a); box-shadow: 0 0 0 1px rgba(103,39,50,0.2); }
-.admin-order-build-tealbury-summary { font-size: 0.95rem; }
-
 .admin-quick-links { margin: 0; padding-left: 1.25rem; list-style: none; }
 .admin-quick-links li { margin: 0.35rem 0; }
 .admin-quick-links a { font-weight: 500; }

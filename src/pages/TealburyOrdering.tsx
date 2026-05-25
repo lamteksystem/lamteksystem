@@ -113,7 +113,7 @@ export default function TealburyOrdering() {
 
   if (orderId && setupOpen) {
     return (
-      <div className="page ordering-page tealbury-ordering-page">
+      <div className="page ordering-page tealbury-ordering-page kq-wizard-page">
         <PageNav backTo="/ordering/start" backLabel="Ordering" />
         <TealburyOrderSetupWizard
           orderId={orderId}
@@ -134,11 +134,11 @@ export default function TealburyOrdering() {
   return (
     <div className="page ordering-page tealbury-ordering-page tealbury-ordering-page--workbench">
       <PageNav backTo="/ordering/start" backLabel="Ordering" />
-      <header className="page-header ordering-page-header tb-page-header">
+      <header className="kq-build-hero ordering-page-header">
         <div>
           <h1>Tealbury product search</h1>
-          <p className="page-lead">
-            Industry-style catalogue search for Tealbury packaged kitchens. Component ordering is under{' '}
+          <p>
+            Browse complete units and accessories for your configured kitchen. Component-only ordering is on{' '}
             <Link to="/ordering">Lamtek create order</Link>.
           </p>
         </div>

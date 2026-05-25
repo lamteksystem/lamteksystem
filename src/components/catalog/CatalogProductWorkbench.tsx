@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Filter, Layers } from 'lucide-react'
 import type { AssemblyWithLines, CategoryRow, ProductRow } from '@/types/database'
 import { CATALOG_PROGRAM, type CatalogProgram } from '@/lib/catalogProgram'
 import { getProductAvailabilityMeta } from '@/lib/productAvailability'
@@ -498,7 +499,15 @@ export default function CatalogProductWorkbench({
 
       <aside className="tb-workbench-filters" aria-label="Product filters">
         <div className="tb-pane-toolbar tb-pane-toolbar--filters">
-          <h2 className="tb-filters-title">Product search</h2>
+          <div className="tb-filters-head">
+            <span className="tb-filters-head-icon" aria-hidden>
+              <Filter size={18} strokeWidth={2} />
+            </span>
+            <div className="tb-filters-head-text">
+              <h2>Product search</h2>
+              <p>Filter by category, range, or unit type</p>
+            </div>
+          </div>
           <button
             type="button"
             className="tb-pane-toggle"
@@ -524,30 +533,28 @@ export default function CatalogProductWorkbench({
           />
         </label>
 
-        <fieldset className="tb-filter-field tb-filter-browse-mode">
-          <legend>Browse by</legend>
-          <label className="tb-check-row">
-            <input
-              type="radio"
-              name="tb-browse-mode"
-              checked={filters.browseMode === 'category'}
-              onChange={() => updateFilter({ browseMode: 'category', categoryId: null })}
-            />
-            Category
-          </label>
-          <label className="tb-check-row">
-            <input
-              type="radio"
-              name="tb-browse-mode"
-              checked={filters.browseMode === 'range'}
-              onChange={() => updateFilter({ browseMode: 'range', categoryId: null })}
-            />
-            Kitchen range
-          </label>
-        </fieldset>
+        <div className="tb-filter-group">
+          <span className="tb-filter-group-label">Browse by</span>
+          <div className="tb-segmented" role="group" aria-label="Browse by">
+            <button
+              type="button"
+              className={filters.browseMode === 'category' ? 'active' : ''}
+              onClick={() => updateFilter({ browseMode: 'category', categoryId: null })}
+            >
+              Category
+            </button>
+            <button
+              type="button"
+              className={filters.browseMode === 'range' ? 'active' : ''}
+              onClick={() => updateFilter({ browseMode: 'range', categoryId: null })}
+            >
+              Range
+            </button>
+          </div>
+        </div>
 
-        <label className="tb-filter-field">
-          <span className="tb-filter-field-label">
+        <div className="tb-filter-group">
+          <span className="tb-filter-group-label">
             {filters.browseMode === 'range' ? 'Kitchen range' : 'Category'}
             {canEditCatalogue && (
               <button
@@ -555,36 +562,43 @@ export default function CatalogProductWorkbench({
                 className="tb-admin-inline-action"
                 title="Admin · add, rename, delete or re-type categories"
                 onClick={() => setManagingCategories(true)}
+                style={{ marginLeft: '0.5rem' }}
               >
                 Manage…
               </button>
             )}
           </span>
-          <select
-            value={filters.categoryId ?? ''}
-            onChange={(e) => updateFilter({ categoryId: e.target.value || null })}
-          >
-            <option value="">
-              {filters.browseMode === 'range'
-                ? `All ranges (${scopeProducts.length})`
-                : `All categories (${scopeProducts.length})`}
-            </option>
+          <div className="tb-category-chips" role="list">
+            <button
+              type="button"
+              role="listitem"
+              className={`tb-category-chip${filters.categoryId === null ? ' active' : ''}`}
+              onClick={() => updateFilter({ categoryId: null })}
+            >
+              All ({scopeProducts.length})
+            </button>
             {browseOptions.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.depth > 0 ? '— ' : ''}
+              <button
+                key={opt.id}
+                type="button"
+                role="listitem"
+                className={`tb-category-chip${filters.categoryId === opt.id ? ' active' : ''}`}
+                onClick={() => updateFilter({ categoryId: opt.id })}
+              >
+                {opt.depth > 0 ? '· ' : ''}
                 {opt.label}
                 {categoryCounts.has(opt.id) ? ` (${categoryCounts.get(opt.id)})` : ''}
-              </option>
+              </button>
             ))}
-          </select>
+          </div>
           {filters.browseMode === 'range' ? (
             <p className="tb-filter-hint">
               Door families plus cross-range groups (wirework, accessories, units, etc.).
             </p>
           ) : (
-            <p className="tb-filter-hint">Product types such as doors, handles, panels and units.</p>
+            <p className="tb-filter-hint">System categories only — assign products via Smart categorise.</p>
           )}
-        </label>
+        </div>
 
         {filters.browseMode === 'category' && facets.doorRanges.length > 0 && (
           <label className="tb-filter-field">
@@ -604,62 +618,62 @@ export default function CatalogProductWorkbench({
         )}
 
         {tealburySetup && (
-          <fieldset className="tb-filter-field tb-filter-checklist">
-            <legend>Product type</legend>
-            <label className="tb-check-row">
-              <input
-                type="radio"
-                name="tb-product-kind"
-                checked={filters.productKind === 'all'}
-                onChange={() => updateFilter({ productKind: 'all' })}
-              />
-              All products
-            </label>
-            <label className="tb-check-row">
-              <input
-                type="radio"
-                name="tb-product-kind"
-                checked={filters.productKind === 'complete'}
-                onChange={() => updateFilter({ productKind: 'complete' })}
-              />
-              Complete units (BOM)
-            </label>
-            <label className="tb-check-row">
-              <input
-                type="radio"
-                name="tb-product-kind"
-                checked={filters.productKind === 'components'}
-                onChange={() => updateFilter({ productKind: 'components' })}
-              />
-              Components &amp; accessories
-            </label>
-          </fieldset>
+          <div className="tb-filter-group">
+            <span className="tb-filter-group-label">
+              <Layers size={12} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} aria-hidden />
+              Product type
+            </span>
+            <div className="tb-segmented" role="group" aria-label="Product type">
+              <button
+                type="button"
+                className={filters.productKind === 'all' ? 'active' : ''}
+                onClick={() => updateFilter({ productKind: 'all' })}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className={filters.productKind === 'complete' ? 'active' : ''}
+                onClick={() => updateFilter({ productKind: 'complete' })}
+              >
+                Units
+              </button>
+              <button
+                type="button"
+                className={filters.productKind === 'components' ? 'active' : ''}
+                onClick={() => updateFilter({ productKind: 'components' })}
+              >
+                Parts
+              </button>
+            </div>
+          </div>
         )}
 
         {facets.sections.length > 0 && (
-          <fieldset className="tb-filter-field tb-filter-checklist">
-            <legend>Category</legend>
-            <label className="tb-check-row">
-              <input
-                type="radio"
-                name="tb-section"
-                checked={filters.section === null}
-                onChange={() => updateFilter({ section: null })}
-              />
-              All sections
-            </label>
-            {facets.sections.map((s) => (
-              <label key={s.id} className="tb-check-row">
-                <input
-                  type="radio"
-                  name="tb-section"
-                  checked={filters.section === s.id}
-                  onChange={() => updateFilter({ section: s.id })}
-                />
-                {s.name}
-              </label>
-            ))}
-          </fieldset>
+          <div className="tb-filter-group">
+            <span className="tb-filter-group-label">Section</span>
+            <div className="tb-category-chips" role="list">
+              <button
+                type="button"
+                role="listitem"
+                className={`tb-category-chip${filters.section === null ? ' active' : ''}`}
+                onClick={() => updateFilter({ section: null })}
+              >
+                All
+              </button>
+              {facets.sections.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="listitem"
+                  className={`tb-category-chip${filters.section === s.id ? ' active' : ''}`}
+                  onClick={() => updateFilter({ section: s.id })}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {showCatalogueSwitcher && allowedCatalogPrograms.length > 1 && (
@@ -947,7 +961,7 @@ export default function CatalogProductWorkbench({
                         <div className="tb-row-actions">
                           <button
                             type="button"
-                            className="btn btn-small"
+                            className="btn btn-small tb-btn-add"
                             onClick={() => addProductToBasket(product, qty)}
                           >
                             Add
@@ -1044,7 +1058,11 @@ export default function CatalogProductWorkbench({
                         </div>
                       </td>
                       <td>
-                        <button type="button" className="btn btn-small" onClick={() => addAssemblyToBasket(assembly, qty)}>
+                        <button
+                          type="button"
+                          className="btn btn-small tb-btn-add"
+                          onClick={() => addAssemblyToBasket(assembly, qty)}
+                        >
                           Add
                         </button>
                       </td>

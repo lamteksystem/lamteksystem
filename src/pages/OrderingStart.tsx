@@ -89,19 +89,21 @@ export default function OrderingStart() {
       <PageNav backTo="/" backLabel="Dashboard" />
 
       {showWizard ? (
-        <TealburyOrderSetupWizard
-          orderId={orderId}
-          isQuote={false}
-          categories={categories}
-          products={products}
-          initial={setup}
-          variant="customer"
-          onComplete={(complete) => {
-            setSetup(complete)
-            setShowWizard(false)
-            navigateAfterSetup(complete)
-          }}
-        />
+        <div className="kq-wizard-page">
+          <TealburyOrderSetupWizard
+            orderId={orderId}
+            isQuote={false}
+            categories={categories}
+            products={products}
+            initial={setup}
+            variant="customer"
+            onComplete={(complete) => {
+              setSetup(complete)
+              setShowWizard(false)
+              navigateAfterSetup(complete)
+            }}
+          />
+        </div>
       ) : (
         <>
           <p className="ordering-wizard-intro">

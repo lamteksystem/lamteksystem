@@ -264,11 +264,21 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
   }, [customers, selectedUserId])
 
   return (
-    <div className={`admin-page admin-order-build-page admin-order-build-page--${mode}`}>
-      <div className="admin-page-header admin-order-build-header">
-        <span className="admin-breadcrumb">{isQuote ? 'Create quote' : 'Create order'}</span>
+    <div className={`admin-page admin-order-build-page admin-order-build-page--${mode} kq-build-shell`}>
+      <header className="kq-build-hero">
+        <div>
+          <span className="admin-breadcrumb">{isQuote ? 'Create quote' : 'Create order'}</span>
+          <h1>{buildActive ? (isQuote ? 'Build quote' : 'Build order') : isQuote ? 'New quote' : 'New order'}</h1>
+          <p>
+            {buildActive
+              ? `Add catalogue lines for ${customerLabel}. Lines save as you add them.`
+              : isQuote
+                ? 'Choose a customer, then search Lamtek and Tealbury catalogues with the guided kitchen setup.'
+                : 'Choose a customer, then add products with the catalogue workbench.'}
+          </p>
+        </div>
         {buildActive && orderHref && (
-          <div className="admin-order-build-header-actions">
+          <div className="kq-build-hero-actions">
             <Link to={orderHref} className="btn btn-outline btn-small">
               {isQuote ? 'Quote detail' : 'Order detail'}
               {lineCount > 0 ? ` (${lineCount})` : ''} →
@@ -278,7 +288,7 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
             </button>
           </div>
         )}
-      </div>
+      </header>
 
       {!buildActive && (
         <>
@@ -305,8 +315,8 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
             </div>
           )}
 
-          <div className="card admin-card admin-create-order-card">
-            <h2 style={{ marginTop: 0 }}>{isQuote ? 'Quote for which customer?' : 'Who is this order for?'}</h2>
+          <div className="card admin-card admin-create-order-card kq-build-start-card">
+            <h2>{isQuote ? 'Quote for which customer?' : 'Who is this order for?'}</h2>
             <label className="admin-create-order-label">
               <span className="admin-settings-label">Customer account</span>
               <select
@@ -358,15 +368,14 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
 
       {buildActive && (
         <>
-          <div className="admin-order-build-context card admin-card">
-            <div className="admin-order-build-context-main">
+          <div className="kq-build-context">
+            <div>
               <strong>{customerLabel}</strong>
               {isQuote && quoteReference.trim() && (
                 <span className="admin-muted"> · Ref: {quoteReference.trim()}</span>
               )}
               <p className="admin-muted" style={{ margin: '0.35rem 0 0', fontSize: '0.9rem' }}>
-                Lines save to this {isQuote ? 'quote' : 'draft order'} as you add them. Use the pane controls to
-                collapse filters or hide product details.
+                Collapse filters or hide the detail panel from the workbench toolbar.
               </p>
             </div>
             {lastAddedMessage && (
@@ -382,6 +391,7 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
               <p>Loading catalogues…</p>
             </div>
           ) : showTealburyWizard ? (
+            <div className="kq-wizard-page">
             <TealburyOrderSetupWizard
               orderId={orderId}
               isQuote={isQuote}
@@ -393,26 +403,30 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
                 setTealburySetupOpen(false)
               }}
             />
+            </div>
           ) : (
             <>
               {tealburySetup && !orderNeedsTealburySetup(tealburySetup) && (
-                <div className="card admin-card admin-order-build-tealbury-summary" style={{ marginBottom: '1rem' }}>
-                  <p style={{ margin: 0 }}>
-                    <strong>Tealbury setup:</strong>{' '}
-                    {tealburySetup.build_style === 'flat_pack' ? 'Flat pack' : 'Rigid'} ·{' '}
-                    {rangeName ?? 'Range'} · {tealburySetup.door_finish} ·{' '}
-                    {carcassFinishLabel(tealburySetup.carcass_finish)} carcass ·{' '}
-                    {tealburySetup.line_style_preference?.replace('_', ' ')} ·{' '}
-                    {hingeBrandLabel(tealburySetup.hinge_brand) ?? '—'} hinges
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-small"
-                      style={{ marginLeft: '0.75rem' }}
-                      onClick={() => setTealburySetupOpen(true)}
-                    >
-                      Change setup
-                    </button>
-                  </p>
+                <div className="kq-build-context" style={{ marginBottom: '1rem' }}>
+                  <div className="kq-build-context-chips">
+                    <span className="kq-build-chip">
+                      {tealburySetup.build_style === 'flat_pack' ? 'Flat pack' : 'Rigid'}
+                    </span>
+                    <span className="kq-build-chip">{rangeName ?? 'Range'}</span>
+                    <span className="kq-build-chip">{tealburySetup.door_finish}</span>
+                    <span className="kq-build-chip">{carcassFinishLabel(tealburySetup.carcass_finish)}</span>
+                    <span className="kq-build-chip">
+                      {tealburySetup.line_style_preference?.replace('_', ' ') ?? '—'}
+                    </span>
+                    <span className="kq-build-chip">{hingeBrandLabel(tealburySetup.hinge_brand) ?? '—'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-small"
+                    onClick={() => setTealburySetupOpen(true)}
+                  >
+                    Change setup
+                  </button>
                 </div>
               )}
               <CatalogProductWorkbench

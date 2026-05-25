@@ -9,7 +9,8 @@ import { productMatchesBrowseFilter } from '@/lib/categoryTaxonomy'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import {
   loadTealburyOrderSetup,
-  orderNeedsTealburySetup,
+  orderNeedsGuidedSetup,
+  isTealburyCatalogueChoice,
   type TealburyOrderSetup,
 } from '@/lib/tealburyOrderSetup'
 import type { CategoryRow, ProductRow } from '@/types/database'
@@ -55,7 +56,7 @@ export default function OrderingStart() {
       const saved = await loadTealburyOrderSetup(id)
       if (cancelled) return
       setSetup(saved)
-      setShowWizard(orderNeedsTealburySetup(saved))
+      setShowWizard(orderNeedsGuidedSetup(saved))
     })()
     return () => {
       cancelled = true
@@ -65,13 +66,18 @@ export default function OrderingStart() {
   function navigateAfterSetup(complete: TealburyOrderSetup) {
     const params = new URLSearchParams()
     if (complete.kitchen_range_id) params.set('range', complete.kitchen_range_id)
+    if (complete.catalogue_choice === 'lamtek') {
+      navigate(`/ordering?${params.toString()}`)
+      return
+    }
     const inRange = complete.kitchen_range_id
       ? products.filter((p) =>
           productMatchesBrowseFilter(p, categories, 'range', complete.kitchen_range_id!),
         )
       : []
     const isTealbury =
-      inRange.length > 0 && inRange.every((p) => p.catalog_program === CATALOG_PROGRAM.TEALBURY)
+      isTealburyCatalogueChoice(complete.catalogue_choice) ||
+      (inRange.length > 0 && inRange.every((p) => p.catalog_program === CATALOG_PROGRAM.TEALBURY))
     navigate(`${isTealbury ? '/ordering/tealbury' : '/ordering'}?${params.toString()}`)
   }
 

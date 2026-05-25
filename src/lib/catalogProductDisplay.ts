@@ -5,7 +5,12 @@ import {
   type CatalogBrowseMode,
 } from '@/lib/categoryTaxonomy'
 import type { ProductCategoryMap } from '@/lib/productCategories'
-import { lineStyleMatchesCategoryName, type TealburyOrderSetup } from '@/lib/tealburyOrderSetup'
+import {
+  isTealburyCatalogueChoice,
+  lineStyleMatchesCategoryName,
+  orderNeedsTealburyKitchenSetup,
+  type TealburyOrderSetup,
+} from '@/lib/tealburyOrderSetup'
 import type { CategoryRow, CategoryTypeRow, OrderRow, ProductRow } from '@/types/database'
 
 export type CatalogProductKindFilter = 'all' | 'complete' | 'components'
@@ -271,9 +276,16 @@ export function filterCatalogProducts(
   const completeIds = options?.completeProductIds
   const setup = options?.tealburySetup
   const types = options?.categoryTypes ?? []
+  const applyTealburyKitchenFilters =
+    setup &&
+    isTealburyCatalogueChoice(setup.catalogue_choice) &&
+    !orderNeedsTealburyKitchenSetup(setup)
 
-  const browseMode: CatalogBrowseMode = setup?.kitchen_range_id ? 'range' : filters.browseMode
-  const rangeCategoryId = setup?.kitchen_range_id ?? filters.categoryId
+  const browseMode: CatalogBrowseMode =
+    applyTealburyKitchenFilters && setup.kitchen_range_id ? 'range' : filters.browseMode
+  const rangeCategoryId = applyTealburyKitchenFilters
+    ? (setup.kitchen_range_id ?? filters.categoryId)
+    : filters.categoryId
 
   return products.filter((p) => {
     if (filters.catalogProgram && p.catalog_program !== filters.catalogProgram) return false
@@ -286,9 +298,11 @@ export function filterCatalogProducts(
     }
     if (rangeCategoryId && categories.length === 0 && p.category_id !== rangeCategoryId) return false
 
-    if (setup?.door_finish && !productHasDoorFinish(p, setup.door_finish)) return false
+    if (applyTealburyKitchenFilters && setup.door_finish && !productHasDoorFinish(p, setup.door_finish)) {
+      return false
+    }
 
-    if (setup?.line_style_preference && pcMap && types.length > 0) {
+    if (applyTealburyKitchenFilters && setup.line_style_preference && pcMap && types.length > 0) {
       if (!productMatchesTealburyLineStyle(p, setup.line_style_preference, categories, types, pcMap)) {
         return false
       }

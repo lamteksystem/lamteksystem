@@ -78,6 +78,8 @@ export default function AdminOrders() {
   const [bulkUpdating, setBulkUpdating] = useState(false)
   const [archivingOrderId, setArchivingOrderId] = useState<string | null>(null)
   const [duplicatingOrderId, setDuplicatingOrderId] = useState<string | null>(null)
+  const [bulkArchiving, setBulkArchiving] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
   const { allowed: canEditOrders } = usePermission('admin.orders', 'edit')
   const { columnDefs, visibleIds, setColumnVisible, setColumnOrder, resetToDefault, isVisible, initialised, order } = useColumnVisibility('admin_orders', ORDER_TABLE_COLUMNS)
 
@@ -134,6 +136,60 @@ export default function AdminOrders() {
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, ...updates } : o)))
     }
     setUpdatingOrderId(null)
+  }
+
+  async function bulkSetArchived(isArchived: boolean) {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0 || !canEditOrders) return
+    if (
+      !window.confirm(
+        isArchived
+          ? `Archive ${ids.length} selected order(s)? They will be hidden from active lists.`
+          : `Restore ${ids.length} selected order(s) from archive?`,
+      )
+    ) {
+      return
+    }
+    setBulkArchiving(true)
+    const updates: Partial<OrderRow> = {
+      is_archived: isArchived,
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('orders').update(updates).in('id', ids)
+    if (!error) {
+      setOrders((prev) => prev.map((o) => (ids.includes(o.id) ? { ...o, ...updates } : o)))
+      setSelectedIds(new Set())
+    }
+    setBulkArchiving(false)
+  }
+
+  async function bulkDeleteOrders() {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0 || !canEditOrders) return
+    const targets = orders.filter((o) => ids.includes(o.id))
+    const blocked = targets.filter((o) => o.status !== 'draft' && o.status !== 'quotation')
+    if (blocked.length > 0) {
+      window.alert(
+        `Only draft orders and quotations can be deleted. ${blocked.length} selected record(s) are not eligible.`,
+      )
+      return
+    }
+    if (
+      !window.confirm(
+        `Permanently delete ${ids.length} draft/quotation record(s)? This cannot be undone.`,
+      )
+    ) {
+      return
+    }
+    setBulkDeleting(true)
+    const { error } = await supabase.from('orders').delete().in('id', ids)
+    if (!error) {
+      setOrders((prev) => prev.filter((o) => !ids.includes(o.id)))
+      setSelectedIds(new Set())
+    } else {
+      window.alert(error.message ?? 'Could not delete selected orders.')
+    }
+    setBulkDeleting(false)
   }
 
   async function updateOrderArchive(orderId: string, isArchived: boolean) {
@@ -478,7 +534,7 @@ export default function AdminOrders() {
                 type="button"
                 className="btn btn-small"
                 onClick={() => bulkUpdateStatus('invoiced')}
-                disabled={bulkUpdating}
+                disabled={bulkUpdating || bulkArchiving || bulkDeleting}
               >
                 {bulkUpdating ? 'Updating…' : 'Mark as Invoiced'}
               </button>
@@ -488,7 +544,7 @@ export default function AdminOrders() {
                   const v = e.target.value as OrderRow['status'] | ''
                   if (v) bulkUpdateStatus(v)
                 }}
-                disabled={bulkUpdating}
+                disabled={bulkUpdating || bulkArchiving || bulkDeleting}
                 className="admin-filter-input"
               >
                 <option value="">Set status to…</option>
@@ -496,6 +552,30 @@ export default function AdminOrders() {
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
+              <button
+                type="button"
+                className="btn btn-outline btn-small"
+                onClick={() => void bulkSetArchived(true)}
+                disabled={!canEditOrders || bulkArchiving || bulkDeleting || bulkUpdating}
+              >
+                {bulkArchiving ? 'Archiving…' : 'Archive selected'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-small"
+                onClick={() => void bulkSetArchived(false)}
+                disabled={!canEditOrders || bulkArchiving || bulkDeleting || bulkUpdating}
+              >
+                {bulkArchiving ? 'Restoring…' : 'Restore from archive'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-small admin-btn-danger"
+                onClick={() => void bulkDeleteOrders()}
+                disabled={!canEditOrders || bulkArchiving || bulkDeleting || bulkUpdating}
+              >
+                {bulkDeleting ? 'Deleting…' : 'Delete selected'}
+              </button>
               <button type="button" className="btn btn-outline btn-small" onClick={() => setSelectedIds(new Set())}>
                 Clear selection
               </button>

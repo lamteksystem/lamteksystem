@@ -2,9 +2,95 @@
 
 /* —— Kitchen setup wizard —— */
 .kq-wizard-page {
-  max-width: 56rem;
-  margin: 0 auto;
-  padding-bottom: 2.5rem;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-bottom: 1rem;
+}
+
+.kq-build-shell--full {
+  max-width: none;
+  width: 100%;
+}
+
+.kq-build-workspace {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.kq-build-workspace .kq-wizard {
+  width: 100%;
+}
+
+.kq-build-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 14px;
+  border: 1px solid var(--lamtek-border);
+  background: var(--lamtek-surface);
+  box-shadow: var(--lamtek-shadow-sm);
+}
+
+.kq-build-bar-title {
+  margin: 0.2rem 0 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.kq-build-bar-lead {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+}
+
+.kq-build-bar-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  align-items: flex-end;
+}
+
+.kq-build-bar-field {
+  display: grid;
+  gap: 0.3rem;
+  min-width: min(100%, 220px);
+}
+
+.kq-build-bar-field span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--lamtek-text-muted);
+}
+
+.kq-build-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.kq-build-bar-note {
+  margin: 0.5rem 0 0;
+  width: 100%;
+}
+
+.kq-build-context--inline {
+  margin-bottom: 0.75rem;
+}
+
+.admin-btn-danger {
+  color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.35);
+}
+
+.admin-btn-danger:hover {
+  background: rgba(185, 28, 28, 0.08);
 }
 
 .kq-wizard {

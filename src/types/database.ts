@@ -330,6 +330,8 @@ export interface OrderRow {
   line_style_preference?: 'high_line' | 'drawer_line' | 'mixed' | null
   /** Tealbury: preferred hinge supplier for complete-unit BOM. */
   hinge_brand?: 'blum' | 'titus' | 'hafele' | null
+  /** Guided setup: tealbury complete kitchens vs lamtek components. */
+  catalogue_choice?: 'tealbury' | 'lamtek' | null
 }
 
 export const COURIER_OPTIONS = ['DPD', 'FedEx', 'Royal Mail', 'Yodel', 'Evri', 'Parcelforce', 'DX', 'Other'] as const

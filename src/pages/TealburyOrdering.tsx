@@ -11,7 +11,7 @@ import { insertAssemblyOrderLines, insertProductOrderLines } from '@/lib/orderLi
 import { resolveAssemblyForHingeBrand } from '@/lib/tealburyBomResolve'
 import {
   loadTealburyOrderSetup,
-  orderNeedsTealburySetup,
+  orderNeedsGuidedSetup,
   type TealburyOrderSetup,
 } from '@/lib/tealburyOrderSetup'
 import { supabase } from '@/lib/supabase'
@@ -33,7 +33,7 @@ export default function TealburyOrdering() {
     void loadTealburyOrderSetup(draftOrder.id).then((s) => {
       if (!cancelled) {
         setTealburySetup(s)
-        setSetupOpen(orderNeedsTealburySetup(s))
+        setSetupOpen(orderNeedsGuidedSetup(s))
       }
     })
     return () => {

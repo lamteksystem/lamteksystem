@@ -13,12 +13,14 @@ import type { CustomerProfileRow, OrderLinkReason, OrderRow } from '@/types/data
 import { ORDER_LINK_REASONS } from '@/types/database'
 import {
   loadTealburyOrderSetup,
-  orderNeedsTealburySetup,
+  orderNeedsGuidedSetup,
+  orderNeedsTealburyKitchenSetup,
+  hingeBrandLabel,
+  isTealburyCatalogueChoice,
   type TealburyOrderSetup,
 } from '@/lib/tealburyOrderSetup'
 import { carcassFinishLabel } from '@/lib/orderRangeFinish'
 import { resolveAssemblyForHingeBrand } from '@/lib/tealburyBomResolve'
-import { hingeBrandLabel } from '@/lib/tealburyOrderSetup'
 import type { AssemblyWithLines } from '@/types/database'
 
 const PARENT_UUID =
@@ -67,10 +69,12 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
 
   const buildActive = Boolean(orderId)
 
-  const catalogPrograms = useMemo(
-    () => [CATALOG_PROGRAM.LAMTEK, CATALOG_PROGRAM.TEALBURY],
-    [],
-  )
+  const catalogPrograms = useMemo(() => {
+    if (tealburySetup?.catalogue_choice === 'lamtek') return [CATALOG_PROGRAM.LAMTEK]
+    if (tealburySetup?.catalogue_choice === 'tealbury') return [CATALOG_PROGRAM.TEALBURY]
+    return [CATALOG_PROGRAM.LAMTEK, CATALOG_PROGRAM.TEALBURY]
+  }, [tealburySetup?.catalogue_choice])
+
   const { products, categories, assemblies, loading: catalogLoading } = useCatalogWorkbenchData(
     buildActive ? catalogPrograms : [],
   )
@@ -247,10 +251,8 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
     [isQuote, orderId, refreshLineCount, selectedUserId, tealburySetup?.hinge_brand, products],
   )
 
-  const showTealburyWizard =
-    buildActive &&
-    (tealburySetupOpen || orderNeedsTealburySetup(tealburySetup)) &&
-    !catalogLoading
+  const showGuidedWizard =
+    buildActive && (tealburySetupOpen || orderNeedsGuidedSetup(tealburySetup)) && !catalogLoading
 
   const rangeName = useMemo(() => {
     if (!tealburySetup?.kitchen_range_id) return null
@@ -263,62 +265,17 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
     return [c.company_name, c.contact_name].filter(Boolean).join(' · ')
   }, [customers, selectedUserId])
 
-  return (
-    <div className={`admin-page admin-order-build-page admin-order-build-page--${mode} kq-build-shell`}>
-      <header className="kq-build-hero">
-        <div>
-          <span className="admin-breadcrumb">{isQuote ? 'Create quote' : 'Create order'}</span>
-          <h1>{buildActive ? (isQuote ? 'Build quote' : 'Build order') : isQuote ? 'New quote' : 'New order'}</h1>
-          <p>
-            {buildActive
-              ? `Add catalogue lines for ${customerLabel}. Lines save as you add them.`
-              : isQuote
-                ? 'Choose a customer, then search Lamtek and Tealbury catalogues with the guided kitchen setup.'
-                : 'Choose a customer, then add products with the catalogue workbench.'}
-          </p>
-        </div>
-        {buildActive && orderHref && (
-          <div className="kq-build-hero-actions">
-            <Link to={orderHref} className="btn btn-outline btn-small">
-              {isQuote ? 'Quote detail' : 'Order detail'}
-              {lineCount > 0 ? ` (${lineCount})` : ''} →
-            </Link>
-            <button type="button" className="btn btn-small" onClick={() => navigate(orderHref)}>
-              Finish &amp; review
-            </button>
-          </div>
-        )}
-      </header>
-
-      {!buildActive && (
-        <>
-          <p className="page-intro">
-            {isQuote
-              ? 'Choose the customer, then add products with the standard catalogue workbench — same flow as customer ordering and TruBlue-style quoting.'
-              : 'Choose the customer, then search Lamtek and Tealbury catalogues and add lines straight onto the draft order.'}
-          </p>
-
-          {parentOrderId && parentOrder && !parentLoadError && (
-            <div className="card admin-card admin-create-quote-linked" style={{ marginBottom: '1rem' }}>
-              <p style={{ margin: 0 }}>
-                <strong>{isQuote ? 'Linked quote' : 'Follow-up order'}</strong> — related to{' '}
-                <Link to={`/admin/orders/${parentOrderId}`}>
-                  {parentOrder.reference?.trim() || parentOrderId.slice(0, 8)}
-                </Link>
-                {linkReasonParam ? ` · ${linkReasonParam}` : ''}.
-              </p>
-            </div>
-          )}
-          {parentOrderId && parentLoadError && (
-            <div className="card admin-card" style={{ marginBottom: '1rem' }}>
-              <p className="admin-error" style={{ margin: 0 }}>{parentLoadError}</p>
-            </div>
-          )}
-
-          <div className="card admin-card admin-create-order-card kq-build-start-card">
-            <h2>{isQuote ? 'Quote for which customer?' : 'Who is this order for?'}</h2>
-            <label className="admin-create-order-label">
-              <span className="admin-settings-label">Customer account</span>
+  const buildBar = (
+    <header className="kq-build-bar">
+      <div className="kq-build-bar-main">
+        <span className="admin-breadcrumb">{isQuote ? 'Create quote' : 'Create order'}</span>
+        <h1 className="kq-build-bar-title">
+          {buildActive ? (isQuote ? 'Build quote' : 'Build order') : isQuote ? 'New quote' : 'New order'}
+        </h1>
+        {!buildActive ? (
+          <div className="kq-build-bar-form">
+            <label className="kq-build-bar-field">
+              <span>Customer account</span>
               <select
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
@@ -333,125 +290,175 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
               </select>
             </label>
             {isQuote && (
-              <label className="admin-create-order-label" style={{ marginTop: '1rem' }}>
-                <span className="admin-settings-label">Quote reference (optional)</span>
+              <label className="kq-build-bar-field">
+                <span>Quote reference (optional)</span>
                 <input
                   type="text"
                   className="admin-filter-input"
                   value={quoteReference}
                   onChange={(e) => setQuoteReference(e.target.value)}
-                  placeholder="e.g. Kitchen ref ABC-12, March 2026"
+                  placeholder="e.g. Kitchen ref ABC-12"
                   maxLength={120}
                 />
               </label>
             )}
-            {customers.length === 0 && (
-              <p className="admin-muted">No customer profiles found. Add customers before continuing.</p>
-            )}
             {error && <p className="admin-error">{error}</p>}
-            <div className="admin-order-build-start-actions" style={{ marginTop: '1.25rem' }}>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => void startBuild()}
-                disabled={!selectedUserId || creating || (!!parentOrderId && !!parentLoadError)}
-              >
-                {creating ? 'Starting…' : 'Open product search'}
-              </button>
-              <Link to={isQuote ? '/admin/create-order' : '/admin/create-quote'} className="btn btn-outline">
-                {isQuote ? 'Create order instead' : 'Create quote instead'}
-              </Link>
-            </div>
-          </div>
-        </>
-      )}
-
-      {buildActive && (
-        <>
-          <div className="kq-build-context">
-            <div>
-              <strong>{customerLabel}</strong>
-              {isQuote && quoteReference.trim() && (
-                <span className="admin-muted"> · Ref: {quoteReference.trim()}</span>
-              )}
-              <p className="admin-muted" style={{ margin: '0.35rem 0 0', fontSize: '0.9rem' }}>
-                Collapse filters or hide the detail panel from the workbench toolbar.
+            {parentOrderId && parentOrder && !parentLoadError && (
+              <p className="admin-muted kq-build-bar-note">
+                Linked to{' '}
+                <Link to={`/admin/orders/${parentOrderId}`}>
+                  {parentOrder.reference?.trim() || parentOrderId.slice(0, 8)}
+                </Link>
+                {linkReasonParam ? ` · ${linkReasonParam}` : ''}.
               </p>
-            </div>
+            )}
+            {parentOrderId && parentLoadError && (
+              <p className="admin-error">{parentLoadError}</p>
+            )}
+          </div>
+        ) : (
+          <p className="kq-build-bar-lead">
+            <strong>{customerLabel}</strong>
+            {isQuote && quoteReference.trim() && (
+              <span className="admin-muted"> · Ref: {quoteReference.trim()}</span>
+            )}
+          </p>
+        )}
+      </div>
+      <div className="kq-build-bar-actions">
+        {!buildActive ? (
+          <>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void startBuild()}
+              disabled={!selectedUserId || creating || (!!parentOrderId && !!parentLoadError)}
+            >
+              {creating ? 'Starting…' : 'Open product search'}
+            </button>
+            <Link to={isQuote ? '/admin/create-order' : '/admin/create-quote'} className="btn btn-outline">
+              {isQuote ? 'Create order instead' : 'Create quote instead'}
+            </Link>
+          </>
+        ) : (
+          <>
             {lastAddedMessage && (
               <p className="ordering-toast admin-order-build-toast" role="status">
                 {lastAddedMessage}
               </p>
             )}
-          </div>
+            {orderHref && (
+              <>
+                <Link to={orderHref} className="btn btn-outline btn-small">
+                  {isQuote ? 'Quote detail' : 'Order detail'}
+                  {lineCount > 0 ? ` (${lineCount})` : ''} →
+                </Link>
+                <button type="button" className="btn btn-small" onClick={() => navigate(orderHref)}>
+                  Finish &amp; review
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </header>
+  )
 
-          {catalogLoading && products.length === 0 ? (
-            <div className="admin-loading-state" style={{ minHeight: '14rem' }}>
-              <div className="admin-loading-spinner" aria-hidden />
-              <p>Loading catalogues…</p>
-            </div>
-          ) : showTealburyWizard ? (
-            <div className="kq-wizard-page">
-            <TealburyOrderSetupWizard
-              orderId={orderId}
-              isQuote={isQuote}
-              categories={categories}
-              products={products}
-              initial={tealburySetup}
-              onComplete={(setup) => {
-                setTealburySetup(setup)
-                setTealburySetupOpen(false)
-              }}
-            />
-            </div>
-          ) : (
-            <>
-              {tealburySetup && !orderNeedsTealburySetup(tealburySetup) && (
-                <div className="kq-build-context" style={{ marginBottom: '1rem' }}>
-                  <div className="kq-build-context-chips">
-                    <span className="kq-build-chip">
-                      {tealburySetup.build_style === 'flat_pack' ? 'Flat pack' : 'Rigid'}
-                    </span>
-                    <span className="kq-build-chip">{rangeName ?? 'Range'}</span>
-                    <span className="kq-build-chip">{tealburySetup.door_finish}</span>
-                    <span className="kq-build-chip">{carcassFinishLabel(tealburySetup.carcass_finish)}</span>
-                    <span className="kq-build-chip">
-                      {tealburySetup.line_style_preference?.replace('_', ' ') ?? '—'}
-                    </span>
-                    <span className="kq-build-chip">{hingeBrandLabel(tealburySetup.hinge_brand) ?? '—'}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-small"
-                    onClick={() => setTealburySetupOpen(true)}
-                  >
-                    Change setup
-                  </button>
+  return (
+    <div className={`admin-page admin-order-build-page admin-order-build-page--${mode} kq-build-shell kq-build-shell--full`}>
+      {buildActive && (
+        <>
+          {tealburySetup &&
+            isTealburyCatalogueChoice(tealburySetup.catalogue_choice) &&
+            !orderNeedsTealburyKitchenSetup(tealburySetup) &&
+            !showGuidedWizard && (
+              <div className="kq-build-context kq-build-context--inline">
+                <div className="kq-build-context-chips">
+                  <span className="kq-build-chip">Tealbury Complete</span>
+                  <span className="kq-build-chip">
+                    {tealburySetup.build_style === 'flat_pack' ? 'Flat pack' : 'Rigid'}
+                  </span>
+                  <span className="kq-build-chip">{rangeName ?? 'Range'}</span>
+                  <span className="kq-build-chip">{tealburySetup.door_finish}</span>
+                  <span className="kq-build-chip">{carcassFinishLabel(tealburySetup.carcass_finish)}</span>
+                  <span className="kq-build-chip">
+                    {tealburySetup.line_style_preference?.replace('_', ' ') ?? '—'}
+                  </span>
+                  <span className="kq-build-chip">{hingeBrandLabel(tealburySetup.hinge_brand) ?? '—'}</span>
                 </div>
-              )}
-              <CatalogProductWorkbench
-                embedded
-                products={products}
-                categories={categories}
-                assemblies={assemblies}
-                allowedCatalogPrograms={catalogPrograms}
-                showCatalogueSwitcher
-                customerUserId={selectedUserId}
-                preferencesScope={preferencesScope}
-                orderId={orderId}
-                orderLinesRefreshToken={orderLinesRefreshToken}
-                cartLineCount={lineCount}
-                cartHref={orderHref}
-                commitLabel={isQuote ? 'Add to quote' : 'Add to order'}
-                linePersistence="immediate"
-                addButtonLabel={isQuote ? 'Add to quote' : 'Add to order'}
-                tealburySetup={orderNeedsTealburySetup(tealburySetup) ? null : tealburySetup}
-                onCommit={commitLines}
-              />
-            </>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-small"
+                  onClick={() => setTealburySetupOpen(true)}
+                >
+                  Change setup
+                </button>
+              </div>
+            )}
+          {tealburySetup?.catalogue_choice === 'lamtek' && !showGuidedWizard && (
+            <div className="kq-build-context kq-build-context--inline">
+              <span className="kq-build-chip">Lamtek components</span>
+              <button
+                type="button"
+                className="btn btn-outline btn-small"
+                onClick={() => setTealburySetupOpen(true)}
+              >
+                Change catalogue
+              </button>
+            </div>
           )}
         </>
       )}
+
+      {!buildActive && buildBar}
+
+      {buildActive && catalogLoading && products.length === 0 ? (
+        <div className="kq-build-workspace">
+          {buildBar}
+          <div className="admin-loading-state" style={{ minHeight: '14rem' }}>
+            <div className="admin-loading-spinner" aria-hidden />
+            <p>Loading catalogues…</p>
+          </div>
+        </div>
+      ) : buildActive && showGuidedWizard ? (
+        <div className="kq-build-workspace">
+          {buildBar}
+          <TealburyOrderSetupWizard
+            orderId={orderId}
+            isQuote={isQuote}
+            categories={categories}
+            products={products}
+            initial={tealburySetup}
+            onComplete={(setup) => {
+              setTealburySetup(setup)
+              setTealburySetupOpen(false)
+            }}
+          />
+        </div>
+      ) : buildActive ? (
+        <CatalogProductWorkbench
+          embedded
+          products={products}
+          categories={categories}
+          assemblies={assemblies}
+          allowedCatalogPrograms={catalogPrograms}
+          showCatalogueSwitcher={catalogPrograms.length > 1}
+          customerUserId={selectedUserId}
+          preferencesScope={preferencesScope}
+          orderId={orderId}
+          orderLinesRefreshToken={orderLinesRefreshToken}
+          cartLineCount={lineCount}
+          cartHref={orderHref}
+          commitLabel={isQuote ? 'Add to quote' : 'Add to order'}
+          linePersistence="immediate"
+          addButtonLabel={isQuote ? 'Add to quote' : 'Add to order'}
+          tealburySetup={
+            tealburySetup && !orderNeedsGuidedSetup(tealburySetup) ? tealburySetup : null
+          }
+          buildBar={buildBar}
+          onCommit={commitLines}
+        />
+      ) : null}
     </div>
   )
 }

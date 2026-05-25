@@ -4,6 +4,8 @@ import {
   Check,
   ChevronLeft,
   Columns3,
+  LayoutGrid,
+  ListChecks,
   Package,
   Palette,
   Wrench,
@@ -13,23 +15,38 @@ import { getProductFinishLabels } from '@/lib/catalogProductDisplay'
 import { CARCASS_FINISH_OPTIONS, carcassFinishLabel } from '@/lib/orderRangeFinish'
 import {
   BUILD_STYLE_OPTIONS,
+  CATALOGUE_CHOICE_OPTIONS,
   HINGE_BRAND_OPTIONS,
   LINE_STYLE_OPTIONS,
   hingeBrandLabel,
+  isKitchenDoorRangeCategoryName,
   saveTealburyOrderSetup,
+  type CatalogueChoice,
   type TealburyOrderSetup,
 } from '@/lib/tealburyOrderSetup'
 import type { CategoryRow, ProductRow } from '@/types/database'
 
-type WizardStep = 'build-style' | 'range' | 'door-finish' | 'line-style' | 'hinge' | 'carcass'
+type WizardStep =
+  | 'catalogue'
+  | 'build-style'
+  | 'kitchen-range'
+  | 'door-finish'
+  | 'line-style'
+  | 'hinge'
+  | 'carcass'
 
-const STEPS: { id: WizardStep; label: string }[] = [
+const TEALBURY_STEPS: { id: WizardStep; label: string }[] = [
+  { id: 'catalogue', label: 'Catalogue' },
   { id: 'build-style', label: 'Build' },
-  { id: 'range', label: 'Range' },
+  { id: 'kitchen-range', label: 'Range' },
   { id: 'door-finish', label: 'Finish' },
   { id: 'line-style', label: 'Line' },
   { id: 'hinge', label: 'Hinges' },
   { id: 'carcass', label: 'Carcass' },
+]
+
+const LAMTEK_STEPS: { id: WizardStep; label: string }[] = [
+  { id: 'catalogue', label: 'Catalogue' },
 ]
 
 type Props = {
@@ -42,15 +59,19 @@ type Props = {
   onComplete: (setup: TealburyOrderSetup) => void
 }
 
-function stepIndex(step: WizardStep): number {
-  return STEPS.findIndex((s) => s.id === step)
+function stepIndex(step: WizardStep, steps: { id: WizardStep }[]): number {
+  return steps.findIndex((s) => s.id === step)
 }
+
+type TealburyOrderSetupPartial = Partial<TealburyOrderSetup>
 
 function stepDone(step: WizardStep, state: TealburyOrderSetupPartial): boolean {
   switch (step) {
+    case 'catalogue':
+      return Boolean(state.catalogue_choice)
     case 'build-style':
       return Boolean(state.build_style)
-    case 'range':
+    case 'kitchen-range':
       return Boolean(state.kitchen_range_id)
     case 'door-finish':
       return Boolean(state.door_finish)
@@ -65,8 +86,6 @@ function stepDone(step: WizardStep, state: TealburyOrderSetupPartial): boolean {
   }
 }
 
-type TealburyOrderSetupPartial = Partial<TealburyOrderSetup>
-
 export default function TealburyOrderSetupWizard({
   orderId,
   isQuote,
@@ -76,7 +95,10 @@ export default function TealburyOrderSetupWizard({
   variant = 'admin',
   onComplete,
 }: Props) {
-  const [step, setStep] = useState<WizardStep>('build-style')
+  const [step, setStep] = useState<WizardStep>('catalogue')
+  const [catalogueChoice, setCatalogueChoice] = useState<CatalogueChoice | null>(
+    initial?.catalogue_choice ?? null,
+  )
   const [buildStyle, setBuildStyle] = useState<TealburyOrderSetup['build_style']>(initial?.build_style ?? null)
   const [rangeId, setRangeId] = useState<string | null>(initial?.kitchen_range_id ?? null)
   const [doorFinish, setDoorFinish] = useState<string | null>(initial?.door_finish ?? null)
@@ -89,7 +111,11 @@ export default function TealburyOrderSetupWizard({
   const [error, setError] = useState<string | null>(null)
 
   const isCustomer = variant === 'customer'
+  const isTealbury = catalogueChoice === 'tealbury'
+  const activeSteps = isTealbury || !catalogueChoice ? TEALBURY_STEPS : LAMTEK_STEPS
+
   const partial: TealburyOrderSetupPartial = {
+    catalogue_choice: catalogueChoice,
     build_style: buildStyle,
     kitchen_range_id: rangeId,
     door_finish: doorFinish,
@@ -98,11 +124,12 @@ export default function TealburyOrderSetupWizard({
     carcass_finish: carcassFinish,
   }
 
-  const currentIdx = stepIndex(step)
-  const progressPct = ((currentIdx + 1) / STEPS.length) * 100
+  const currentIdx = Math.max(0, stepIndex(step, activeSteps))
+  const progressPct = ((currentIdx + 1) / activeSteps.length) * 100
 
   useEffect(() => {
     if (!initial) return
+    if (initial.catalogue_choice) setCatalogueChoice(initial.catalogue_choice)
     if (initial.build_style) setBuildStyle(initial.build_style)
     if (initial.kitchen_range_id) setRangeId(initial.kitchen_range_id)
     if (initial.door_finish) setDoorFinish(initial.door_finish)
@@ -112,7 +139,9 @@ export default function TealburyOrderSetupWizard({
   }, [initial])
 
   const rangeOptions = useMemo(
-    () => buildCategoryTreeOptions(categories, 'range').filter((o) => o.kind === 'door_range'),
+    () =>
+      buildCategoryTreeOptions(categories, 'range')
+        .filter((o) => o.kind === 'door_range' && isKitchenDoorRangeCategoryName(o.label)),
     [categories],
   )
 
@@ -130,21 +159,21 @@ export default function TealburyOrderSetupWizard({
 
   const docLabel = isQuote ? 'quote' : 'order'
 
-  async function finish(finalCarcass: string) {
-    if (!buildStyle || !rangeId || !doorFinish || !lineStyle || !hingeBrand) {
-      setError('Complete each step before continuing.')
-      return
+  function buildSetup(carcass: string | null): TealburyOrderSetup {
+    return {
+      catalogue_choice: catalogueChoice,
+      build_style: isTealbury ? buildStyle : null,
+      kitchen_range_id: isTealbury ? rangeId : null,
+      door_finish: isTealbury ? doorFinish : null,
+      line_style_preference: isTealbury ? lineStyle : null,
+      hinge_brand: isTealbury ? hingeBrand : null,
+      carcass_finish: isTealbury ? carcass : null,
     }
+  }
+
+  async function saveAndComplete(setup: TealburyOrderSetup) {
     setSubmitting(true)
     setError(null)
-    const setup: TealburyOrderSetup = {
-      build_style: buildStyle,
-      kitchen_range_id: rangeId,
-      door_finish: doorFinish,
-      line_style_preference: lineStyle,
-      hinge_brand: hingeBrand,
-      carcass_finish: finalCarcass,
-    }
     const { error: saveErr } = await saveTealburyOrderSetup(orderId, setup)
     setSubmitting(false)
     if (saveErr) {
@@ -152,6 +181,19 @@ export default function TealburyOrderSetupWizard({
       return
     }
     onComplete(setup)
+  }
+
+  async function finishLamtek() {
+    if (!catalogueChoice) return
+    await saveAndComplete(buildSetup(null))
+  }
+
+  async function finish(finalCarcass: string) {
+    if (!catalogueChoice || !buildStyle || !rangeId || !doorFinish || !lineStyle || !hingeBrand) {
+      setError('Complete each step before continuing.')
+      return
+    }
+    await saveAndComplete(buildSetup(finalCarcass))
   }
 
   function goBack(target: WizardStep) {
@@ -164,12 +206,13 @@ export default function TealburyOrderSetupWizard({
       <header className="kq-wizard-hero">
         <span className="kq-wizard-hero-badge">
           <Package size={14} aria-hidden />
-          Tealbury kitchen
+          Kitchen {docLabel} setup
         </span>
-        <h2>{isCustomer ? 'Configure your kitchen' : `Set up this ${docLabel}`}</h2>
+        <h2>{isCustomer ? 'Tell us about this kitchen' : `Set up this ${docLabel}`}</h2>
         <p>
-          A short guided setup so the catalogue shows the right ranges, units, and accessories. Complete kitchens
-          add as a full BOM; plinth, cornice and panels stay separate lines.
+          We will ask a few quick questions so the product search shows the right catalogue — Tealbury Complete
+          kitchens with full unit BOMs, or Lamtek components if you are ordering parts only. Plinth, cornice and
+          pelmet are added later from the workbench, not here.
         </p>
       </header>
 
@@ -178,7 +221,7 @@ export default function TealburyOrderSetupWizard({
           <div className="kq-wizard-progress-fill" style={{ width: `${progressPct}%` }} />
         </div>
         <div className="kq-wizard-steps" role="list" aria-label="Setup steps">
-          {STEPS.map((s, i) => {
+          {activeSteps.map((s, i) => {
             const done = stepDone(s.id, partial)
             const active = s.id === step
             return (
@@ -197,7 +240,52 @@ export default function TealburyOrderSetupWizard({
 
       <div className="kq-wizard-body">
         <div className="kq-wizard-main">
-          {step === 'build-style' && (
+          {step === 'catalogue' && (
+            <>
+              <h3 className="kq-wizard-step-title">Which catalogue are you ordering from?</h3>
+              <p className="kq-wizard-step-lead">
+                Tealbury Complete is for packaged kitchens (door range, finishes, and complete units). Lamtek is
+                for individual components without the kitchen wizard.
+              </p>
+              <div className="kq-wizard-options">
+                {CATALOGUE_CHOICE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`kq-wizard-option${catalogueChoice === opt.value ? ' kq-wizard-option--active' : ''}`}
+                    disabled={submitting}
+                    onClick={() => {
+                      setCatalogueChoice(opt.value)
+                      setError(null)
+                      if (opt.value === 'lamtek') {
+                        void finishLamtek()
+                        return
+                      }
+                      setStep('build-style')
+                    }}
+                  >
+                    <span className="kq-wizard-option-icon" aria-hidden>
+                      {opt.value === 'tealbury' ? (
+                        <LayoutGrid size={22} strokeWidth={1.75} />
+                      ) : (
+                        <ListChecks size={22} strokeWidth={1.75} />
+                      )}
+                    </span>
+                    <span className="kq-wizard-option-text">
+                      <strong>{opt.label}</strong>
+                      <span>{opt.detail}</span>
+                    </span>
+                    <Check className="kq-wizard-option-check" size={20} strokeWidth={2.5} aria-hidden />
+                  </button>
+                ))}
+              </div>
+              {submitting && catalogueChoice === 'lamtek' && (
+                <p className="admin-muted">Saving…</p>
+              )}
+            </>
+          )}
+
+          {step === 'build-style' && isTealbury && (
             <>
               <h3 className="kq-wizard-step-title">How should units be supplied?</h3>
               <p className="kq-wizard-step-lead">
@@ -211,7 +299,7 @@ export default function TealburyOrderSetupWizard({
                     className={`kq-wizard-option${buildStyle === opt.value ? ' kq-wizard-option--active' : ''}`}
                     onClick={() => {
                       setBuildStyle(opt.value)
-                      setStep('range')
+                      setStep('kitchen-range')
                       setError(null)
                     }}
                   >
@@ -226,13 +314,20 @@ export default function TealburyOrderSetupWizard({
                   </button>
                 ))}
               </div>
+              <nav className="kq-wizard-nav">
+                <button type="button" className="btn btn-outline btn-small" onClick={() => goBack('catalogue')}>
+                  <ChevronLeft size={16} aria-hidden /> Back
+                </button>
+              </nav>
             </>
           )}
 
-          {step === 'range' && (
+          {step === 'kitchen-range' && isTealbury && (
             <>
-              <h3 className="kq-wizard-step-title">Choose a kitchen range</h3>
-              <p className="kq-wizard-step-lead">Door style and pricing follow the range you pick.</p>
+              <h3 className="kq-wizard-step-title">Choose a door range</h3>
+              <p className="kq-wizard-step-lead">
+                Pick the Tealbury door family for this kitchen. Panels, plinth and cornice are not chosen here.
+              </p>
               <div className="kq-wizard-options kq-wizard-options--grid">
                 {rangeOptions.map((opt) => (
                   <button
@@ -261,7 +356,7 @@ export default function TealburyOrderSetupWizard({
             </>
           )}
 
-          {step === 'door-finish' && (
+          {step === 'door-finish' && isTealbury && (
             <>
               <h3 className="kq-wizard-step-title">Door / range finish</h3>
               <p className="kq-wizard-step-lead">
@@ -300,14 +395,18 @@ export default function TealburyOrderSetupWizard({
                 </div>
               )}
               <nav className="kq-wizard-nav">
-                <button type="button" className="btn btn-outline btn-small" onClick={() => goBack('range')}>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-small"
+                  onClick={() => goBack('kitchen-range')}
+                >
                   <ChevronLeft size={16} aria-hidden /> Back
                 </button>
               </nav>
             </>
           )}
 
-          {step === 'line-style' && (
+          {step === 'line-style' && isTealbury && (
             <>
               <h3 className="kq-wizard-step-title">Predominant line style</h3>
               <p className="kq-wizard-step-lead">Sets the default category filter — you can still add other unit types.</p>
@@ -342,7 +441,7 @@ export default function TealburyOrderSetupWizard({
             </>
           )}
 
-          {step === 'hinge' && (
+          {step === 'hinge' && isTealbury && (
             <>
               <h3 className="kq-wizard-step-title">Hinge brand</h3>
               <p className="kq-wizard-step-lead">Complete units will use matching hinges and hinge plates from this brand.</p>
@@ -376,7 +475,7 @@ export default function TealburyOrderSetupWizard({
             </>
           )}
 
-          {step === 'carcass' && (
+          {step === 'carcass' && isTealbury && (
             <>
               <h3 className="kq-wizard-step-title">Cabinet / carcass colour</h3>
               <p className="kq-wizard-step-lead">Interior carcass colour for units in this {docLabel}.</p>
@@ -410,43 +509,57 @@ export default function TealburyOrderSetupWizard({
         </div>
 
         <aside className="kq-wizard-summary" aria-label="Choices so far">
-          <h3>Your kitchen</h3>
-          {!buildStyle && !rangeId ? (
+          <h3>Your choices</h3>
+          {!catalogueChoice && !buildStyle ? (
             <p className="kq-wizard-summary-empty">Choices appear here as you go.</p>
           ) : (
             <dl>
               <div>
-                <dt>Build</dt>
-                <dd>{buildStyle === 'flat_pack' ? 'Flat pack' : buildStyle === 'rigid' ? 'Rigid' : '—'}</dd>
-              </div>
-              <div>
-                <dt>Range</dt>
-                <dd>{rangeName ?? '—'}</dd>
-              </div>
-              <div>
-                <dt>Door finish</dt>
-                <dd>{doorFinish ?? '—'}</dd>
-              </div>
-              <div>
-                <dt>Line style</dt>
+                <dt>Catalogue</dt>
                 <dd>
-                  {lineStyle === 'high_line'
-                    ? 'High-line'
-                    : lineStyle === 'drawer_line'
-                      ? 'Drawer-line'
-                      : lineStyle === 'mixed'
-                        ? 'Mixed'
-                        : '—'}
+                  {catalogueChoice === 'tealbury'
+                    ? 'Tealbury Complete'
+                    : catalogueChoice === 'lamtek'
+                      ? 'Lamtek'
+                      : '—'}
                 </dd>
               </div>
-              <div>
-                <dt>Hinges</dt>
-                <dd>{hingeBrandLabel(hingeBrand) ?? '—'}</dd>
-              </div>
-              <div>
-                <dt>Carcass</dt>
-                <dd>{carcassFinishLabel(carcassFinish) ?? '—'}</dd>
-              </div>
+              {isTealbury && (
+                <>
+                  <div>
+                    <dt>Build</dt>
+                    <dd>{buildStyle === 'flat_pack' ? 'Flat pack' : buildStyle === 'rigid' ? 'Rigid' : '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Range</dt>
+                    <dd>{rangeName ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Door finish</dt>
+                    <dd>{doorFinish ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Line style</dt>
+                    <dd>
+                      {lineStyle === 'high_line'
+                        ? 'High-line'
+                        : lineStyle === 'drawer_line'
+                          ? 'Drawer-line'
+                          : lineStyle === 'mixed'
+                            ? 'Mixed'
+                            : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Hinges</dt>
+                    <dd>{hingeBrandLabel(hingeBrand) ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Carcass</dt>
+                    <dd>{carcassFinishLabel(carcassFinish) ?? '—'}</dd>
+                  </div>
+                </>
+              )}
             </dl>
           )}
         </aside>

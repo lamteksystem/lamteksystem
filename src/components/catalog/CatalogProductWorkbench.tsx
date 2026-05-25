@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Filter, Layers } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { ChevronLeft, ChevronRight, Filter, Layers } from 'lucide-react'
 import type { AssemblyWithLines, CategoryRow, ProductRow } from '@/types/database'
 import { CATALOG_PROGRAM, type CatalogProgram } from '@/lib/catalogProgram'
 import { getProductAvailabilityMeta } from '@/lib/productAvailability'
@@ -41,7 +42,11 @@ import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productC
 import { fetchCompleteProductIds } from '@/lib/productAssembly'
 import { resolveAssemblyForHingeBrand } from '@/lib/tealburyBomResolve'
 import { useCategoryTypes } from '@/hooks/useCategoryTypes'
-import { orderNeedsTealburySetup, type TealburyOrderSetup } from '@/lib/tealburyOrderSetup'
+import {
+  isTealburyCatalogueChoice,
+  orderNeedsTealburyKitchenSetup,
+  type TealburyOrderSetup,
+} from '@/lib/tealburyOrderSetup'
 import AdminProductModal from '@/components/admin/AdminProductModal'
 import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 
@@ -68,6 +73,8 @@ interface CatalogProductWorkbenchProps {
   /** When set, section filters and product-kind tabs follow Tealbury kitchen setup. */
   tealburySetup?: TealburyOrderSetup | null
   onCommit: (payload: CatalogPickerCommitPayload) => Promise<void>
+  /** Renders above the workbench grid (customer bar, quote ref, etc.). */
+  buildBar?: ReactNode
 }
 
 export default function CatalogProductWorkbench({
@@ -89,7 +96,9 @@ export default function CatalogProductWorkbench({
   initialCategoryId = null,
   tealburySetup = null,
   onCommit,
+  buildBar,
 }: CatalogProductWorkbenchProps) {
+  const tableScrollRef = useRef<HTMLDivElement>(null)
   const [filters, setFilters] = useState<WorkbenchFilterState>({
     ...EMPTY_WORKBENCH_FILTERS,
     categoryId: initialCategoryId,
@@ -215,7 +224,12 @@ export default function CatalogProductWorkbench({
         productCategoryMap,
         completeProductIds,
         categoryTypes,
-        tealburySetup: tealburySetup && !orderNeedsTealburySetup(tealburySetup) ? tealburySetup : null,
+        tealburySetup:
+          tealburySetup &&
+          isTealburyCatalogueChoice(tealburySetup.catalogue_choice) &&
+          !orderNeedsTealburyKitchenSetup(tealburySetup)
+            ? tealburySetup
+            : null,
       }),
     [
       scopeProducts,
@@ -289,7 +303,10 @@ export default function CatalogProductWorkbench({
         loadFilterPresets(preferencesScope),
       ])
       if (cancelled) return
-      const setupReady = tealburySetup && !orderNeedsTealburySetup(tealburySetup)
+      const setupReady =
+        tealburySetup &&
+        isTealburyCatalogueChoice(tealburySetup.catalogue_choice) &&
+        !orderNeedsTealburyKitchenSetup(tealburySetup)
       setFilters({
         ...EMPTY_WORKBENCH_FILTERS,
         ...savedFilters,
@@ -307,7 +324,13 @@ export default function CatalogProductWorkbench({
   }, [preferencesScope, initialCategoryId, tealburySetup])
 
   useEffect(() => {
-    if (!tealburySetup || orderNeedsTealburySetup(tealburySetup)) return
+    if (
+      !tealburySetup ||
+      !isTealburyCatalogueChoice(tealburySetup.catalogue_choice) ||
+      orderNeedsTealburyKitchenSetup(tealburySetup)
+    ) {
+      return
+    }
     setFilters((prev) => ({
       ...prev,
       browseMode: 'range',
@@ -505,6 +528,15 @@ export default function CatalogProductWorkbench({
     void saveFilterPresets(preferencesScope, next)
   }
 
+  const showProductDetail =
+    Boolean(selectedProduct && mainTab === 'products')
+
+  const scrollTable = useCallback((direction: -1 | 1) => {
+    const el = tableScrollRef.current
+    if (!el) return
+    el.scrollBy({ left: direction * Math.max(280, el.clientWidth * 0.65), behavior: 'smooth' })
+  }, [])
+
   const workbenchClass = [
     'tb-workbench',
     embedded ? 'tb-workbench--embedded' : '',
@@ -515,13 +547,17 @@ export default function CatalogProductWorkbench({
     .join(' ')
 
   return (
+    <div className={buildBar ? 'kq-build-workspace' : undefined}>
+      {buildBar}
     <article className={workbenchClass}>
       {statusMessage && (
         <p className="ordering-toast tb-workbench-toast" role="status">
           {statusMessage}
         </p>
       )}
-      {tealburySetup && !orderNeedsTealburySetup(tealburySetup) && (
+      {tealburySetup &&
+        isTealburyCatalogueChoice(tealburySetup.catalogue_choice) &&
+        !orderNeedsTealburyKitchenSetup(tealburySetup) && (
         <p className="tb-workbench-setup-banner" role="status">
           Showing products for your kitchen setup (range, finish, and line style). Use filters below to narrow further.
         </p>
@@ -822,6 +858,24 @@ export default function CatalogProductWorkbench({
             {mainTab === 'products' ? 'product' : 'unit'}
             {(mainTab === 'products' ? filtered.length : filteredAssemblies.length) === 1 ? '' : 's'}
           </p>
+          <div className="tb-table-scroll-controls" role="group" aria-label="Scroll product table">
+            <button
+              type="button"
+              className="tb-table-scroll-btn"
+              onClick={() => scrollTable(-1)}
+              aria-label="Scroll table left"
+            >
+              <ChevronLeft size={18} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="tb-table-scroll-btn"
+              onClick={() => scrollTable(1)}
+              aria-label="Scroll table right"
+            >
+              <ChevronRight size={18} aria-hidden />
+            </button>
+          </div>
         </header>
 
         <div className="tb-workbench-tabs">
@@ -844,7 +898,7 @@ export default function CatalogProductWorkbench({
         </div>
 
         {mainTab === 'products' ? (
-        <div className="tb-table-wrap">
+        <div className="tb-table-wrap" ref={tableScrollRef}>
           <table className="tb-product-table">
             <thead>
               <tr>
@@ -1017,7 +1071,7 @@ export default function CatalogProductWorkbench({
           </table>
         </div>
         ) : (
-        <div className="tb-table-wrap">
+        <div className="tb-table-wrap" ref={tableScrollRef}>
           <table className="tb-product-table">
             <thead>
               <tr>
@@ -1107,7 +1161,10 @@ export default function CatalogProductWorkbench({
       </section>
 
       {rightPaneOpen && (
-      <aside className="tb-workbench-right" aria-label="Order and product details">
+      <aside
+        className={`tb-workbench-right${showProductDetail ? ' tb-workbench-right--detail-open' : ''}`}
+        aria-label="Order and product details"
+      >
         <div className="tb-right-pane-toolbar">
           <span className="tb-right-pane-toolbar-label">Order panel</span>
           <button
@@ -1119,7 +1176,34 @@ export default function CatalogProductWorkbench({
             Hide panel
           </button>
         </div>
-        {selectedProduct && mainTab === 'products' ? (
+
+        <div className="tb-right-pane-order">
+          {immediate ? (
+            <CatalogOrderLinesPanel
+              lines={orderLines}
+              loading={orderLinesLoading}
+              cartHref={cartHref}
+            />
+          ) : (
+            <CatalogProductStagingBasket
+              lines={staged}
+              linePersistence={linePersistence}
+              cartLineCount={cartLineCount}
+              cartHref={cartHref}
+              commitLabel={commitLabel}
+              onQuantityChange={(lineId, quantity) => {
+                setStaged((prev) => prev.map((l) => (l.id === lineId ? { ...l, quantity } : l)))
+              }}
+              onRemove={(lineId) => setStaged((prev) => prev.filter((l) => l.id !== lineId))}
+              onClear={() => setStaged([])}
+              onCommit={() => void commitBasket()}
+              committing={committing}
+            />
+          )}
+        </div>
+
+        {showProductDetail && selectedProduct ? (
+          <div className="tb-right-pane-detail">
             <CatalogProductDetailPanel
               product={selectedProduct}
               categories={effectiveCategories}
@@ -1132,33 +1216,9 @@ export default function CatalogProductWorkbench({
               adding={committing}
               onAdminEdit={canEditCatalogue ? () => setEditingProduct(selectedProduct) : undefined}
             />
-          ) : (
-            <section className="tb-detail tb-detail--placeholder">
-              <p>Select a product row to view specification, properties and customer pricing.</p>
-            </section>
-          )}
-
-        {immediate ? (
-          <CatalogOrderLinesPanel
-            lines={orderLines}
-            loading={orderLinesLoading}
-            cartHref={cartHref}
-          />
+          </div>
         ) : (
-          <CatalogProductStagingBasket
-            lines={staged}
-            linePersistence={linePersistence}
-            cartLineCount={cartLineCount}
-            cartHref={cartHref}
-            commitLabel={commitLabel}
-            onQuantityChange={(lineId, quantity) => {
-              setStaged((prev) => prev.map((l) => (l.id === lineId ? { ...l, quantity } : l)))
-            }}
-            onRemove={(lineId) => setStaged((prev) => prev.filter((l) => l.id !== lineId))}
-            onClear={() => setStaged([])}
-            onCommit={() => void commitBasket()}
-            committing={committing}
-          />
+          <p className="tb-right-pane-hint">Select a product row to view details below your lines.</p>
         )}
       </aside>
       )}
@@ -1194,46 +1254,50 @@ export default function CatalogProductWorkbench({
         />
       )}
 
-      {canEditCatalogue && managingCategories && (
-        <div
-          className="admin-modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="workbench-categories-modal-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setManagingCategories(false)
-          }}
-        >
-          <div className="admin-modal card tb-categories-modal">
-            <header className="tb-categories-modal-header">
-              <div>
-                <h2 id="workbench-categories-modal-title">Manage categories</h2>
-                <p className="admin-muted tb-categories-modal-sub">
-                  Add, rename, re-parent, or delete categories. Changes apply to the ordering
-                  screen immediately.
-                </p>
+      {canEditCatalogue &&
+        managingCategories &&
+        createPortal(
+          <div
+            className="admin-modal-overlay admin-modal-overlay--top"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="workbench-categories-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setManagingCategories(false)
+            }}
+          >
+            <div className="admin-modal card tb-categories-modal">
+              <header className="tb-categories-modal-header">
+                <div>
+                  <h2 id="workbench-categories-modal-title">Manage categories</h2>
+                  <p className="admin-muted tb-categories-modal-sub">
+                    Add, rename, re-parent, or delete categories. Changes apply to the ordering
+                    screen immediately.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="admin-modal-close"
+                  onClick={() => setManagingCategories(false)}
+                  aria-label="Close manage categories"
+                >
+                  ×
+                </button>
+              </header>
+              <div className="tb-categories-modal-body">
+                <CatalogueCategoriesManager
+                  categories={effectiveCategories}
+                  products={effectiveProducts}
+                  productCategoryMap={productCategoryMap}
+                  onChanged={() => void refreshCatalogueFromDb()}
+                  variant="embedded"
+                />
               </div>
-              <button
-                type="button"
-                className="admin-modal-close"
-                onClick={() => setManagingCategories(false)}
-                aria-label="Close manage categories"
-              >
-                ×
-              </button>
-            </header>
-            <div className="tb-categories-modal-body">
-              <CatalogueCategoriesManager
-                categories={effectiveCategories}
-                products={effectiveProducts}
-                productCategoryMap={productCategoryMap}
-                onChanged={() => void refreshCatalogueFromDb()}
-                variant="embedded"
-              />
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </article>
+    </div>
   )
 }

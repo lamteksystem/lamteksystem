@@ -235,6 +235,32 @@
   gap: 0.75rem 1rem;
 }
 
+.tb-table-scroll-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.tb-table-scroll-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 1px solid var(--lamtek-border, var(--lamtek-gray-light));
+  border-radius: 8px;
+  background: var(--lamtek-white);
+  color: var(--lamtek-burgundy, #672332);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.tb-table-scroll-btn:hover {
+  border-color: var(--lamtek-gold, #b8860b);
+  background: rgba(103, 39, 50, 0.06);
+}
+
 .tb-search-form {
   display: flex;
   flex-wrap: wrap;
@@ -473,6 +499,55 @@
   border-left: 1px solid var(--lamtek-gray-light);
   min-width: 0;
   max-width: 360px;
+  background: var(--lamtek-bg);
+  overflow: hidden;
+}
+
+.tb-right-pane-order {
+  flex: 1 1 auto;
+  min-height: 8rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tb-right-pane-order .tb-order-lines {
+  flex: 1 1 auto;
+  min-height: 0;
+  border-top: none;
+}
+
+.tb-workbench-right--detail-open .tb-right-pane-order {
+  flex: 0 1 38%;
+  max-height: min(42vh, 320px);
+}
+
+.tb-right-pane-detail {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--lamtek-gray-light);
+  display: flex;
+  flex-direction: column;
+}
+
+.tb-right-pane-detail .tb-detail {
+  flex: 1 1 auto;
+  min-height: 0;
+  border-bottom: none;
+}
+
+.tb-right-pane-hint {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.8rem;
+  color: var(--lamtek-text-muted);
+  border-top: 1px solid var(--lamtek-gray-light);
+  background: #f8fafc;
+}
+
+[data-theme='dark'] .tb-right-pane-hint {
   background: var(--lamtek-bg);
 }
 

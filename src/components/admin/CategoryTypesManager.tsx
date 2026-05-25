@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import {
   createCategoryType,
   deleteCategoryType,
+  ORDERING_BEHAVIOUR_LABELS,
   slugifyCategoryTypeCode,
   updateCategoryType,
 } from '@/lib/categoryTypes'
@@ -46,6 +47,8 @@ export default function CategoryTypesManager({
   const [newLabel, setNewLabel] = useState('')
   const [newCode, setNewCode] = useState('')
   const [newBrowseMode, setNewBrowseMode] = useState<CategoryTypeRow['browse_mode']>('product')
+  const [newOrderingBehaviour, setNewOrderingBehaviour] =
+    useState<CategoryTypeRow['ordering_behaviour']>('standard')
   const [newDescription, setNewDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
@@ -62,6 +65,7 @@ export default function CategoryTypesManager({
       code: newCode.trim() || undefined,
       description: newDescription.trim() || undefined,
       browse_mode: newBrowseMode,
+      ordering_behaviour: newOrderingBehaviour,
     })
     setBusy(false)
     if (err || !categoryType) {
@@ -72,6 +76,7 @@ export default function CategoryTypesManager({
     setNewCode('')
     setNewDescription('')
     setNewBrowseMode('product')
+    setNewOrderingBehaviour('standard')
     setMessage({ type: 'ok', text: `Added type “${categoryType.label}”.` })
     await reload()
     await onTypesChanged?.()
@@ -107,6 +112,21 @@ export default function CategoryTypesManager({
     if (!canEdit) return
     setBusy(true)
     const { error: err } = await updateCategoryType(code, { browse_mode })
+    setBusy(false)
+    if (err) setMessage({ type: 'err', text: err })
+    else {
+      await reload()
+      await onTypesChanged?.()
+    }
+  }
+
+  async function saveOrderingBehaviour(
+    code: string,
+    ordering_behaviour: CategoryTypeRow['ordering_behaviour'],
+  ) {
+    if (!canEdit) return
+    setBusy(true)
+    const { error: err } = await updateCategoryType(code, { ordering_behaviour })
     setBusy(false)
     if (err) setMessage({ type: 'err', text: err })
     else {
@@ -157,8 +177,9 @@ export default function CategoryTypesManager({
       <h2 className="admin-modal-form-section-title">Category types</h2>
       <p className="admin-muted admin-taxonomy-section-intro">
         These are the options in the <strong>Type</strong> dropdown when you add or edit a category
-        (Product category, Kitchen range, Cross-range, plus any custom types you add). Built-in types
-        can be hidden but not deleted.
+        (Product category, Kitchen range, Tealbury Complete, etc.). <strong>Browse as</strong> controls
+        filters; <strong>Quote/order behaviour</strong> controls guided setup and how lines are added.
+        Built-in types can be hidden but not deleted.
       </p>
       {error && <p className="admin-error">{error}</p>}
       {message && (
@@ -173,7 +194,8 @@ export default function CategoryTypesManager({
             <tr>
               <th>Code</th>
               <th>Display name</th>
-              <th>Behaviour</th>
+              <th>Browse as</th>
+              <th>Quote/order behaviour</th>
               <th>Description</th>
               <th>Status</th>
               {canEdit && <th>Actions</th>}
@@ -214,6 +236,30 @@ export default function CategoryTypesManager({
                     </select>
                   ) : (
                     BROWSE_MODE_LABELS[t.browse_mode]
+                  )}
+                </td>
+                <td>
+                  {canEdit ? (
+                    <select
+                      defaultValue={t.ordering_behaviour ?? 'standard'}
+                      disabled={busy}
+                      onChange={(e) =>
+                        void saveOrderingBehaviour(
+                          t.code,
+                          e.target.value as CategoryTypeRow['ordering_behaviour'],
+                        )
+                      }
+                    >
+                      {(Object.keys(ORDERING_BEHAVIOUR_LABELS) as CategoryTypeRow['ordering_behaviour'][]).map(
+                        (k) => (
+                          <option key={k} value={k}>
+                            {ORDERING_BEHAVIOUR_LABELS[k]}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  ) : (
+                    ORDERING_BEHAVIOUR_LABELS[t.ordering_behaviour ?? 'standard']
                   )}
                 </td>
                 <td>
@@ -289,7 +335,7 @@ export default function CategoryTypesManager({
               />
             </label>
             <label>
-              Behaviour
+              Browse as
               <select
                 value={newBrowseMode}
                 onChange={(e) => setNewBrowseMode(e.target.value as CategoryTypeRow['browse_mode'])}
@@ -298,6 +344,24 @@ export default function CategoryTypesManager({
                 <option value="product">{BROWSE_MODE_LABELS.product}</option>
                 <option value="door_range">{BROWSE_MODE_LABELS.door_range}</option>
                 <option value="universal">{BROWSE_MODE_LABELS.universal}</option>
+              </select>
+            </label>
+            <label>
+              Quote/order behaviour
+              <select
+                value={newOrderingBehaviour}
+                onChange={(e) =>
+                  setNewOrderingBehaviour(e.target.value as CategoryTypeRow['ordering_behaviour'])
+                }
+                disabled={busy}
+              >
+                {(Object.keys(ORDERING_BEHAVIOUR_LABELS) as CategoryTypeRow['ordering_behaviour'][]).map(
+                  (k) => (
+                    <option key={k} value={k}>
+                      {ORDERING_BEHAVIOUR_LABELS[k]}
+                    </option>
+                  ),
+                )}
               </select>
             </label>
             <label>

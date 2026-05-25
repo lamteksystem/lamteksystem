@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import CatalogProductWorkbench from '@/components/catalog/CatalogProductWorkbench'
+import TealburyOrderSetupWizard from '@/components/catalog/TealburyOrderSetupWizard'
 import type { CatalogPickerCommitPayload } from '@/components/catalog/CatalogProductPickerModal'
 import { useCatalogWorkbenchData } from '@/hooks/useCatalogWorkbenchData'
 import { insertStaffOrder } from '@/lib/adminStaffOrderCreate'
@@ -10,6 +11,12 @@ import { supabase } from '@/lib/supabase'
 import { useStaff } from '@/hooks/useStaff'
 import type { CustomerProfileRow, OrderLinkReason, OrderRow } from '@/types/database'
 import { ORDER_LINK_REASONS } from '@/types/database'
+import {
+  loadTealburyOrderSetup,
+  orderNeedsTealburySetup,
+  type TealburyOrderSetup,
+} from '@/lib/tealburyOrderSetup'
+import { carcassFinishLabel } from '@/lib/orderRangeFinish'
 
 const PARENT_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -47,6 +54,8 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [lastAddedMessage, setLastAddedMessage] = useState<string | null>(null)
+  const [tealburySetup, setTealburySetup] = useState<TealburyOrderSetup | null>(null)
+  const [tealburySetupOpen, setTealburySetupOpen] = useState(false)
 
   const parentOrderId = useMemo(() => {
     const t = parentOrderParam.trim()
@@ -142,6 +151,20 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
   }, [refreshLineCount])
 
   useEffect(() => {
+    if (!orderId) {
+      setTealburySetup(null)
+      return
+    }
+    let cancelled = false
+    void loadTealburyOrderSetup(orderId).then((setup) => {
+      if (!cancelled) setTealburySetup(setup)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [orderId, orderLinesRefreshToken])
+
+  useEffect(() => {
     if (!lastAddedMessage) return
     const t = window.setTimeout(() => setLastAddedMessage(null), 2800)
     return () => window.clearTimeout(t)
@@ -216,6 +239,16 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
     },
     [isQuote, orderId, refreshLineCount, selectedUserId],
   )
+
+  const showTealburyWizard =
+    buildActive &&
+    (tealburySetupOpen || orderNeedsTealburySetup(tealburySetup)) &&
+    !catalogLoading
+
+  const rangeName = useMemo(() => {
+    if (!tealburySetup?.kitchen_range_id) return null
+    return categories.find((c) => c.id === tealburySetup.kitchen_range_id)?.name ?? null
+  }, [categories, tealburySetup?.kitchen_range_id])
 
   const customerLabel = useMemo(() => {
     const c = customers.find((x) => x.user_id === selectedUserId)
@@ -341,25 +374,59 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
               <div className="admin-loading-spinner" aria-hidden />
               <p>Loading catalogues…</p>
             </div>
-          ) : (
-            <CatalogProductWorkbench
-              embedded
-              products={products}
-              categories={categories}
-              assemblies={assemblies}
-              allowedCatalogPrograms={catalogPrograms}
-              showCatalogueSwitcher
-              customerUserId={selectedUserId}
-              preferencesScope={preferencesScope}
+          ) : showTealburyWizard ? (
+            <TealburyOrderSetupWizard
               orderId={orderId}
-              orderLinesRefreshToken={orderLinesRefreshToken}
-              cartLineCount={lineCount}
-              cartHref={orderHref}
-              commitLabel={isQuote ? 'Add to quote' : 'Add to order'}
-              linePersistence="immediate"
-              addButtonLabel={isQuote ? 'Add to quote' : 'Add to order'}
-              onCommit={commitLines}
+              isQuote={isQuote}
+              categories={categories}
+              products={products}
+              initial={tealburySetup}
+              onComplete={(setup) => {
+                setTealburySetup(setup)
+                setTealburySetupOpen(false)
+              }}
             />
+          ) : (
+            <>
+              {tealburySetup && !orderNeedsTealburySetup(tealburySetup) && (
+                <div className="card admin-card admin-order-build-tealbury-summary" style={{ marginBottom: '1rem' }}>
+                  <p style={{ margin: 0 }}>
+                    <strong>Tealbury setup:</strong>{' '}
+                    {tealburySetup.build_style === 'flat_pack' ? 'Flat pack' : 'Rigid'} ·{' '}
+                    {rangeName ?? 'Range'} · {tealburySetup.door_finish} ·{' '}
+                    {carcassFinishLabel(tealburySetup.carcass_finish)} carcass ·{' '}
+                    {tealburySetup.line_style_preference?.replace('_', ' ')}
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-small"
+                      style={{ marginLeft: '0.75rem' }}
+                      onClick={() => setTealburySetupOpen(true)}
+                    >
+                      Change setup
+                    </button>
+                  </p>
+                </div>
+              )}
+              <CatalogProductWorkbench
+                embedded
+                products={products}
+                categories={categories}
+                assemblies={assemblies}
+                allowedCatalogPrograms={catalogPrograms}
+                showCatalogueSwitcher
+                customerUserId={selectedUserId}
+                preferencesScope={preferencesScope}
+                orderId={orderId}
+                orderLinesRefreshToken={orderLinesRefreshToken}
+                cartLineCount={lineCount}
+                cartHref={orderHref}
+                commitLabel={isQuote ? 'Add to quote' : 'Add to order'}
+                linePersistence="immediate"
+                addButtonLabel={isQuote ? 'Add to quote' : 'Add to order'}
+                tealburySetup={orderNeedsTealburySetup(tealburySetup) ? null : tealburySetup}
+                onCommit={commitLines}
+              />
+            </>
           )}
         </>
       )}

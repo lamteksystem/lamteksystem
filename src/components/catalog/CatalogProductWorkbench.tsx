@@ -37,6 +37,9 @@ import { usePermission } from '@/hooks/usePermission'
 import { useAssemblyPartTypes } from '@/hooks/useAssemblyPartTypes'
 import { supabase } from '@/lib/supabase'
 import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productCategories'
+import { fetchCompleteProductIds } from '@/lib/productAssembly'
+import { useCategoryTypes } from '@/hooks/useCategoryTypes'
+import type { TealburyOrderSetup } from '@/lib/tealburyOrderSetup'
 import AdminProductModal from '@/components/admin/AdminProductModal'
 import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 
@@ -60,6 +63,8 @@ interface CatalogProductWorkbenchProps {
   showCatalogueSwitcher?: boolean
   embedded?: boolean
   initialCategoryId?: string | null
+  /** When set, section filters and product-kind tabs follow Tealbury kitchen setup. */
+  tealburySetup?: TealburyOrderSetup | null
   onCommit: (payload: CatalogPickerCommitPayload) => Promise<void>
 }
 
@@ -80,6 +85,7 @@ export default function CatalogProductWorkbench({
   showCatalogueSwitcher = false,
   embedded = false,
   initialCategoryId = null,
+  tealburySetup = null,
   onCommit,
 }: CatalogProductWorkbenchProps) {
   const [filters, setFilters] = useState<WorkbenchFilterState>({
@@ -114,6 +120,8 @@ export default function CatalogProductWorkbench({
   const [productsOverride, setProductsOverride] = useState<ProductRow[] | null>(null)
   const [categoriesOverride, setCategoriesOverride] = useState<CategoryRow[] | null>(null)
   const [productCategoryMap, setProductCategoryMap] = useState<ProductCategoryMap>(new Map())
+  const [completeProductIds, setCompleteProductIds] = useState<Set<string>>(new Set())
+  const { types: categoryTypes } = useCategoryTypes(true)
   const {
     types: assemblyPartTypes,
     labels: assemblyPartTypeLabels,
@@ -129,9 +137,7 @@ export default function CatalogProductWorkbench({
     setCategoriesOverride(null)
   }, [categories])
 
-  // Lazy-load the multi-category map only once admin can edit. Used by AdminProductModal.
   useEffect(() => {
-    if (!canEditCatalogue) return
     let cancelled = false
     void fetchProductCategoryMap().then((map) => {
       if (!cancelled) setProductCategoryMap(map)
@@ -139,7 +145,17 @@ export default function CatalogProductWorkbench({
     return () => {
       cancelled = true
     }
-  }, [canEditCatalogue])
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchCompleteProductIds().then((ids) => {
+      if (!cancelled) setCompleteProductIds(ids)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Esc closes the manage-categories modal. (AdminProductModal handles its own keys.)
   useEffect(() => {
@@ -172,11 +188,33 @@ export default function CatalogProductWorkbench({
     return effectiveProducts.filter((p) => !p.catalog_program || allowed.has(p.catalog_program))
   }, [effectiveProducts, allowedCatalogPrograms])
 
-  const facets = useMemo(() => buildCatalogFacets(scopeProducts), [scopeProducts])
+  const facets = useMemo(
+    () =>
+      buildCatalogFacets(scopeProducts, {
+        categories: effectiveCategories,
+        categoryTypes,
+        productCategoryMap,
+        lineStylePreference: tealburySetup?.line_style_preference,
+        completeProductIds,
+      }),
+    [
+      scopeProducts,
+      effectiveCategories,
+      categoryTypes,
+      productCategoryMap,
+      tealburySetup?.line_style_preference,
+      completeProductIds,
+    ],
+  )
   const catMap = useMemo(() => categoryNameById(effectiveCategories), [effectiveCategories])
   const filtered = useMemo(
-    () => filterCatalogProducts(scopeProducts, filters, favouriteSet, effectiveCategories),
-    [scopeProducts, filters, favouriteSet, effectiveCategories],
+    () =>
+      filterCatalogProducts(scopeProducts, filters, favouriteSet, effectiveCategories, {
+        productCategoryMap,
+        completeProductIds,
+        categoryTypes,
+      }),
+    [scopeProducts, filters, favouriteSet, effectiveCategories, productCategoryMap, completeProductIds, categoryTypes],
   )
   const browseOptions = useMemo(
     () => buildCategoryTreeOptions(effectiveCategories, filters.browseMode),
@@ -236,8 +274,11 @@ export default function CatalogProductWorkbench({
       setFilters({
         ...EMPTY_WORKBENCH_FILTERS,
         ...savedFilters,
-        browseMode: savedFilters.browseMode ?? 'category',
-        categoryId: initialCategoryId,
+        browseMode: tealburySetup?.kitchen_range_id
+          ? 'range'
+          : (savedFilters.browseMode ?? 'category'),
+        categoryId: initialCategoryId ?? tealburySetup?.kitchen_range_id ?? null,
+        productKind: savedFilters.productKind ?? 'all',
       })
       setFavouriteIds(favs)
       setFilterPresets(presets)
@@ -246,7 +287,7 @@ export default function CatalogProductWorkbench({
     return () => {
       cancelled = true
     }
-  }, [preferencesScope, initialCategoryId])
+  }, [preferencesScope, initialCategoryId, tealburySetup?.kitchen_range_id])
 
   useEffect(() => {
     if (!prefsReady) return
@@ -318,31 +359,10 @@ export default function CatalogProductWorkbench({
     [immediate, onCommit, reloadOrderLines],
   )
 
-  const addProductToBasket = useCallback(
-    (product: ProductRow, quantity: number) => {
-      if (linePersistence === 'immediate') {
-        void persistPayload(
-          { products: [{ product, quantity }], assemblies: [] },
-          `Added ${quantity} × ${product.name} to order`,
-        )
-        return
-      }
-      const unitPrice = productUnitPrice(product)
-      setStaged((prev) => {
-        const existing = prev.find((l) => l.kind === 'product' && l.product.id === product.id)
-        if (existing && existing.kind === 'product') {
-          return prev.map((l) =>
-            l.id === existing.id ? { ...l, quantity: Math.min(99, l.quantity + quantity) } : l,
-          )
-        }
-        return [
-          ...prev,
-          { kind: 'product', id: `p-${product.id}`, product, quantity, unitPrice },
-        ]
-      })
-      setStatusMessage(`Added ${quantity} × ${product.name} to selection — confirm below`)
-    },
-    [linePersistence, persistPayload, productUnitPrice],
+  const assemblyForCompleteProduct = useCallback(
+    (productId: string) =>
+      assemblies.find((a) => a.product_id === productId && (a.assembly_lines?.length ?? 0) > 0) ?? null,
+    [assemblies],
   )
 
   const addAssemblyToBasket = useCallback(
@@ -350,7 +370,7 @@ export default function CatalogProductWorkbench({
       if (linePersistence === 'immediate') {
         void persistPayload(
           { products: [], assemblies: [{ assembly, quantity }] },
-          `Added ${quantity} × ${assembly.name} to order`,
+          `Added ${quantity} × ${assembly.name} (complete unit BOM) to order`,
         )
         return
       }
@@ -373,6 +393,38 @@ export default function CatalogProductWorkbench({
       setStatusMessage(`Added ${quantity} × ${assembly.name} to selection — confirm below`)
     },
     [linePersistence, persistPayload],
+  )
+
+  const addProductToBasket = useCallback(
+    (product: ProductRow, quantity: number) => {
+      const bom = completeProductIds.has(product.id) ? assemblyForCompleteProduct(product.id) : null
+      if (bom) {
+        addAssemblyToBasket(bom, quantity)
+        return
+      }
+      if (linePersistence === 'immediate') {
+        void persistPayload(
+          { products: [{ product, quantity }], assemblies: [] },
+          `Added ${quantity} × ${product.name} to order`,
+        )
+        return
+      }
+      const unitPrice = productUnitPrice(product)
+      setStaged((prev) => {
+        const existing = prev.find((l) => l.kind === 'product' && l.product.id === product.id)
+        if (existing && existing.kind === 'product') {
+          return prev.map((l) =>
+            l.id === existing.id ? { ...l, quantity: Math.min(99, l.quantity + quantity) } : l,
+          )
+        }
+        return [
+          ...prev,
+          { kind: 'product', id: `p-${product.id}`, product, quantity, unitPrice },
+        ]
+      })
+      setStatusMessage(`Added ${quantity} × ${product.name} to selection — confirm below`)
+    },
+    [linePersistence, persistPayload, productUnitPrice, completeProductIds, assemblyForCompleteProduct, addAssemblyToBasket],
   )
 
   const commitBasket = useCallback(async () => {
@@ -546,9 +598,42 @@ export default function CatalogProductWorkbench({
           </label>
         )}
 
+        {tealburySetup && (
+          <fieldset className="tb-filter-field tb-filter-checklist">
+            <legend>Product type</legend>
+            <label className="tb-check-row">
+              <input
+                type="radio"
+                name="tb-product-kind"
+                checked={filters.productKind === 'all'}
+                onChange={() => updateFilter({ productKind: 'all' })}
+              />
+              All products
+            </label>
+            <label className="tb-check-row">
+              <input
+                type="radio"
+                name="tb-product-kind"
+                checked={filters.productKind === 'complete'}
+                onChange={() => updateFilter({ productKind: 'complete' })}
+              />
+              Complete units (BOM)
+            </label>
+            <label className="tb-check-row">
+              <input
+                type="radio"
+                name="tb-product-kind"
+                checked={filters.productKind === 'components'}
+                onChange={() => updateFilter({ productKind: 'components' })}
+              />
+              Components &amp; accessories
+            </label>
+          </fieldset>
+        )}
+
         {facets.sections.length > 0 && (
           <fieldset className="tb-filter-field tb-filter-checklist">
-            <legend>Section</legend>
+            <legend>Category</legend>
             <label className="tb-check-row">
               <input
                 type="radio"
@@ -559,14 +644,19 @@ export default function CatalogProductWorkbench({
               All sections
             </label>
             {facets.sections.map((s) => (
-              <label key={s} className="tb-check-row">
+              <label key={s.id} className="tb-check-row">
                 <input
                   type="radio"
                   name="tb-section"
-                  checked={filters.section === s}
-                  onChange={() => updateFilter({ section: s })}
+                  checked={filters.section === s.id}
+                  onChange={() => updateFilter({ section: s.id })}
                 />
-                {s}
+                {s.name}
+                {s.legacyImport ? (
+                  <span className="admin-muted" style={{ marginLeft: '0.35rem' }}>
+                    (import)
+                  </span>
+                ) : null}
               </label>
             ))}
           </fieldset>

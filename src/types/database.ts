@@ -22,12 +22,19 @@ export interface MarketingSiteSettingsRow {
 /** Category type code — built-ins: product_type, door_range, universal; custom types allowed. */
 export type CategoryKind = string
 
+export type CategoryOrderingBehaviour =
+  | 'standard'
+  | 'tealbury_complete'
+  | 'component_only'
+  | 'accessory'
+
 export interface CategoryTypeRow {
   code: string
   label: string
   description: string | null
   sort_order: number
   browse_mode: 'product' | 'door_range' | 'universal'
+  ordering_behaviour: CategoryOrderingBehaviour
   active: boolean
   is_system: boolean
   created_at: string
@@ -317,6 +324,10 @@ export interface OrderRow {
   door_finish?: string | null
   /** Selected carcass/cabinet finish (e.g. "White", "Light Oak", "Grey"). Free text for now. */
   carcass_finish?: string | null
+  /** Tealbury: flat_pack or rigid factory build. */
+  build_style?: 'flat_pack' | 'rigid' | null
+  /** Tealbury: predominant high-line vs drawer-line when browsing units. */
+  line_style_preference?: 'high_line' | 'drawer_line' | 'mixed' | null
 }
 
 export const COURIER_OPTIONS = ['DPD', 'FedEx', 'Royal Mail', 'Yodel', 'Evri', 'Parcelforce', 'DX', 'Other'] as const

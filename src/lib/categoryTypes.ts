@@ -3,7 +3,7 @@ import type { CategoryTypeRow } from '@/types/database'
 
 export const DEFAULT_CATEGORY_TYPES: Pick<
   CategoryTypeRow,
-  'code' | 'label' | 'description' | 'sort_order' | 'browse_mode' | 'is_system'
+  'code' | 'label' | 'description' | 'sort_order' | 'browse_mode' | 'ordering_behaviour' | 'is_system'
 >[] = [
   {
     code: 'product_type',
@@ -11,6 +11,7 @@ export const DEFAULT_CATEGORY_TYPES: Pick<
     description: 'Standard catalogue grouping',
     sort_order: 10,
     browse_mode: 'product',
+    ordering_behaviour: 'standard',
     is_system: true,
   },
   {
@@ -19,6 +20,7 @@ export const DEFAULT_CATEGORY_TYPES: Pick<
     description: 'Door programme used on orders',
     sort_order: 20,
     browse_mode: 'door_range',
+    ordering_behaviour: 'standard',
     is_system: true,
   },
   {
@@ -27,9 +29,26 @@ export const DEFAULT_CATEGORY_TYPES: Pick<
     description: 'Items usable with any range',
     sort_order: 30,
     browse_mode: 'universal',
+    ordering_behaviour: 'accessory',
     is_system: true,
   },
+  {
+    code: 'tealbury_complete',
+    label: 'Tealbury Complete',
+    description: 'Sellable units with BOM (carcass, doors, hinges, etc.)',
+    sort_order: 15,
+    browse_mode: 'product',
+    ordering_behaviour: 'tealbury_complete',
+    is_system: false,
+  },
 ]
+
+export const ORDERING_BEHAVIOUR_LABELS: Record<CategoryTypeRow['ordering_behaviour'], string> = {
+  standard: 'Standard — search & add',
+  tealbury_complete: 'Tealbury Complete — guided setup + BOM units',
+  component_only: 'Components only — individual parts',
+  accessory: 'Accessories — plinth, cornice, posts, etc.',
+}
 
 let categoryTypesCache: CategoryTypeRow[] | null = null
 
@@ -101,11 +120,20 @@ export function categoryTypeBrowseMode(
   return row?.browse_mode ?? 'product'
 }
 
+export function categoryTypeOrderingBehaviour(
+  types: CategoryTypeRow[],
+  code: string | null | undefined,
+): CategoryTypeRow['ordering_behaviour'] {
+  const row = types.find((t) => t.code === code)
+  return row?.ordering_behaviour ?? 'standard'
+}
+
 export async function createCategoryType(params: {
   label: string
   code?: string
   description?: string
   browse_mode?: CategoryTypeRow['browse_mode']
+  ordering_behaviour?: CategoryTypeRow['ordering_behaviour']
   sort_order?: number
 }): Promise<{ categoryType: CategoryTypeRow | null; error: string | null }> {
   const label = params.label.trim()
@@ -124,6 +152,7 @@ export async function createCategoryType(params: {
       label,
       description: params.description?.trim() || null,
       browse_mode: params.browse_mode ?? 'product',
+      ordering_behaviour: params.ordering_behaviour ?? 'standard',
       sort_order: params.sort_order ?? maxSort + 10,
       active: true,
       is_system: false,
@@ -138,7 +167,9 @@ export async function createCategoryType(params: {
 
 export async function updateCategoryType(
   code: string,
-  patch: Partial<Pick<CategoryTypeRow, 'label' | 'description' | 'browse_mode' | 'sort_order' | 'active'>>,
+  patch: Partial<
+    Pick<CategoryTypeRow, 'label' | 'description' | 'browse_mode' | 'ordering_behaviour' | 'sort_order' | 'active'>
+  >,
 ): Promise<{ error: string | null }> {
   const { error } = await supabase
     .from('category_types')

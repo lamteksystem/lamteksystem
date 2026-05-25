@@ -1,9 +1,15 @@
 import { CATALOG_PROGRAM, type CatalogProgram } from '@/lib/catalogProgram'
 import {
+  categoryBrowseModeForRow,
   productMatchesBrowseFilter,
   type CatalogBrowseMode,
 } from '@/lib/categoryTaxonomy'
-import type { CategoryRow, ProductRow } from '@/types/database'
+import { categoryTypeOrderingBehaviour } from '@/lib/categoryTypes'
+import type { ProductCategoryMap } from '@/lib/productCategories'
+import { lineStyleMatchesCategoryName } from '@/lib/tealburyOrderSetup'
+import type { CategoryRow, CategoryTypeRow, OrderRow, ProductRow } from '@/types/database'
+
+export type CatalogProductKindFilter = 'all' | 'complete' | 'components'
 
 export interface WorkbenchFilterState {
   productCode: string
@@ -11,7 +17,9 @@ export interface WorkbenchFilterState {
   browseMode: CatalogBrowseMode
   categoryId: string | null
   doorRange: string | null
+  /** System category id (product_type) or legacy import section label. */
   section: string | null
+  productKind: CatalogProductKindFilter
   inStockOnly: boolean
   favouritesOnly: boolean
   catalogProgram: CatalogProgram | null
@@ -24,14 +32,21 @@ export const EMPTY_WORKBENCH_FILTERS: WorkbenchFilterState = {
   categoryId: null,
   doorRange: null,
   section: null,
+  productKind: 'all',
   inStockOnly: false,
   favouritesOnly: false,
   catalogProgram: null,
 }
 
+export interface CatalogSectionOption {
+  id: string
+  name: string
+  legacyImport?: boolean
+}
+
 export interface CatalogFacets {
   doorRanges: string[]
-  sections: string[]
+  sections: CatalogSectionOption[]
 }
 
 export function getProductOpts(product: ProductRow): Record<string, unknown> {
@@ -73,17 +88,73 @@ export function formatProductDimensions(product: ProductRow): string | null {
   return `${parts.join(' × ')} mm`
 }
 
-export function buildCatalogFacets(products: ProductRow[]): CatalogFacets {
+function productInSystemSection(
+  product: ProductRow,
+  sectionCategoryId: string,
+  categories: CategoryRow[],
+  productCategoryMap: ProductCategoryMap,
+): boolean {
+  const catIds = productCategoryMap.get(product.id) ?? (product.category_id ? [product.category_id] : [])
+  if (catIds.includes(sectionCategoryId)) return true
+  const legacy = getProductSections(product)
+  const sectionCat = categories.find((c) => c.id === sectionCategoryId)
+  if (sectionCat && legacy.some((l) => l.toLowerCase() === sectionCat.name.toLowerCase())) return true
+  return false
+}
+
+export function buildCatalogFacets(
+  products: ProductRow[],
+  options?: {
+    categories?: CategoryRow[]
+    categoryTypes?: CategoryTypeRow[]
+    productCategoryMap?: ProductCategoryMap
+    lineStylePreference?: OrderRow['line_style_preference']
+    completeProductIds?: Set<string>
+  },
+): CatalogFacets {
   const doorSet = new Set<string>()
-  const sectionSet = new Set<string>()
   for (const p of products) {
     const door = getDoorRange(p)
     if (door) doorSet.add(door)
-    for (const s of getProductSections(p)) sectionSet.add(s)
   }
+
+  const categories = options?.categories ?? []
+  const types = options?.categoryTypes ?? []
+  const pcMap = options?.productCategoryMap
+  const linePref = options?.lineStylePreference
+
+  let sections: CatalogSectionOption[] = []
+  if (categories.length > 0 && pcMap) {
+    const productTypeCats = categories.filter((c) => {
+      if (categoryBrowseModeForRow(c, types) !== 'product') return false
+      if (linePref && !lineStyleMatchesCategoryName(linePref, c.name)) return false
+      const behaviour = categoryTypeOrderingBehaviour(types, c.category_kind)
+      if (behaviour === 'accessory') return true
+      if (behaviour === 'tealbury_complete' || behaviour === 'component_only' || behaviour === 'standard') {
+        return products.some((p) => productInSystemSection(p, c.id, categories, pcMap))
+      }
+      return products.some((p) => productInSystemSection(p, c.id, categories, pcMap))
+    })
+    sections = productTypeCats
+      .map((c) => ({ id: c.id, name: c.name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  if (sections.length === 0) {
+    const sectionSet = new Set<string>()
+    for (const p of products) {
+      for (const s of getProductSections(p)) sectionSet.add(s)
+    }
+    sections = [...sectionSet].sort((a, b) => a.localeCompare(b)).map((name) => ({
+      id: name,
+      name,
+      legacyImport: true,
+    }))
+  }
+
   return {
     doorRanges: [...doorSet].sort((a, b) => a.localeCompare(b)),
-    sections: [...sectionSet].sort((a, b) => a.localeCompare(b)),
+    sections,
   }
 }
 
@@ -171,7 +242,15 @@ export function filterCatalogProducts(
   filters: WorkbenchFilterState,
   favouriteIds?: Set<string>,
   categories: CategoryRow[] = [],
+  options?: {
+    productCategoryMap?: ProductCategoryMap
+    completeProductIds?: Set<string>
+    categoryTypes?: CategoryTypeRow[]
+  },
 ): ProductRow[] {
+  const pcMap = options?.productCategoryMap
+  const completeIds = options?.completeProductIds
+
   return products.filter((p) => {
     if (filters.catalogProgram && p.catalog_program !== filters.catalogProgram) return false
     if (
@@ -183,7 +262,16 @@ export function filterCatalogProducts(
     }
     if (filters.categoryId && categories.length === 0 && p.category_id !== filters.categoryId) return false
     if (filters.doorRange && getDoorRange(p) !== filters.doorRange) return false
-    if (filters.section && !getProductSections(p).includes(filters.section)) return false
+    if (filters.section) {
+      if (pcMap && categories.length > 0) {
+        if (!productInSystemSection(p, filters.section, categories, pcMap)) return false
+      } else if (!getProductSections(p).includes(filters.section)) return false
+    }
+    if (filters.productKind !== 'all' && completeIds) {
+      const isComplete = completeIds.has(p.id)
+      if (filters.productKind === 'complete' && !isComplete) return false
+      if (filters.productKind === 'components' && isComplete) return false
+    }
     if (filters.inStockOnly && (p.stock_quantity ?? 0) <= 0) return false
     if (filters.favouritesOnly && favouriteIds && !favouriteIds.has(p.id)) return false
 

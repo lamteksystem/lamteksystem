@@ -21,6 +21,8 @@ This note is for **Lamtek-only** product decisions — not a plan to become a ma
 | Logistics | **Delivery schedule** week view (`/admin/delivery-schedule`) |
 | Warehouse | **Warehouse scan** on pick lists (camera + manual code) |
 | Quote structure | **Line combinations** — `combination_label` on order lines, grouped on print |
+| Tealbury Complete | **Category type** `tealbury_complete` + guided setup wizard (flat/rigid, range, line style, carcass) |
+| Section filters | **System categories** in workbench (not legacy import section strings) |
 
 ## What we are not building
 

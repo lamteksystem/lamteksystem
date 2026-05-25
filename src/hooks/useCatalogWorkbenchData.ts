@@ -31,23 +31,28 @@ export function useCatalogWorkbenchData(programs: CatalogProgram[]) {
       }
       const { data: prodData } = await prodQuery
       const plist = (prodData ?? []) as ProductRow[]
-      const catIds = [...new Set(plist.map((p) => p.category_id).filter(Boolean))] as string[]
-      const { data: catData } =
-        catIds.length === 0
-          ? { data: [] as CategoryRow[] }
-          : await supabase.from('categories').select('*').in('id', catIds).order('sort_order').order('name')
+      const { data: catData } = await supabase.from('categories').select('*').order('sort_order').order('name')
 
       let assyList: AssemblyWithLines[] = []
-      if (programs.includes(CATALOG_PROGRAM.LAMTEK)) {
-        const { data: assyData } = await supabase
-          .from('assemblies')
-          .select(
-            `*, assembly_lines ( id, assembly_id, product_id, quantity, sort_order, product:products (*) )`,
-          )
-          .eq('active', true)
-          .order('sort_order')
-          .order('width_mm', { nullsFirst: false })
-        assyList = ((assyData ?? []) as AssemblyWithLines[]).filter((a) =>
+      const { data: assyData } = await supabase
+        .from('assemblies')
+        .select(
+          `*, assembly_lines ( id, assembly_id, product_id, quantity, sort_order, component_role, product:products (*) )`,
+        )
+        .eq('active', true)
+        .order('sort_order')
+        .order('width_mm', { nullsFirst: false })
+      const rawAssemblies = (assyData ?? []) as AssemblyWithLines[]
+      if (programs.includes(CATALOG_PROGRAM.LAMTEK) && programs.includes(CATALOG_PROGRAM.TEALBURY)) {
+        assyList = rawAssemblies
+      } else if (programs.includes(CATALOG_PROGRAM.TEALBURY)) {
+        assyList = rawAssemblies.filter(
+          (a) =>
+            a.product_id &&
+            plist.some((p) => p.id === a.product_id && p.catalog_program === CATALOG_PROGRAM.TEALBURY),
+        )
+      } else if (programs.includes(CATALOG_PROGRAM.LAMTEK)) {
+        assyList = rawAssemblies.filter((a) =>
           (a.assembly_lines ?? []).every((line) => {
             const p = line.product as ProductRow | undefined
             return !p || p.catalog_program !== CATALOG_PROGRAM.TEALBURY

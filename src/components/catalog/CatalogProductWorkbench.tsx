@@ -48,6 +48,7 @@ import type { CatalogPickerCommitPayload } from '@/components/catalog/CatalogPro
 import { usePermission } from '@/hooks/usePermission'
 import { useAssemblyPartTypes } from '@/hooks/useAssemblyPartTypes'
 import { supabase } from '@/lib/supabase'
+import { recalcOrderTotals } from '@/lib/orders'
 import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productCategories'
 import { fetchCompleteProductIds } from '@/lib/productAssembly'
 import { resolveAssemblyForHingeBrand } from '@/lib/tealburyBomResolve'
@@ -122,6 +123,7 @@ export default function CatalogProductWorkbench({
   const [staged, setStaged] = useState<StagedCatalogLine[]>([])
   const [committing, setCommitting] = useState(false)
   const [rowQtyById, setRowQtyById] = useState<Record<string, number>>({})
+  const [mutatingOrderLineId, setMutatingOrderLineId] = useState<string | null>(null)
   const [assemblyQtyById, setAssemblyQtyById] = useState<Record<string, number>>({})
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [favouriteIds, setFavouriteIds] = useState<string[]>([])
@@ -561,6 +563,52 @@ export default function CatalogProductWorkbench({
       setStatusMessage(`Added ${quantity} × ${assembly.name} to selection — confirm below`)
     },
     [linePersistence, persistPayload, tealburySetup?.hinge_brand, scopeProducts],
+  )
+
+  const handleOrderLineQuantity = useCallback(
+    async (lineId: string, quantity: number) => {
+      if (!immediate || !orderId) return
+      setMutatingOrderLineId(lineId)
+      try {
+        if (quantity < 1) {
+          const { error } = await supabase.from('order_lines').delete().eq('id', lineId)
+          if (error) throw error
+        } else {
+          const { error } = await supabase
+            .from('order_lines')
+            .update({ quantity })
+            .eq('id', lineId)
+          if (error) throw error
+        }
+        await recalcOrderTotals(orderId)
+        await reloadOrderLines()
+      } catch (e) {
+        console.error(e)
+        setStatusMessage('Could not update order line quantity.')
+      } finally {
+        setMutatingOrderLineId(null)
+      }
+    },
+    [immediate, orderId, reloadOrderLines],
+  )
+
+  const handleOrderLineRemove = useCallback(
+    async (lineId: string) => {
+      if (!immediate || !orderId) return
+      setMutatingOrderLineId(lineId)
+      try {
+        const { error } = await supabase.from('order_lines').delete().eq('id', lineId)
+        if (error) throw error
+        await recalcOrderTotals(orderId)
+        await reloadOrderLines()
+      } catch (e) {
+        console.error(e)
+        setStatusMessage('Could not remove order line.')
+      } finally {
+        setMutatingOrderLineId(null)
+      }
+    },
+    [immediate, orderId, reloadOrderLines],
   )
 
   const addProductToBasket = useCallback(
@@ -1323,6 +1371,9 @@ export default function CatalogProductWorkbench({
                     lines={orderLines}
                     loading={orderLinesLoading}
                     cartHref={cartHref}
+                    onQuantityChange={handleOrderLineQuantity}
+                    onRemoveLine={handleOrderLineRemove}
+                    mutatingLineId={mutatingOrderLineId}
                   />
                 ) : (
                   <CatalogProductStagingBasket
@@ -1349,6 +1400,9 @@ export default function CatalogProductWorkbench({
                   lines={orderLines}
                   loading={orderLinesLoading}
                   cartHref={cartHref}
+                  onQuantityChange={handleOrderLineQuantity}
+                  onRemoveLine={handleOrderLineRemove}
+                  mutatingLineId={mutatingOrderLineId}
                 />
               ) : (
                 <CatalogProductStagingBasket

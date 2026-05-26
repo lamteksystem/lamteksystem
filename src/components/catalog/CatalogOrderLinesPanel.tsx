@@ -7,7 +7,10 @@ interface CatalogOrderLinesPanelProps {
   lines: WorkbenchOrderLine[]
   loading?: boolean
   cartHref?: string
+  onQuantityChange?: (lineId: string, quantity: number) => void
   onRemoveLine?: (lineId: string) => void
+  /** Disables controls while a line update is in flight. */
+  mutatingLineId?: string | null
 }
 
 function lineTitle(line: WorkbenchOrderLine): string {
@@ -63,10 +66,13 @@ export default function CatalogOrderLinesPanel({
   lines,
   loading = false,
   cartHref = '',
+  onQuantityChange,
   onRemoveLine,
+  mutatingLineId = null,
 }: CatalogOrderLinesPanelProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const totalExVat = lines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0)
+  const canEditLines = Boolean(onQuantityChange && onRemoveLine)
 
   return (
     <section className="tb-order-lines" aria-label="Lines on order">
@@ -85,42 +91,101 @@ export default function CatalogOrderLinesPanel({
         <ul className="tb-order-lines-list">
           {lines.map((line) => {
             const expanded = expandedId === line.id
+            const lineBusy = mutatingLineId === line.id
+            const lineTotal = line.quantity * line.unit_price
             return (
               <li key={line.id} className={`tb-order-line${expanded ? ' tb-order-line--expanded' : ''}`}>
-                <button
-                  type="button"
-                  className="tb-order-line-summary"
-                  onClick={() => setExpandedId((prev) => (prev === line.id ? null : line.id))}
-                  aria-expanded={expanded}
-                >
-                  <span className="tb-order-line-chevron" aria-hidden>
-                    {expanded ? '▾' : '▸'}
-                  </span>
-                  <span className="tb-order-line-main">
-                    <span className="tb-basket-line-code">{lineCode(line)}</span>
-                    <span className="tb-basket-line-name" title={lineTitle(line)}>
-                      {lineTitle(line)}
+                <div className="tb-order-line-header">
+                  <button
+                    type="button"
+                    className="tb-order-line-expand"
+                    onClick={() => setExpandedId((prev) => (prev === line.id ? null : line.id))}
+                    aria-expanded={expanded}
+                    aria-label={expanded ? 'Collapse line details' : 'Expand line details'}
+                  >
+                    <span className="tb-order-line-chevron" aria-hidden>
+                      {expanded ? '▾' : '▸'}
                     </span>
-                  </span>
-                  <span className="tb-order-line-meta">
-                    <span className="tb-order-line-qty">× {line.quantity}</span>
-                    <span className="tb-order-line-price">
-                      £{(line.quantity * line.unit_price).toFixed(2)}
+                  </button>
+                  <button
+                    type="button"
+                    className="tb-order-line-summary"
+                    onClick={() => setExpandedId((prev) => (prev === line.id ? null : line.id))}
+                  >
+                    <span className="tb-order-line-main">
+                      <span className="tb-basket-line-code">{lineCode(line)}</span>
+                      <span className="tb-basket-line-name" title={lineTitle(line)}>
+                        {lineTitle(line)}
+                      </span>
                     </span>
-                  </span>
-                </button>
+                  </button>
+                  {canEditLines ? (
+                    <div
+                      className="tb-order-line-actions"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <div className="qty-stepper qty-stepper--compact">
+                        <button
+                          type="button"
+                          className="qty-stepper-btn"
+                          aria-label="Decrease quantity"
+                          disabled={lineBusy}
+                          onClick={() =>
+                            onQuantityChange!(
+                              line.id,
+                              line.quantity <= 1 ? 0 : line.quantity - 1,
+                            )
+                          }
+                        >
+                          −
+                        </button>
+                        <input
+                          className="qty-stepper-input"
+                          inputMode="numeric"
+                          value={line.quantity}
+                          disabled={lineBusy}
+                          aria-label={`Quantity for ${lineTitle(line)}`}
+                          onChange={(e) => {
+                            const n = Number(e.target.value)
+                            onQuantityChange!(
+                              line.id,
+                              Number.isFinite(n) && n > 0 ? Math.floor(n) : 1,
+                            )
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="qty-stepper-btn"
+                          aria-label="Increase quantity"
+                          disabled={lineBusy}
+                          onClick={() =>
+                            onQuantityChange!(line.id, Math.min(99, line.quantity + 1))
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        className="tb-basket-remove"
+                        disabled={lineBusy}
+                        aria-label={`Remove ${lineTitle(line)}`}
+                        onClick={() => onRemoveLine!(line.id)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="tb-order-line-meta">
+                      <span className="tb-order-line-qty">× {line.quantity}</span>
+                    </span>
+                  )}
+                  <span className="tb-order-line-price">£{lineTotal.toFixed(2)}</span>
+                </div>
                 {expanded && (
                   <div className="tb-order-line-detail">
                     <LineBreakdown line={line} />
-                    {onRemoveLine && (
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-small tb-order-line-remove"
-                        onClick={() => onRemoveLine(line.id)}
-                      >
-                        Remove line
-                      </button>
-                    )}
                   </div>
                 )}
               </li>

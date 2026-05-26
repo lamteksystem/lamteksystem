@@ -4426,6 +4426,17 @@ button.ordering-wizard-card {
   padding: 0;
   order: 0;
 }
+
+.admin-app--sidebar-collapsed .admin-sidebar-logo-text {
+  width: 2.4rem;
+  height: 2.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 10px;
+  font-size: 1.05rem;
+}
 .admin-app--sidebar-collapsed .admin-sidebar-logo .admin-sidebar-badge {
   display: none;
 }
@@ -4757,11 +4768,15 @@ button.ordering-wizard-card {
 
 /* Instant hover tooltips on collapsed sidebar rail */
 .admin-app--sidebar-collapsed .admin-nav-item[data-tip],
+.admin-app--sidebar-collapsed .admin-sidebar-logo[data-tip],
+.admin-app--sidebar-collapsed .admin-sidebar-toggle[data-tip],
 .admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip] {
   position: relative;
 }
 
 .admin-app--sidebar-collapsed .admin-nav-item[data-tip]::after,
+.admin-app--sidebar-collapsed .admin-sidebar-logo[data-tip]::after,
+.admin-app--sidebar-collapsed .admin-sidebar-toggle[data-tip]::after,
 .admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip]::after {
   content: attr(data-tip);
   position: absolute;
@@ -4785,6 +4800,8 @@ button.ordering-wizard-card {
 }
 
 .admin-app--sidebar-collapsed .admin-nav-item[data-tip]::before,
+.admin-app--sidebar-collapsed .admin-sidebar-logo[data-tip]::before,
+.admin-app--sidebar-collapsed .admin-sidebar-toggle[data-tip]::before,
 .admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip]::before {
   content: '';
   position: absolute;
@@ -4801,9 +4818,17 @@ button.ordering-wizard-card {
 }
 
 .admin-app--sidebar-collapsed .admin-nav-item[data-tip]:hover::after,
+.admin-app--sidebar-collapsed .admin-sidebar-logo[data-tip]:hover::after,
+.admin-app--sidebar-collapsed .admin-sidebar-toggle[data-tip]:hover::after,
 .admin-app--sidebar-collapsed .admin-nav-item[data-tip]:hover::before,
+.admin-app--sidebar-collapsed .admin-sidebar-logo[data-tip]:hover::before,
+.admin-app--sidebar-collapsed .admin-sidebar-toggle[data-tip]:hover::before,
 .admin-app--sidebar-collapsed .admin-nav-item[data-tip]:focus-visible::after,
+.admin-app--sidebar-collapsed .admin-sidebar-logo[data-tip]:focus-visible::after,
+.admin-app--sidebar-collapsed .admin-sidebar-toggle[data-tip]:focus-visible::after,
 .admin-app--sidebar-collapsed .admin-nav-item[data-tip]:focus-visible::before,
+.admin-app--sidebar-collapsed .admin-sidebar-logo[data-tip]:focus-visible::before,
+.admin-app--sidebar-collapsed .admin-sidebar-toggle[data-tip]:focus-visible::before,
 .admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip]:hover::after,
 .admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip]:hover::before,
 .admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip]:focus-visible::after,

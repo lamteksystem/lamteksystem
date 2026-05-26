@@ -357,14 +357,20 @@ export default function AdminLayout() {
     <div className={`admin-app ${sidebarCollapsed ? 'admin-app--sidebar-collapsed' : ''}`}>
       <aside className="admin-sidebar">
         <div className="admin-sidebar-head">
-          <Link to="/admin" className="admin-sidebar-logo">
-            <span className="admin-sidebar-logo-text">Lamtek</span>
+          <Link
+            to="/admin"
+            className="admin-sidebar-logo"
+            data-tip="Lamtek"
+            aria-label="Lamtek"
+          >
+            <span className="admin-sidebar-logo-text">{sidebarCollapsed ? 'L' : 'Lamtek'}</span>
             {!sidebarCollapsed && <span className="admin-sidebar-badge">Staff</span>}
           </Link>
           <button
             type="button"
             className="admin-sidebar-toggle"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            data-tip={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >

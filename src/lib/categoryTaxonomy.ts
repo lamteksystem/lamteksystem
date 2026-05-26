@@ -144,39 +144,64 @@ export function expandCategorySelection(
   return ids
 }
 
+export type CategoryChipSection = 'kitchen_range' | 'product_category'
+
+export type CategoryTreeOption = {
+  id: string
+  label: string
+  depth: number
+  kind: CategoryKind
+  chipSection: CategoryChipSection
+}
+
 export function buildCategoryTreeOptions(
   categories: CategoryRow[],
   mode: CatalogBrowseMode,
-): { id: string; label: string; depth: number; kind: CategoryKind }[] {
+): CategoryTreeOption[] {
   const sorted = [...categories].sort(
     (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name),
   )
 
   if (mode === 'range') {
     const doorRanges = sorted.filter((c) => getCategoryKind(c) === 'door_range')
-    const universal = sorted.filter((c) => getCategoryKind(c) === 'universal')
+    const universal = sorted.filter((c) => getCategoryKind(c) === 'universal' && !c.parent_id)
     return [
-      ...doorRanges.map((c) => ({ id: c.id, label: c.name, depth: 0, kind: 'door_range' as const })),
+      ...doorRanges.map((c) => ({
+        id: c.id,
+        label: c.name,
+        depth: 0,
+        kind: 'door_range' as const,
+        chipSection: 'kitchen_range' as const,
+      })),
       ...universal.map((c) => ({
         id: c.id,
-        label: `${c.name} (all ranges)`,
+        label: c.name,
         depth: 0,
         kind: 'universal' as const,
+        chipSection: 'product_category' as const,
       })),
     ]
   }
 
   const parents = sorted.filter((c) => !c.parent_id && getCategoryKind(c) !== 'door_range')
-  const options: { id: string; label: string; depth: number; kind: CategoryKind }[] = []
+  const options: CategoryTreeOption[] = []
   for (const parent of parents) {
-    if (getCategoryKind(parent) === 'universal') continue
-    options.push({ id: parent.id, label: parent.name, depth: 0, kind: getCategoryKind(parent) })
+    const kind = getCategoryKind(parent)
+    options.push({
+      id: parent.id,
+      label: parent.name,
+      depth: 0,
+      kind,
+      chipSection: 'product_category',
+    })
+    if (kind === 'universal') continue
     for (const child of sorted.filter((c) => c.parent_id === parent.id)) {
       options.push({
         id: child.id,
         label: child.name,
         depth: 1,
         kind: getCategoryKind(child),
+        chipSection: 'product_category',
       })
     }
   }

@@ -586,6 +586,20 @@
   padding: 0.15rem 0;
 }
 
+.tb-filter-subgroup {
+  margin-bottom: 0.75rem;
+}
+
+.tb-filter-subgroup-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--lamtek-text-muted);
+  margin-bottom: 0.35rem;
+}
+
 .tb-category-chip {
   border: 1px solid var(--lamtek-border);
   background: var(--lamtek-white);
@@ -596,6 +610,10 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+  text-align: left;
+  align-self: flex-start;
+  max-width: 100%;
+  line-height: 1.3;
 }
 
 .tb-category-chip:hover {

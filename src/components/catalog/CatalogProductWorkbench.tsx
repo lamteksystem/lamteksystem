@@ -249,6 +249,14 @@ export default function CatalogProductWorkbench({
     () => buildCategoryTreeOptions(effectiveCategories, filters.browseMode),
     [effectiveCategories, filters.browseMode],
   )
+  const kitchenRangeBrowseOptions = useMemo(
+    () => browseOptions.filter((o) => o.chipSection === 'kitchen_range'),
+    [browseOptions],
+  )
+  const categoryBrowseOptions = useMemo(
+    () => browseOptions.filter((o) => o.chipSection === 'product_category'),
+    [browseOptions],
+  )
   const selectedProduct = useMemo(
     () => effectiveProducts.find((p) => p.id === selectedProductId) ?? null,
     [effectiveProducts, selectedProductId],
@@ -616,64 +624,91 @@ export default function CatalogProductWorkbench({
               className={filters.browseMode === 'category' ? 'active' : ''}
               onClick={() => updateFilter({ browseMode: 'category', categoryId: null })}
             >
-              Category
+              Categories
             </button>
             <button
               type="button"
               className={filters.browseMode === 'range' ? 'active' : ''}
               onClick={() => updateFilter({ browseMode: 'range', categoryId: null })}
             >
-              Range
+              Kitchen range
             </button>
           </div>
-        </div>
-
-        <div className="tb-filter-group">
-          <span className="tb-filter-group-label">
-            {filters.browseMode === 'range' ? 'Kitchen range' : 'Category'}
-            {canEditCatalogue && (
-              <button
-                type="button"
-                className="tb-admin-inline-action"
-                title="Admin · add, rename, delete or re-type categories"
-                onClick={() => setManagingCategories(true)}
-                style={{ marginLeft: '0.5rem' }}
-              >
-                Manage…
-              </button>
-            )}
-          </span>
-          <div className="tb-category-chips" role="list">
+          {canEditCatalogue && (
             <button
               type="button"
-              role="listitem"
-              className={`tb-category-chip${filters.categoryId === null ? ' active' : ''}`}
-              onClick={() => updateFilter({ categoryId: null })}
+              className="tb-admin-inline-action"
+              title="Admin · add, rename, delete or re-type categories"
+              onClick={() => setManagingCategories(true)}
             >
-              All ({scopeProducts.length})
+              Manage categories…
             </button>
-            {browseOptions.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                role="listitem"
-                className={`tb-category-chip${filters.categoryId === opt.id ? ' active' : ''}`}
-                onClick={() => updateFilter({ categoryId: opt.id })}
-              >
-                {opt.depth > 0 ? '· ' : ''}
-                {opt.label}
-                {categoryCounts.has(opt.id) ? ` (${categoryCounts.get(opt.id)})` : ''}
-              </button>
-            ))}
-          </div>
-          {filters.browseMode === 'range' ? (
-            <p className="tb-filter-hint">
-              Door families plus cross-range groups (wirework, accessories, units, etc.).
-            </p>
-          ) : (
-            <p className="tb-filter-hint">System categories only — assign products via Smart categorise.</p>
           )}
         </div>
+
+        {filters.browseMode === 'range' && kitchenRangeBrowseOptions.length > 0 && (
+          <div className="tb-filter-subgroup">
+            <span className="tb-filter-subgroup-label">Kitchen range</span>
+            <div className="tb-category-chips" role="list" aria-label="Kitchen ranges">
+              <button
+                type="button"
+                role="listitem"
+                className={`tb-category-chip${filters.categoryId === null ? ' active' : ''}`}
+                onClick={() => updateFilter({ categoryId: null })}
+              >
+                All ({scopeProducts.length})
+              </button>
+              {kitchenRangeBrowseOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="listitem"
+                  className={`tb-category-chip${filters.categoryId === opt.id ? ' active' : ''}`}
+                  onClick={() => updateFilter({ categoryId: opt.id })}
+                >
+                  {opt.label}
+                  {categoryCounts.has(opt.id) ? ` (${categoryCounts.get(opt.id)})` : ''}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(filters.browseMode === 'category' || categoryBrowseOptions.length > 0) && (
+          <div className="tb-filter-subgroup">
+            <span className="tb-filter-subgroup-label">Categories</span>
+            <div className="tb-category-chips" role="list" aria-label="Product categories">
+              {filters.browseMode === 'category' && (
+                <button
+                  type="button"
+                  role="listitem"
+                  className={`tb-category-chip${filters.categoryId === null ? ' active' : ''}`}
+                  onClick={() => updateFilter({ categoryId: null })}
+                >
+                  All ({scopeProducts.length})
+                </button>
+              )}
+              {categoryBrowseOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="listitem"
+                  className={`tb-category-chip${filters.categoryId === opt.id ? ' active' : ''}`}
+                  onClick={() => updateFilter({ categoryId: opt.id })}
+                >
+                  {opt.depth > 0 ? '· ' : ''}
+                  {opt.label}
+                  {categoryCounts.has(opt.id) ? ` (${categoryCounts.get(opt.id)})` : ''}
+                </button>
+              ))}
+            </div>
+            <p className="tb-filter-hint">
+              {filters.browseMode === 'range'
+                ? 'Cross-range groups (hinges, cornice, lighting, etc.) — usable with any door range.'
+                : 'Product groups such as units, cornice, pelmet, and lighting.'}
+            </p>
+          </div>
+        )}
 
         {filters.browseMode === 'category' && facets.doorRanges.length > 0 && (
           <label className="tb-filter-field">

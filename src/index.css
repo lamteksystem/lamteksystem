@@ -4401,7 +4401,7 @@ button.ordering-wizard-card {
 }
 
 .admin-app--sidebar-collapsed .admin-sidebar {
-  width: 56px;
+  width: 68px;
 }
 
 .admin-sidebar-head {
@@ -4506,16 +4506,70 @@ button.ordering-wizard-card {
   flex: 1;
   padding: 0.75rem 0;
   overflow-y: auto;
+  overflow-x: visible;
+}
+
+.admin-nav-section {
+  padding: 0.15rem 0;
+}
+
+.admin-nav-section + .admin-nav-section {
+  margin-top: 0.35rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-nav-section--compact {
+  margin-top: 0.25rem;
+  padding-top: 0.35rem;
+}
+
+.admin-nav-section--bottom {
+  margin-top: auto;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.admin-nav-section-label {
+  display: block;
+  padding: 0.35rem 1rem 0.3rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.admin-app--sidebar-collapsed .admin-nav-section-label {
+  display: none;
+}
+
+.admin-app--sidebar-collapsed .admin-nav-section + .admin-nav-section {
+  border-top: none;
+  margin-top: 0.2rem;
+  padding-top: 0.2rem;
+}
+
+.admin-app--sidebar-collapsed .admin-nav-section + .admin-nav-section::before {
+  content: '';
+  display: block;
+  height: 1px;
+  margin: 0.3rem 0.65rem 0.35rem;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.admin-app--sidebar-collapsed .admin-nav-section--bottom::before {
+  display: none;
 }
 
 .admin-nav-group {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 
 .admin-nav-group--bottom {
-  margin-top: auto;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(255,255,255,0.08);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .admin-nav-group-title {
@@ -4532,18 +4586,35 @@ button.ordering-wizard-card {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.55rem 1rem;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  padding: 0.5rem 1rem;
   background: transparent;
   border: none;
   color: rgba(255,255,255,0.9);
   font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
   text-align: left;
+}
+
+.admin-nav-group-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.admin-nav-group-toggle > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
 }
 
 .admin-nav-group-toggle:hover {
@@ -4565,11 +4636,22 @@ button.ordering-wizard-card {
 }
 
 .admin-nav-sub {
-  padding-left: 2.35rem;
+  margin: 0.15rem 0 0.35rem 2.85rem;
+  padding: 0.35rem 0.75rem 0.4rem;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  padding-bottom: 0.35rem;
+  gap: 0.2rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.admin-nav-sub-heading {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.38);
+  padding-bottom: 0.15rem;
 }
 
 .admin-nav-sub-link {
@@ -4631,6 +4713,103 @@ button.ordering-wizard-card {
 
 .admin-nav-icon svg {
   flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.admin-app--sidebar-collapsed .admin-nav-item {
+  justify-content: center;
+  gap: 0;
+  padding: 0.5rem 0.4rem;
+  border-left-width: 0;
+  border-radius: 8px;
+  margin: 0 0.35rem;
+}
+
+.admin-app--sidebar-collapsed .admin-nav-item.active {
+  border-left-width: 0;
+  box-shadow: inset 0 0 0 1px rgba(232, 189, 198, 0.35);
+}
+
+.admin-app--sidebar-collapsed .admin-nav-item--sub {
+  padding-left: 0.4rem;
+}
+
+.admin-app--sidebar-collapsed .admin-nav-icon {
+  width: 2.35rem;
+  height: 2.35rem;
+  font-size: 1rem;
+  opacity: 1;
+}
+
+.admin-app--sidebar-collapsed .admin-nav-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.admin-app--sidebar-collapsed .admin-nav-group-rail {
+  margin-bottom: 0.15rem;
+}
+
+.admin-app--sidebar-collapsed .admin-nav-children .admin-nav-item {
+  margin-top: 0.05rem;
+}
+
+/* Instant hover tooltips on collapsed sidebar rail */
+.admin-app--sidebar-collapsed .admin-nav-item[data-tip],
+.admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip] {
+  position: relative;
+}
+
+.admin-app--sidebar-collapsed .admin-nav-item[data-tip]::after,
+.admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0.4rem 0.7rem;
+  background: #141414;
+  color: #fafafa;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 300;
+  transition: opacity 0ms, visibility 0ms;
+}
+
+.admin-app--sidebar-collapsed .admin-nav-item[data-tip]::before,
+.admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip]::before {
+  content: '';
+  position: absolute;
+  left: calc(100% + 2px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: #141414;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 301;
+  transition: opacity 0ms, visibility 0ms;
+}
+
+.admin-app--sidebar-collapsed .admin-nav-item[data-tip]:hover::after,
+.admin-app--sidebar-collapsed .admin-nav-item[data-tip]:hover::before,
+.admin-app--sidebar-collapsed .admin-nav-item[data-tip]:focus-visible::after,
+.admin-app--sidebar-collapsed .admin-nav-item[data-tip]:focus-visible::before,
+.admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip]:hover::after,
+.admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip]:hover::before,
+.admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip]:focus-visible::after,
+.admin-app--sidebar-collapsed .admin-nav-group-rail[data-tip]:focus-visible::before {
+  opacity: 1;
+  visibility: visible;
 }
 
 .admin-nav-item.active .admin-nav-icon {

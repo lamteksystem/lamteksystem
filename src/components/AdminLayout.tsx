@@ -27,15 +27,23 @@ import {
   MapPin,
   Package,
   PanelsTopLeft,
+  Plus,
   PoundSterling,
   BookOpen,
   Settings,
+  Shield,
+  ShoppingCart,
   Ticket,
   Users,
   Wrench,
   Zap,
 } from 'lucide-react'
 import { CATALOGUE_TOOLS } from '@/lib/catalogueToolsPaths'
+import {
+  AdminSidebarGroupRail,
+  AdminSidebarNavItem,
+  adminNavTip,
+} from '@/components/admin/AdminSidebarNav'
 
 interface CustomerOption {
   user_id: string
@@ -308,7 +316,7 @@ export default function AdminLayout() {
   }
 
   function groupIsOpen(groupId: string, forceOpen: boolean) {
-    if (sidebarCollapsed) return false
+    if (sidebarCollapsed) return forceOpen
     if (forceOpen) return true
     return sidebarGroups?.[groupId] ?? false
   }
@@ -364,15 +372,22 @@ export default function AdminLayout() {
           </button>
         </div>
         <nav className="admin-sidebar-nav">
-          <div className="admin-nav-group">
-            {!sidebarCollapsed && <span className="admin-nav-group-title">Workspace</span>}
-            <NavLink to="/admin" end className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-              <span className="admin-nav-icon">
-                <LayoutDashboard size={16} strokeWidth={2} aria-hidden />
-              </span>
-              {!sidebarCollapsed && <span>Today</span>}
-            </NavLink>
+          <div className="admin-nav-section">
+            {!sidebarCollapsed && <div className="admin-nav-section-label">Home</div>}
+            <div className="admin-nav-group">
+              <AdminSidebarNavItem
+                to="/admin"
+                end
+                label="Today"
+                section="Home"
+                collapsed={sidebarCollapsed}
+                icon={<LayoutDashboard size={18} strokeWidth={2} aria-hidden />}
+              />
+            </div>
           </div>
+
+          <div className="admin-nav-section">
+            {!sidebarCollapsed && <div className="admin-nav-section-label">Sales</div>}
 
           {canViewOrders && (() => {
             const groupId = 'orders'
@@ -386,13 +401,24 @@ export default function AdminLayout() {
             const open = groupIsOpen(groupId, forceOpen)
             return (
               <div className={`admin-nav-group ${open ? 'admin-nav-group--open' : ''}`}>
-                {!sidebarCollapsed && (
+                {sidebarCollapsed ? (
+                  <AdminSidebarGroupRail
+                    to="/admin/orders"
+                    label="Orders & quotes"
+                    section="Sales"
+                    active={activeGroup === groupId}
+                    icon={<ShoppingCart size={22} strokeWidth={2} aria-hidden />}
+                  />
+                ) : (
                   <button
                     type="button"
                     className="admin-nav-group-toggle"
                     aria-expanded={open}
                     onClick={() => setGroupOpen(groupId, !open)}
                   >
+                    <span className="admin-nav-group-toggle-icon" aria-hidden>
+                      <ShoppingCart size={16} strokeWidth={2} />
+                    </span>
                     <span>Orders &amp; quotes</span>
                     <span className="admin-nav-group-chevron" aria-hidden>
                       {open ? <ChevronDown size={14} strokeWidth={2} /> : <ChevronRight size={14} strokeWidth={2} />}
@@ -400,60 +426,68 @@ export default function AdminLayout() {
                   </button>
                 )}
                 <div className={`admin-nav-children ${open ? 'open' : ''}`}>
-                  <NavLink to="/admin/orders" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                    <span className="admin-nav-icon">
-                      <ClipboardList size={16} strokeWidth={2} aria-hidden />
-                    </span>
-                    {!sidebarCollapsed && <span>All orders &amp; quotes</span>}
-                  </NavLink>
-                  <NavLink
+                  <AdminSidebarNavItem
+                    to="/admin/orders"
+                    label="All orders & quotes"
+                    section="Orders"
+                    collapsed={sidebarCollapsed}
+                    icon={<ClipboardList size={18} strokeWidth={2} aria-hidden />}
+                  />
+                  <AdminSidebarNavItem
                     to="/admin/orders?archive=archived"
-                    className={({ isActive }) =>
-                      `admin-nav-item ${isActive && location.search.includes('archive=archived') ? 'active' : ''}`
-                    }
-                  >
-                    <span className="admin-nav-icon">
-                      <Archive size={16} strokeWidth={2} aria-hidden />
-                    </span>
-                    {!sidebarCollapsed && <span>Archived</span>}
-                  </NavLink>
-                  <NavLink to="/admin/orders/reminders" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                    <span className="admin-nav-icon">
-                      <Bell size={16} strokeWidth={2} aria-hidden />
-                    </span>
-                    {!sidebarCollapsed && <span>Reminders</span>}
-                  </NavLink>
-                  <NavLink to="/admin/orders/processing" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                    <span className="admin-nav-icon">
-                      <Zap size={16} strokeWidth={2} aria-hidden />
-                    </span>
-                    {!sidebarCollapsed && <span>Processing</span>}
-                  </NavLink>
-                  <NavLink to="/admin/delivery-schedule" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                    <span className="admin-nav-icon">
-                      <CalendarClock size={16} strokeWidth={2} aria-hidden />
-                    </span>
-                    {!sidebarCollapsed && <span>Delivery schedule</span>}
-                  </NavLink>
-                  <NavLink
+                    label="Archived"
+                    section="Orders"
+                    collapsed={sidebarCollapsed}
+                    isActive={({ isActive }) => isActive && location.search.includes('archive=archived')}
+                    icon={<Archive size={18} strokeWidth={2} aria-hidden />}
+                  />
+                  <AdminSidebarNavItem
+                    to="/admin/orders/reminders"
+                    label="Reminders"
+                    section="Orders"
+                    collapsed={sidebarCollapsed}
+                    icon={<Bell size={18} strokeWidth={2} aria-hidden />}
+                  />
+                  <AdminSidebarNavItem
+                    to="/admin/orders/processing"
+                    label="Processing"
+                    section="Orders"
+                    collapsed={sidebarCollapsed}
+                    icon={<Zap size={18} strokeWidth={2} aria-hidden />}
+                  />
+                  <AdminSidebarNavItem
+                    to="/admin/delivery-schedule"
+                    label="Delivery schedule"
+                    section="Orders"
+                    collapsed={sidebarCollapsed}
+                    icon={<CalendarClock size={18} strokeWidth={2} aria-hidden />}
+                  />
+                  <AdminSidebarNavItem
                     to="/admin/pick-lists"
-                    className={({ isActive }) =>
-                      `admin-nav-item ${isActive || location.pathname.startsWith('/admin/pick-lists') || location.pathname.startsWith('/admin/package-labels') ? 'active' : ''}`
+                    label="Pick lists"
+                    section="Orders"
+                    collapsed={sidebarCollapsed}
+                    isActive={({ isActive }) =>
+                      isActive ||
+                      location.pathname.startsWith('/admin/pick-lists') ||
+                      location.pathname.startsWith('/admin/package-labels')
                     }
-                  >
-                    <span className="admin-nav-icon">
-                      <Package size={16} strokeWidth={2} aria-hidden />
-                    </span>
-                    {!sidebarCollapsed && <span>Pick lists</span>}
-                  </NavLink>
-                  <NavLink to="/admin/create-order" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                    <span className="admin-nav-icon">+</span>
-                    {!sidebarCollapsed && <span>Create order</span>}
-                  </NavLink>
-                  <NavLink to="/admin/create-quote" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                    <span className="admin-nav-icon">+</span>
-                    {!sidebarCollapsed && <span>Create quote</span>}
-                  </NavLink>
+                    icon={<Package size={18} strokeWidth={2} aria-hidden />}
+                  />
+                  <AdminSidebarNavItem
+                    to="/admin/create-order"
+                    label="Create order"
+                    section="Orders"
+                    collapsed={sidebarCollapsed}
+                    icon={<Plus size={18} strokeWidth={2.25} aria-hidden />}
+                  />
+                  <AdminSidebarNavItem
+                    to="/admin/create-quote"
+                    label="Create quote"
+                    section="Orders"
+                    collapsed={sidebarCollapsed}
+                    icon={<Plus size={18} strokeWidth={2.25} aria-hidden />}
+                  />
                 </div>
               </div>
             )
@@ -465,39 +499,49 @@ export default function AdminLayout() {
             const open = groupIsOpen(groupId, forceOpen)
             return (
               <div className={`admin-nav-group ${open ? 'admin-nav-group--open' : ''}`}>
-                {!sidebarCollapsed && (
+                {sidebarCollapsed ? (
+                  <AdminSidebarGroupRail
+                    to="/admin/customers"
+                    label="Customers & CRM"
+                    section="Sales"
+                    active={activeGroup === groupId}
+                    icon={<Users size={22} strokeWidth={2} aria-hidden />}
+                  />
+                ) : (
                   <button
                     type="button"
                     className="admin-nav-group-toggle"
                     aria-expanded={open}
                     onClick={() => setGroupOpen(groupId, !open)}
                   >
-                    <span>Customers & CRM</span>
+                    <span className="admin-nav-group-toggle-icon" aria-hidden>
+                      <Users size={16} strokeWidth={2} />
+                    </span>
+                    <span>Customers &amp; CRM</span>
                     <span className="admin-nav-group-chevron" aria-hidden>
                       {open ? <ChevronDown size={14} strokeWidth={2} /> : <ChevronRight size={14} strokeWidth={2} />}
                     </span>
                   </button>
                 )}
                 <div className={`admin-nav-children ${open ? 'open' : ''}`}>
-                  <NavLink to="/admin/customers" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                    <span className="admin-nav-icon">
-                      <Users size={16} strokeWidth={2} aria-hidden />
-                    </span>
-                      {!sidebarCollapsed && <span>Customers</span>}
-                  </NavLink>
-                  <NavLink
+                  <AdminSidebarNavItem
+                    to="/admin/customers"
+                    label="Customers"
+                    section="CRM"
+                    collapsed={sidebarCollapsed}
+                    icon={<Users size={18} strokeWidth={2} aria-hidden />}
+                  />
+                  <AdminSidebarNavItem
                     to="/admin/crm/open-orders"
-                    className={({ isActive }) =>
-                      `admin-nav-item ${isActive || location.pathname.startsWith('/admin/crm') ? 'active' : ''}`
-                    }
-                  >
-                    <span className="admin-nav-icon">
-                      <PanelsTopLeft size={16} strokeWidth={2} aria-hidden />
-                    </span>
-                    {!sidebarCollapsed && <span>CRM</span>}
-                  </NavLink>
-                  {!sidebarCollapsed && (
+                    label="CRM"
+                    section="CRM"
+                    collapsed={sidebarCollapsed}
+                    isActive={({ isActive }) => isActive || location.pathname.startsWith('/admin/crm')}
+                    icon={<PanelsTopLeft size={18} strokeWidth={2} aria-hidden />}
+                  />
+                  {!sidebarCollapsed && open && (
                     <div className="admin-nav-sub">
+                      <span className="admin-nav-sub-heading">CRM views</span>
                       <NavLink
                         to="/admin/crm/open-orders"
                         className={({ isActive }) => `admin-nav-sub-link${isActive ? ' active' : ''}`}
@@ -540,6 +584,10 @@ export default function AdminLayout() {
               </div>
             )
           })()}
+          </div>
+
+          <div className="admin-nav-section">
+            {!sidebarCollapsed && <div className="admin-nav-section-label">Catalogue &amp; stock</div>}
 
           {(canViewCatalogue || canViewStock || canViewUploads) && (() => {
             const groupId = 'catalogue'
@@ -553,13 +601,30 @@ export default function AdminLayout() {
             const open = groupIsOpen(groupId, forceOpen)
             return (
               <div className={`admin-nav-group ${open ? 'admin-nav-group--open' : ''}`}>
-                {!sidebarCollapsed && (
+                {sidebarCollapsed ? (
+                  <AdminSidebarGroupRail
+                    to={
+                      canViewCatalogue
+                        ? '/admin/catalogue'
+                        : canViewStock
+                          ? '/admin/stock'
+                          : '/admin/uploads'
+                    }
+                    label="Catalogue"
+                    section="Catalogue"
+                    active={activeGroup === groupId}
+                    icon={<Package size={22} strokeWidth={2} aria-hidden />}
+                  />
+                ) : (
                   <button
                     type="button"
                     className="admin-nav-group-toggle"
                     aria-expanded={open}
                     onClick={() => setGroupOpen(groupId, !open)}
                   >
+                    <span className="admin-nav-group-toggle-icon" aria-hidden>
+                      <Package size={16} strokeWidth={2} />
+                    </span>
                     <span>Catalogue</span>
                     <span className="admin-nav-group-chevron" aria-hidden>
                       {open ? <ChevronDown size={14} strokeWidth={2} /> : <ChevronRight size={14} strokeWidth={2} />}
@@ -568,79 +633,82 @@ export default function AdminLayout() {
                 )}
                 <div className={`admin-nav-children ${open ? 'open' : ''}`}>
                   {canViewCatalogue && (
-                    <NavLink
+                    <AdminSidebarNavItem
                       to="/admin/catalogue"
                       end
-                      className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}
-                    >
-                      <span className="admin-nav-icon">
-                        <ClipboardList size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Catalogue</span>}
-                    </NavLink>
+                      label="Catalogue"
+                      section="Catalogue"
+                      collapsed={sidebarCollapsed}
+                      icon={<ClipboardList size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                   {canViewCatalogue && (
-                    <NavLink
+                    <AdminSidebarNavItem
                       to="/admin/catalogue/categories"
-                      className={({ isActive }) => `admin-nav-item admin-nav-item--sub ${isActive ? 'active' : ''}`}
-                      title="Live category tree"
-                    >
-                      <span className="admin-nav-icon">
-                        <FolderTree size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Manage categories</span>}
-                    </NavLink>
+                      label="Manage categories"
+                      section="Catalogue"
+                      collapsed={sidebarCollapsed}
+                      sub
+                      icon={<FolderTree size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                   {canEditCatalogue && (
-                    <NavLink
+                    <AdminSidebarNavItem
                       to={CATALOGUE_TOOLS.hub}
-                      className={({ isActive }) =>
-                        `admin-nav-item admin-nav-item--sub ${isActive || location.pathname.startsWith(CATALOGUE_TOOLS.hub + '/') ? 'active' : ''}`
+                      label="Product & category tools"
+                      section="Catalogue"
+                      collapsed={sidebarCollapsed}
+                      sub
+                      isActive={({ isActive }) =>
+                        isActive || location.pathname.startsWith(`${CATALOGUE_TOOLS.hub}/`)
                       }
-                      title="Import, parsers, smart categorise, and maintenance"
-                    >
-                      <span className="admin-nav-icon">
-                        <Wrench size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Product &amp; category tools</span>}
-                    </NavLink>
+                      icon={<Wrench size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                   {canViewStock && (
-                    <NavLink to="/admin/stock" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <Package size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Stock take</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/stock"
+                      label="Stock take"
+                      section="Stock"
+                      collapsed={sidebarCollapsed}
+                      icon={<Package size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                   {canViewStock && (
-                    <NavLink to="/admin/locations" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <MapPin size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Locations</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/locations"
+                      label="Locations"
+                      section="Stock"
+                      collapsed={sidebarCollapsed}
+                      icon={<MapPin size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                   {canViewStock && (
-                    <NavLink to="/admin/delivery-windows" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <CalendarClock size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Delivery windows</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/delivery-windows"
+                      label="Delivery windows"
+                      section="Stock"
+                      collapsed={sidebarCollapsed}
+                      icon={<CalendarClock size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                   {canViewUploads && (
-                    <NavLink to="/admin/uploads" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <FileText size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Brochure & files</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/uploads"
+                      label="Brochure & files"
+                      section="Catalogue"
+                      collapsed={sidebarCollapsed}
+                      icon={<FileText size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                 </div>
               </div>
             )
           })()}
+          </div>
+
+          <div className="admin-nav-section">
+            {!sidebarCollapsed && <div className="admin-nav-section-label">Finance</div>}
 
           {(canViewPricing || canViewReports || canViewAccounting) && (() => {
             const groupId = 'finance'
@@ -651,13 +719,24 @@ export default function AdminLayout() {
             const open = groupIsOpen(groupId, forceOpen)
             return (
               <div className={`admin-nav-group ${open ? 'admin-nav-group--open' : ''}`}>
-                {!sidebarCollapsed && (
+                {sidebarCollapsed ? (
+                  <AdminSidebarGroupRail
+                    to={canViewAccounting ? '/admin/accounting' : canViewPricing ? '/admin/pricing' : '/admin/reports'}
+                    label="Finance"
+                    section="Finance"
+                    active={activeGroup === groupId}
+                    icon={<PoundSterling size={22} strokeWidth={2} aria-hidden />}
+                  />
+                ) : (
                   <button
                     type="button"
                     className="admin-nav-group-toggle"
                     aria-expanded={open}
                     onClick={() => setGroupOpen(groupId, !open)}
                   >
+                    <span className="admin-nav-group-toggle-icon" aria-hidden>
+                      <PoundSterling size={16} strokeWidth={2} />
+                    </span>
                     <span>Finance</span>
                     <span className="admin-nav-group-chevron" aria-hidden>
                       {open ? <ChevronDown size={14} strokeWidth={2} /> : <ChevronRight size={14} strokeWidth={2} />}
@@ -666,33 +745,40 @@ export default function AdminLayout() {
                 )}
                 <div className={`admin-nav-children ${open ? 'open' : ''}`}>
                   {canViewAccounting && (
-                    <NavLink to="/admin/accounting" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <Landmark size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Accounting</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/accounting"
+                      label="Accounting"
+                      section="Finance"
+                      collapsed={sidebarCollapsed}
+                      icon={<Landmark size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                   {canViewPricing && (
-                    <NavLink to="/admin/pricing" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <PoundSterling size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Pricing & margin</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/pricing"
+                      label="Pricing & margin"
+                      section="Finance"
+                      collapsed={sidebarCollapsed}
+                      icon={<PoundSterling size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                   {canViewReports && (
-                    <NavLink to="/admin/reports" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <BarChart3 size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Reports</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/reports"
+                      label="Reports"
+                      section="Finance"
+                      collapsed={sidebarCollapsed}
+                      icon={<BarChart3 size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                 </div>
               </div>
             )
           })()}
+          </div>
+
+          <div className="admin-nav-section">
+            {!sidebarCollapsed && <div className="admin-nav-section-label">Team &amp; access</div>}
 
           {(canViewUsers || canViewTickets || canViewPermissions) && (() => {
             const groupId = 'users'
@@ -703,14 +789,31 @@ export default function AdminLayout() {
             const open = groupIsOpen(groupId, forceOpen)
             return (
               <div className={`admin-nav-group ${open ? 'admin-nav-group--open' : ''}`}>
-                {!sidebarCollapsed && (
+                {sidebarCollapsed ? (
+                  <AdminSidebarGroupRail
+                    to={
+                      canViewUsers
+                        ? '/admin/users'
+                        : canViewTickets
+                          ? '/admin/tickets'
+                          : '/admin/permissions'
+                    }
+                    label="Team & access"
+                    section="Admin"
+                    active={activeGroup === groupId}
+                    icon={<Shield size={22} strokeWidth={2} aria-hidden />}
+                  />
+                ) : (
                   <button
                     type="button"
                     className="admin-nav-group-toggle"
                     aria-expanded={open}
                     onClick={() => setGroupOpen(groupId, !open)}
                   >
-                    <span>Team, Support & Access</span>
+                    <span className="admin-nav-group-toggle-icon" aria-hidden>
+                      <Shield size={16} strokeWidth={2} />
+                    </span>
+                    <span>Team, Support &amp; Access</span>
                     <span className="admin-nav-group-chevron" aria-hidden>
                       {open ? <ChevronDown size={14} strokeWidth={2} /> : <ChevronRight size={14} strokeWidth={2} />}
                     </span>
@@ -718,77 +821,93 @@ export default function AdminLayout() {
                 )}
                 <div className={`admin-nav-children ${open ? 'open' : ''}`}>
                   {canViewUsers && (
-                    <NavLink to="/admin/users" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <Users size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Team users</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/users"
+                      label="Team users"
+                      section="Team"
+                      collapsed={sidebarCollapsed}
+                      icon={<Users size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                   {canViewUsers && (
-                    <NavLink to="/admin/users/create" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">+</span>
-                      {!sidebarCollapsed && <span>Create team user</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/users/create"
+                      label="Create team user"
+                      section="Team"
+                      collapsed={sidebarCollapsed}
+                      icon={<Plus size={18} strokeWidth={2.25} aria-hidden />}
+                    />
                   )}
                   {canViewUsers && (
-                    <NavLink to="/admin/applications" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <ClipboardCheck size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Account applications</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/applications"
+                      label="Account applications"
+                      section="Team"
+                      collapsed={sidebarCollapsed}
+                      icon={<ClipboardCheck size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                   {canViewTickets && (
-                    <NavLink to="/admin/tickets" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <Ticket size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Tickets</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/tickets"
+                      label="Tickets"
+                      section="Support"
+                      collapsed={sidebarCollapsed}
+                      icon={<Ticket size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                   {canViewPermissions && (
-                    <NavLink to="/admin/permissions" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-                      <span className="admin-nav-icon">
-                        <Lock size={16} strokeWidth={2} aria-hidden />
-                      </span>
-                      {!sidebarCollapsed && <span>Permissions</span>}
-                    </NavLink>
+                    <AdminSidebarNavItem
+                      to="/admin/permissions"
+                      label="Permissions"
+                      section="Access"
+                      collapsed={sidebarCollapsed}
+                      icon={<Lock size={18} strokeWidth={2} aria-hidden />}
+                    />
                   )}
                 </div>
               </div>
             )
           })()}
-
-          <div className="admin-nav-group">
-            {!sidebarCollapsed && <span className="admin-nav-group-title">Tools</span>}
-            <Link to="/" className="admin-nav-item">
-              <span className="admin-nav-icon">
-                <ArrowUpRight size={16} strokeWidth={2} aria-hidden />
-              </span>
-              {!sidebarCollapsed && <span>Customer portal</span>}
-            </Link>
           </div>
 
+          <div className="admin-nav-section admin-nav-section--compact">
+            {!sidebarCollapsed && <div className="admin-nav-section-label">Links</div>}
+            <div className="admin-nav-group">
+              <Link to="/" className="admin-nav-item" {...adminNavTip('Customer portal', 'Links')}>
+                <span className="admin-nav-icon">
+                  <ArrowUpRight size={18} strokeWidth={2} aria-hidden />
+                </span>
+                {!sidebarCollapsed && <span>Customer portal</span>}
+              </Link>
+            </div>
+          </div>
+
+          <div className="admin-nav-section admin-nav-section--bottom">
+            {!sidebarCollapsed && <div className="admin-nav-section-label">Account</div>}
           <div className="admin-nav-group admin-nav-group--bottom">
-            <NavLink to="/admin/notifications" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-              <span className="admin-nav-icon">
-                <Mail size={16} strokeWidth={2} aria-hidden />
-              </span>
-              {!sidebarCollapsed && <span>Notifications</span>}
-            </NavLink>
-            <NavLink to="/admin/settings" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-              <span className="admin-nav-icon">
-                <Settings size={16} strokeWidth={2} aria-hidden />
-              </span>
-              {!sidebarCollapsed && <span>Settings</span>}
-            </NavLink>
-            <NavLink to="/admin/support-manual" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-              <span className="admin-nav-icon">
-                <BookOpen size={16} strokeWidth={2} aria-hidden />
-              </span>
-              {!sidebarCollapsed && <span>Support manual</span>}
-            </NavLink>
+            <AdminSidebarNavItem
+              to="/admin/notifications"
+              label="Notifications"
+              section="Account"
+              collapsed={sidebarCollapsed}
+              icon={<Mail size={18} strokeWidth={2} aria-hidden />}
+            />
+            <AdminSidebarNavItem
+              to="/admin/settings"
+              label="Settings"
+              section="Account"
+              collapsed={sidebarCollapsed}
+              icon={<Settings size={18} strokeWidth={2} aria-hidden />}
+            />
+            <AdminSidebarNavItem
+              to="/admin/support-manual"
+              label="Support manual"
+              section="Account"
+              collapsed={sidebarCollapsed}
+              icon={<BookOpen size={18} strokeWidth={2} aria-hidden />}
+            />
+          </div>
           </div>
         </nav>
       </aside>

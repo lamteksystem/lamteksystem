@@ -1,14 +1,17 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import {
   createCategoryType,
   deleteCategoryType,
-  ORDERING_BEHAVIOUR_LABELS,
   slugifyCategoryTypeCode,
   updateCategoryType,
 } from '@/lib/categoryTypes'
+import { ORDERING_BEHAVIOUR_SETTINGS_HREF } from '@/lib/catalogueSettingsPaths'
+import { createOrderingBehaviour } from '@/lib/orderingBehaviours'
 import { useCategoryTypes } from '@/hooks/useCategoryTypes'
+import { useOrderingBehaviours } from '@/hooks/useOrderingBehaviours'
 import { usePermission } from '@/hooks/usePermission'
-import type { CategoryTypeRow } from '@/types/database'
+import type { CategoryTypeRow, OrderingBehaviourDefinitionRow } from '@/types/database'
 
 const BROWSE_MODE_LABELS: Record<CategoryTypeRow['browse_mode'], string> = {
   product: 'Product categories',
@@ -16,17 +19,55 @@ const BROWSE_MODE_LABELS: Record<CategoryTypeRow['browse_mode'], string> = {
   universal: 'Cross-range',
 }
 
+const ADD_BEHAVIOUR_OPTION = '__add_behaviour__'
+
 export type CategoryTypesEditScope = 'settings' | 'catalogue' | 'any'
+
+function OrderingBehaviourSelect({
+  value,
+  behaviours,
+  disabled,
+  canEdit,
+  onSelect,
+  onRequestAdd,
+}: {
+  value: string
+  behaviours: OrderingBehaviourDefinitionRow[]
+  disabled: boolean
+  canEdit: boolean
+  onSelect: (code: string) => void
+  onRequestAdd: () => void
+}) {
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={(e) => {
+        const next = e.target.value
+        if (next === ADD_BEHAVIOUR_OPTION) {
+          onRequestAdd()
+          return
+        }
+        onSelect(next)
+      }}
+    >
+      {behaviours.map((b) => (
+        <option key={b.code} value={b.code}>
+          {b.label}
+        </option>
+      ))}
+      {canEdit && <option value={ADD_BEHAVIOUR_OPTION}>+ Add new behaviour…</option>}
+    </select>
+  )
+}
 
 export default function CategoryTypesManager({
   embedded = false,
-  /** Who may add/edit types: settings admins, catalogue editors, or either. */
   editScope = 'settings',
   onTypesChanged,
 }: {
   embedded?: boolean
   editScope?: CategoryTypesEditScope
-  /** Called after types are added/updated so category Type dropdowns can refresh. */
   onTypesChanged?: () => void | Promise<void>
 }) {
   const { allowed: settingsEdit, loading: settingsPermLoading } = usePermission('admin.settings', 'edit')
@@ -44,16 +85,55 @@ export default function CategoryTypesManager({
         ? settingsPermLoading
         : settingsPermLoading && cataloguePermLoading
   const { types, loading, error, reload } = useCategoryTypes(false)
+  const {
+    behaviours,
+    labelFor,
+    loading: behavioursLoading,
+    reload: reloadBehaviours,
+  } = useOrderingBehaviours()
   const [newLabel, setNewLabel] = useState('')
   const [newCode, setNewCode] = useState('')
   const [newBrowseMode, setNewBrowseMode] = useState<CategoryTypeRow['browse_mode']>('product')
-  const [newOrderingBehaviour, setNewOrderingBehaviour] =
-    useState<CategoryTypeRow['ordering_behaviour']>('standard')
+  const [newOrderingBehaviour, setNewOrderingBehaviour] = useState('standard')
   const [newDescription, setNewDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [quickBehaviourOpen, setQuickBehaviourOpen] = useState(false)
+  const [quickBehaviourLabel, setQuickBehaviourLabel] = useState('')
+  const [quickBehaviourApply, setQuickBehaviourApply] = useState<
+    { kind: 'add-form' } | { kind: 'type-row'; typeCode: string }
+  >({ kind: 'add-form' })
 
   const codePreview = newCode.trim() || (newLabel.trim() ? slugifyCategoryTypeCode(newLabel) : '')
+
+  function openQuickAddBehaviour(
+    apply: { kind: 'add-form' } | { kind: 'type-row'; typeCode: string },
+  ) {
+    setQuickBehaviourApply(apply)
+    setQuickBehaviourLabel('')
+    setQuickBehaviourOpen(true)
+  }
+
+  async function submitQuickBehaviour(e: FormEvent) {
+    e.preventDefault()
+    if (!canEdit || !quickBehaviourLabel.trim()) return
+    setBusy(true)
+    setMessage(null)
+    const { row, error: err } = await createOrderingBehaviour({ label: quickBehaviourLabel })
+    setBusy(false)
+    if (err || !row) {
+      setMessage({ type: 'err', text: err ?? 'Could not add behaviour.' })
+      return
+    }
+    await reloadBehaviours()
+    if (quickBehaviourApply.kind === 'add-form') {
+      setNewOrderingBehaviour(row.code)
+    } else {
+      await saveOrderingBehaviour(quickBehaviourApply.typeCode, row.code)
+    }
+    setQuickBehaviourOpen(false)
+    setMessage({ type: 'ok', text: `Added behaviour “${row.label}”.` })
+  }
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault()
@@ -120,13 +200,22 @@ export default function CategoryTypesManager({
     }
   }
 
-  async function saveOrderingBehaviour(
-    code: string,
-    ordering_behaviour: CategoryTypeRow['ordering_behaviour'],
-  ) {
+  async function saveOrderingBehaviour(code: string, ordering_behaviour: string) {
     if (!canEdit) return
     setBusy(true)
     const { error: err } = await updateCategoryType(code, { ordering_behaviour })
+    setBusy(false)
+    if (err) setMessage({ type: 'err', text: err })
+    else {
+      await reload()
+      await onTypesChanged?.()
+    }
+  }
+
+  async function toggleBuiltIn(row: CategoryTypeRow) {
+    if (!canEdit) return
+    setBusy(true)
+    const { error: err } = await updateCategoryType(row.code, { is_system: !row.is_system })
     setBusy(false)
     if (err) setMessage({ type: 'err', text: err })
     else {
@@ -165,7 +254,7 @@ export default function CategoryTypesManager({
     }
   }
 
-  if (permLoading || loading) {
+  if (permLoading || loading || behavioursLoading) {
     return <p className="admin-muted">Loading category types…</p>
   }
 
@@ -178,14 +267,50 @@ export default function CategoryTypesManager({
       <p className="admin-muted admin-taxonomy-section-intro">
         These are the options in the <strong>Type</strong> dropdown when you add or edit a category
         (Product category, Kitchen range, Tealbury Complete, etc.). <strong>Browse as</strong> controls
-        filters; <strong>Quote/order behaviour</strong> controls guided setup and how lines are added.
-        Built-in types can be hidden but not deleted.
+        filters; <strong>Quote/order behaviour</strong> controls guided setup and how lines are added.{' '}
+        <Link to={ORDERING_BEHAVIOUR_SETTINGS_HREF}>Manage behaviours in settings →</Link>
       </p>
       {error && <p className="admin-error">{error}</p>}
       {message && (
         <p className={message.type === 'ok' ? 'admin-message-ok' : 'admin-error'} role="status">
           {message.text}
         </p>
+      )}
+
+      {quickBehaviourOpen && canEdit && (
+        <form
+          className="admin-registry-add-form admin-quick-behaviour-form"
+          onSubmit={(e) => void submitQuickBehaviour(e)}
+        >
+          <h4 className="admin-modal-form-section-title">Add quote/order behaviour</h4>
+          <label>
+            Display name
+            <input
+              value={quickBehaviourLabel}
+              onChange={(e) => setQuickBehaviourLabel(e.target.value)}
+              placeholder="e.g. Panels workflow"
+              required
+              disabled={busy}
+              autoFocus
+            />
+          </label>
+          <div className="admin-settings-actions-row">
+            <button type="submit" className="btn btn-small" disabled={busy || !quickBehaviourLabel.trim()}>
+              {busy ? 'Adding…' : 'Add & select'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline btn-small"
+              disabled={busy}
+              onClick={() => setQuickBehaviourOpen(false)}
+            >
+              Cancel
+            </button>
+            <Link to={ORDERING_BEHAVIOUR_SETTINGS_HREF} className="btn btn-outline btn-small">
+              Full behaviour settings
+            </Link>
+          </div>
+        </form>
       )}
 
       <div className="admin-registry-table-wrap">
@@ -195,8 +320,14 @@ export default function CategoryTypesManager({
               <th>Code</th>
               <th>Display name</th>
               <th>Browse as</th>
-              <th>Quote/order behaviour</th>
+              <th>
+                Quote/order behaviour{' '}
+                <Link to={ORDERING_BEHAVIOUR_SETTINGS_HREF} className="admin-table-header-link">
+                  Settings
+                </Link>
+              </th>
               <th>Description</th>
+              <th>Built-in</th>
               <th>Status</th>
               {canEdit && <th>Actions</th>}
             </tr>
@@ -240,26 +371,16 @@ export default function CategoryTypesManager({
                 </td>
                 <td>
                   {canEdit ? (
-                    <select
-                      defaultValue={t.ordering_behaviour ?? 'standard'}
+                    <OrderingBehaviourSelect
+                      value={t.ordering_behaviour ?? 'standard'}
+                      behaviours={behaviours}
                       disabled={busy}
-                      onChange={(e) =>
-                        void saveOrderingBehaviour(
-                          t.code,
-                          e.target.value as CategoryTypeRow['ordering_behaviour'],
-                        )
-                      }
-                    >
-                      {(Object.keys(ORDERING_BEHAVIOUR_LABELS) as CategoryTypeRow['ordering_behaviour'][]).map(
-                        (k) => (
-                          <option key={k} value={k}>
-                            {ORDERING_BEHAVIOUR_LABELS[k]}
-                          </option>
-                        ),
-                      )}
-                    </select>
+                      canEdit={canEdit}
+                      onSelect={(code) => void saveOrderingBehaviour(t.code, code)}
+                      onRequestAdd={() => openQuickAddBehaviour({ kind: 'type-row', typeCode: t.code })}
+                    />
                   ) : (
-                    ORDERING_BEHAVIOUR_LABELS[t.ordering_behaviour ?? 'standard']
+                    labelFor(t.ordering_behaviour)
                   )}
                 </td>
                 <td>
@@ -276,6 +397,23 @@ export default function CategoryTypesManager({
                     />
                   ) : (
                     t.description ?? '—'
+                  )}
+                </td>
+                <td>
+                  {canEdit ? (
+                    <label className="admin-settings-row admin-settings-row--compact" title="Built-in types cannot be deleted">
+                      <input
+                        type="checkbox"
+                        checked={t.is_system}
+                        disabled={busy}
+                        onChange={() => void toggleBuiltIn(t)}
+                      />
+                      <span className="admin-muted">{t.is_system ? 'Yes' : 'No'}</span>
+                    </label>
+                  ) : t.is_system ? (
+                    'Yes'
+                  ) : (
+                    'No'
                   )}
                 </td>
                 <td>
@@ -348,21 +486,14 @@ export default function CategoryTypesManager({
             </label>
             <label>
               Quote/order behaviour
-              <select
+              <OrderingBehaviourSelect
                 value={newOrderingBehaviour}
-                onChange={(e) =>
-                  setNewOrderingBehaviour(e.target.value as CategoryTypeRow['ordering_behaviour'])
-                }
+                behaviours={behaviours}
                 disabled={busy}
-              >
-                {(Object.keys(ORDERING_BEHAVIOUR_LABELS) as CategoryTypeRow['ordering_behaviour'][]).map(
-                  (k) => (
-                    <option key={k} value={k}>
-                      {ORDERING_BEHAVIOUR_LABELS[k]}
-                    </option>
-                  ),
-                )}
-              </select>
+                canEdit={canEdit}
+                onSelect={setNewOrderingBehaviour}
+                onRequestAdd={() => openQuickAddBehaviour({ kind: 'add-form' })}
+              />
             </label>
             <label>
               Description <span className="admin-muted">(optional)</span>

@@ -5090,6 +5090,29 @@ button.ordering-wizard-card {
   gap: 0.65rem;
   margin-top: 1rem;
 }
+.admin-settings-row--compact {
+  gap: 0.35rem;
+  justify-content: flex-start;
+}
+.admin-settings-row--compact input {
+  width: auto;
+}
+.admin-table-header-link {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.admin-quick-behaviour-form {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 8px;
+  background: var(--lamtek-surface, #fafafa);
+}
+.admin-taxonomy-section + .admin-taxonomy-section {
+  margin-top: 1.25rem;
+}
 .admin-settings-column-defaults-list {
   list-style: none;
   margin: 0;

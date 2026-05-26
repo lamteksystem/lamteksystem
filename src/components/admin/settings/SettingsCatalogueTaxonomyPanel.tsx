@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 import CategoryTypesManager from '@/components/admin/CategoryTypesManager'
+import OrderingBehavioursManager from '@/components/admin/OrderingBehavioursManager'
 import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productCategories'
 import { LIVE_CATALOGUE } from '@/lib/catalogueToolsPaths'
 import { useCategoryTypes } from '@/hooks/useCategoryTypes'
@@ -43,6 +44,12 @@ export default function SettingsCatalogueTaxonomyPanel() {
         <Link to="/admin/catalogue-tools/smart-categorise">Smart categorise</Link> or the full editor on{' '}
         <Link to={LIVE_CATALOGUE.categories}>Manage categories</Link>.
       </p>
+
+      <OrderingBehavioursManager
+        embedded
+        editScope="any"
+        onChanged={() => reloadCategoryTypes()}
+      />
 
       <CategoryTypesManager
         embedded

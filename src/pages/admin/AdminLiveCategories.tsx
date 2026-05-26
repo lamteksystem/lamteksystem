@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import CatalogueCategoriesManager from '@/components/admin/CatalogueCategoriesManager'
 import CategoryTypesManager from '@/components/admin/CategoryTypesManager'
+import { ORDERING_BEHAVIOUR_SETTINGS_HREF } from '@/lib/catalogueSettingsPaths'
 import { fetchProductCategoryMap, type ProductCategoryMap } from '@/lib/productCategories'
 import { CATALOGUE_TOOLS } from '@/lib/catalogueToolsPaths'
 import { CORE_CATALOGUE_CATEGORY_NAMES, pruneImportedCategories } from '@/lib/categoryPrune'
@@ -70,7 +71,9 @@ export default function AdminLiveCategories() {
           <h1>Categories</h1>
           <p className="admin-muted">
             First add or edit <strong>category types</strong> (the Type dropdown options), then add
-            categories below. Smart categorisation and imports live under{' '}
+            categories below. Configure quote/order behaviours in{' '}
+            <Link to={ORDERING_BEHAVIOUR_SETTINGS_HREF}>Settings → Catalogue taxonomy</Link>.
+            Smart categorisation and imports live under{' '}
             <Link to={CATALOGUE_TOOLS.hub}>Product &amp; category tools</Link>.
           </p>
           {canEditCatalogue && (

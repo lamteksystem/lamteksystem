@@ -43,7 +43,8 @@ export const DEFAULT_CATEGORY_TYPES: Pick<
   },
 ]
 
-export const ORDERING_BEHAVIOUR_LABELS: Record<CategoryTypeRow['ordering_behaviour'], string> = {
+/** @deprecated Prefer labels from ordering_behaviour_definitions via useOrderingBehaviours. */
+export const ORDERING_BEHAVIOUR_LABELS: Record<string, string> = {
   standard: 'Standard — search & add',
   tealbury_complete: 'Tealbury Complete — guided setup + BOM units',
   component_only: 'Components only — individual parts',
@@ -168,7 +169,10 @@ export async function createCategoryType(params: {
 export async function updateCategoryType(
   code: string,
   patch: Partial<
-    Pick<CategoryTypeRow, 'label' | 'description' | 'browse_mode' | 'ordering_behaviour' | 'sort_order' | 'active'>
+    Pick<
+      CategoryTypeRow,
+      'label' | 'description' | 'browse_mode' | 'ordering_behaviour' | 'sort_order' | 'active' | 'is_system'
+    >
   >,
 ): Promise<{ error: string | null }> {
   const { error } = await supabase

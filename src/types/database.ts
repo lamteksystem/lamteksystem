@@ -30,11 +30,18 @@ export interface CatalogWorkbenchSettingsRow {
 /** Category type code — built-ins: product_type, door_range, universal; custom types allowed. */
 export type CategoryKind = string
 
-export type CategoryOrderingBehaviour =
-  | 'standard'
-  | 'tealbury_complete'
-  | 'component_only'
-  | 'accessory'
+/** Quote/order behaviour code — see ordering_behaviour_definitions. */
+export type CategoryOrderingBehaviour = string
+
+export interface OrderingBehaviourDefinitionRow {
+  code: string
+  label: string
+  description: string | null
+  sort_order: number
+  is_system: boolean
+  created_at: string
+  updated_at: string
+}
 
 export interface CategoryTypeRow {
   code: string

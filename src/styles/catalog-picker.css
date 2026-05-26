@@ -198,6 +198,11 @@
   overflow: hidden;
 }
 
+.catalog-picker-body .tb-workbench-right--detail-open .tb-right-pane-detail {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .catalog-picker-body .tb-workbench-right--detail-open .tb-right-pane-order {
   flex: 0 1 38%;
   max-height: min(42%, 320px);

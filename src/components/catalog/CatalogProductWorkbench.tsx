@@ -1186,6 +1186,23 @@ export default function CatalogProductWorkbench({
           </button>
         </div>
 
+        {showProductDetail && selectedProduct ? (
+          <div className="tb-right-pane-detail">
+            <CatalogProductDetailPanel
+              product={selectedProduct}
+              categories={effectiveCategories}
+              customerUserId={customerUserId}
+              isFavourite={favouriteSet.has(selectedProduct.id)}
+              onToggleFavourite={() => toggleFavourite(selectedProduct.id)}
+              onClose={() => setSelectedProductId(null)}
+              onAddToBasket={addProductToBasket}
+              addButtonLabel={addButtonLabel}
+              adding={committing}
+              onAdminEdit={canEditCatalogue ? () => setEditingProduct(selectedProduct) : undefined}
+            />
+          </div>
+        ) : null}
+
         <div className="tb-right-pane-order">
           {immediate ? (
             <CatalogOrderLinesPanel
@@ -1211,24 +1228,9 @@ export default function CatalogProductWorkbench({
           )}
         </div>
 
-        {showProductDetail && selectedProduct ? (
-          <div className="tb-right-pane-detail">
-            <CatalogProductDetailPanel
-              product={selectedProduct}
-              categories={effectiveCategories}
-              customerUserId={customerUserId}
-              isFavourite={favouriteSet.has(selectedProduct.id)}
-              onToggleFavourite={() => toggleFavourite(selectedProduct.id)}
-              onClose={() => setSelectedProductId(null)}
-              onAddToBasket={addProductToBasket}
-              addButtonLabel={addButtonLabel}
-              adding={committing}
-              onAdminEdit={canEditCatalogue ? () => setEditingProduct(selectedProduct) : undefined}
-            />
-          </div>
-        ) : (
-          <p className="tb-right-pane-hint">Select a product row to view details below your lines.</p>
-        )}
+        {!(showProductDetail && selectedProduct) ? (
+          <p className="tb-right-pane-hint">Select a product row to view details above your order lines.</p>
+        ) : null}
       </aside>
       )}
       </div>

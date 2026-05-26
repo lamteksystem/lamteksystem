@@ -503,6 +503,15 @@
   overflow: hidden;
 }
 
+.tb-right-pane-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+}
+
 .tb-right-pane-order {
   flex: 1 1 auto;
   min-height: 8rem;
@@ -517,18 +526,21 @@
   border-top: none;
 }
 
+/* Product details: content height only; On order sits directly underneath */
 .tb-workbench-right--detail-open .tb-right-pane-detail {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  max-height: min(48vh, 440px);
   min-height: 0;
 }
 
 .tb-workbench-right--detail-open .tb-right-pane-order {
-  flex: 0 1 38%;
-  max-height: min(42vh, 320px);
+  flex: 1 1 auto;
+  min-height: 8rem;
+  max-height: none;
 }
 
 .tb-right-pane-detail {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   border-bottom: 1px solid var(--lamtek-gray-light);
@@ -537,7 +549,7 @@
 }
 
 .tb-right-pane-detail .tb-detail {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 0;
   border-bottom: none;
 }
@@ -545,6 +557,7 @@
 .tb-right-pane-hint {
   flex-shrink: 0;
   margin: 0;
+  margin-top: auto;
   padding: 0.65rem 0.85rem;
   font-size: 0.8rem;
   color: var(--lamtek-text-muted);

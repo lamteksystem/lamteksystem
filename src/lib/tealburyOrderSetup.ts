@@ -146,9 +146,4 @@ export function lineStyleMatchesCategoryName(
   return true
 }
 
-/** Kitchen ranges only — excludes plinth, cornice, pelmet and other cross-range groups. */
-export function isKitchenDoorRangeCategoryName(name: string): boolean {
-  const n = name.trim()
-  if (/plinth|cornice|pelmet|panel|post|wirework|accessor|mould|corbel|worktop/i.test(n)) return false
-  return true
-}
+export { isKitchenDoorRangeCategoryName } from '@/lib/categoryTaxonomy'

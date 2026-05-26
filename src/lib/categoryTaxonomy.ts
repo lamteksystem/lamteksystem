@@ -46,6 +46,21 @@ export function isCompleteUnitsCategoryName(name: string): boolean {
   return /^complete(\s+units?)?$/i.test(name.trim())
 }
 
+/** True door programmes (Dawson, Norwood, …) — not panels, cornice, pelmet, or other product groups. */
+export function isKitchenDoorRangeCategoryName(name: string): boolean {
+  const n = name.trim()
+  if (!n) return false
+  if (isCompleteUnitsCategoryName(n)) return false
+  if (/plinth|cornice|pelmet|panel|post|wirework|accessor|mould|corbel|worktop|lighting|hinge|fitting/i.test(n)) {
+    return false
+  }
+  return true
+}
+
+export function isKitchenDoorRangeCategory(category: CategoryRow): boolean {
+  return getCategoryKind(category) === 'door_range' && isKitchenDoorRangeCategoryName(category.name)
+}
+
 export function inferCategoryKindFromName(name: string): CategoryKind {
   if (isCompleteUnitsCategoryName(name)) return 'product_type'
   const n = name.toLowerCase()
@@ -154,17 +169,28 @@ export type CategoryTreeOption = {
   chipSection: CategoryChipSection
 }
 
+function includeCategoryInBrowseList(
+  category: CategoryRow,
+  options?: { hideCompleteCategory?: boolean },
+): boolean {
+  if (options?.hideCompleteCategory && isCompleteUnitsCategoryName(category.name)) return false
+  return true
+}
+
 export function buildCategoryTreeOptions(
   categories: CategoryRow[],
   mode: CatalogBrowseMode,
+  options?: { hideCompleteCategory?: boolean },
 ): CategoryTreeOption[] {
-  const sorted = [...categories].sort(
-    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name),
-  )
+  const sorted = [...categories]
+    .filter((c) => includeCategoryInBrowseList(c, options))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name))
 
   if (mode === 'range') {
-    const doorRanges = sorted.filter((c) => getCategoryKind(c) === 'door_range')
-    const universal = sorted.filter((c) => getCategoryKind(c) === 'universal' && !c.parent_id)
+    const doorRanges = sorted.filter((c) => isKitchenDoorRangeCategory(c))
+    const universal = sorted.filter(
+      (c) => getCategoryKind(c) === 'universal' && !c.parent_id,
+    )
     return [
       ...doorRanges.map((c) => ({
         id: c.id,
@@ -184,10 +210,10 @@ export function buildCategoryTreeOptions(
   }
 
   const parents = sorted.filter((c) => !c.parent_id && getCategoryKind(c) !== 'door_range')
-  const options: CategoryTreeOption[] = []
+  const treeOptions: CategoryTreeOption[] = []
   for (const parent of parents) {
     const kind = getCategoryKind(parent)
-    options.push({
+    treeOptions.push({
       id: parent.id,
       label: parent.name,
       depth: 0,
@@ -196,7 +222,7 @@ export function buildCategoryTreeOptions(
     })
     if (kind === 'universal') continue
     for (const child of sorted.filter((c) => c.parent_id === parent.id)) {
-      options.push({
+      treeOptions.push({
         id: child.id,
         label: child.name,
         depth: 1,
@@ -205,7 +231,28 @@ export function buildCategoryTreeOptions(
       })
     }
   }
-  return options
+  return treeOptions
+}
+
+/** Browse mode + category for product filtering (respects chip selection over wizard defaults). */
+export function resolveBrowseFilterContext(
+  filters: { browseMode: CatalogBrowseMode; categoryId: string | null },
+  categories: CategoryRow[],
+  options?: { defaultKitchenRangeId?: string | null },
+): { browseMode: CatalogBrowseMode; categoryId: string | null } {
+  const categoryId = filters.categoryId ?? options?.defaultKitchenRangeId ?? null
+  if (!categoryId) {
+    return { browseMode: filters.browseMode, categoryId: null }
+  }
+  const selected = categories.find((c) => c.id === categoryId)
+  if (!selected) {
+    return { browseMode: filters.browseMode, categoryId }
+  }
+  const kind = getCategoryKind(selected)
+  if (kind === 'door_range' || kind === 'universal') {
+    return { browseMode: 'range', categoryId }
+  }
+  return { browseMode: 'category', categoryId }
 }
 
 function productCategoryIds(
@@ -260,7 +307,11 @@ export function countProductsForBrowseOption(
   categoryId: string,
   productCategoryMap?: ProductCategoryMap,
 ): number {
+  const { browseMode: effectiveMode } = resolveBrowseFilterContext(
+    { browseMode, categoryId },
+    categories,
+  )
   return products.filter((p) =>
-    productMatchesBrowseFilter(p, categories, browseMode, categoryId, productCategoryMap),
+    productMatchesBrowseFilter(p, categories, effectiveMode, categoryId, productCategoryMap),
   ).length
 }

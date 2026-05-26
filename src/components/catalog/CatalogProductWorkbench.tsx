@@ -12,8 +12,6 @@ import {
   categoryNameById,
   displayProductCode,
   filterCatalogProducts,
-  getPropertiesRows,
-  getSpecificationBullets,
   type WorkbenchFilterState,
 } from '@/lib/catalogProductDisplay'
 import {
@@ -102,6 +100,7 @@ export default function CatalogProductWorkbench({
   buildBar,
 }: CatalogProductWorkbenchProps) {
   const tableScrollRef = useRef<HTMLDivElement>(null)
+  const appliedSetupRangeIdRef = useRef<string | null>(null)
   const [filters, setFilters] = useState<WorkbenchFilterState>({
     ...EMPTY_WORKBENCH_FILTERS,
     categoryId: initialCategoryId,
@@ -245,9 +244,17 @@ export default function CatalogProductWorkbench({
       tealburySetup,
     ],
   )
+  const hideCompleteInBrowse = Boolean(
+    tealburySetup &&
+      isTealburyCatalogueChoice(tealburySetup.catalogue_choice) &&
+      !orderNeedsTealburyKitchenSetup(tealburySetup),
+  )
   const browseOptions = useMemo(
-    () => buildCategoryTreeOptions(effectiveCategories, filters.browseMode),
-    [effectiveCategories, filters.browseMode],
+    () =>
+      buildCategoryTreeOptions(effectiveCategories, filters.browseMode, {
+        hideCompleteCategory: hideCompleteInBrowse,
+      }),
+    [effectiveCategories, filters.browseMode, hideCompleteInBrowse],
   )
   const kitchenRangeBrowseOptions = useMemo(
     () => browseOptions.filter((o) => o.chipSection === 'kitchen_range'),
@@ -340,12 +347,16 @@ export default function CatalogProductWorkbench({
       !isTealburyCatalogueChoice(tealburySetup.catalogue_choice) ||
       orderNeedsTealburyKitchenSetup(tealburySetup)
     ) {
+      appliedSetupRangeIdRef.current = null
       return
     }
+    const rangeId = tealburySetup.kitchen_range_id ?? null
+    if (appliedSetupRangeIdRef.current === rangeId) return
+    appliedSetupRangeIdRef.current = rangeId
     setFilters((prev) => ({
       ...prev,
       browseMode: 'range',
-      categoryId: tealburySetup.kitchen_range_id,
+      categoryId: rangeId,
       productKind: prev.productKind === 'all' ? 'complete' : prev.productKind,
     }))
   }, [tealburySetup])
@@ -948,8 +959,6 @@ export default function CatalogProductWorkbench({
               <col className="tb-col-image" />
               <col className="tb-col-code" />
               <col className="tb-col-desc" />
-              <col className="tb-col-spec" />
-              <col className="tb-col-props" />
               <col className="tb-col-price" />
               <col className="tb-col-qty" />
               <col className="tb-col-action" />
@@ -965,12 +974,6 @@ export default function CatalogProductWorkbench({
                 <th scope="col" className="tb-col-desc">
                   Description
                 </th>
-                <th scope="col" className="tb-col-spec">
-                  Specification
-                </th>
-                <th scope="col" className="tb-col-props">
-                  Properties
-                </th>
                 <th scope="col" className="tb-col-price">
                   Price
                 </th>
@@ -985,15 +988,13 @@ export default function CatalogProductWorkbench({
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="tb-table-empty">
+                  <td colSpan={6} className="tb-table-empty">
                     No products match your filters. Try clearing search or choosing another range.
                   </td>
                 </tr>
               ) : (
                 filtered.map((product) => {
                   const isSelected = product.id === selectedProductId
-                  const specs = getSpecificationBullets(product)
-                  const props = getPropertiesRows(product)
                   const sell = productUnitPrice(product)
                   const availability = getProductAvailabilityMeta(product)
                   const qty = rowQtyById[product.id] ?? 1
@@ -1024,29 +1025,6 @@ export default function CatalogProductWorkbench({
                         <span className="tb-avail" title={availability.detail ?? availability.label}>
                           {availability.label}
                         </span>
-                      </td>
-                      <td className="tb-col-spec">
-                        {specs.length > 0 ? (
-                          <ul className="tb-spec-list">
-                            {specs.slice(0, 3).map((line) => (
-                              <li key={line}>{line}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="tb-muted">—</span>
-                        )}
-                      </td>
-                      <td className="tb-col-props">
-                        {props.length > 0 ? (
-                          <span className="tb-props-summary" title={props.map((r) => `${r.label}: ${r.value}`).join(' · ')}>
-                            {props
-                              .slice(0, 3)
-                              .map((row) => `${row.label}: ${row.value}`)
-                              .join(' · ')}
-                          </span>
-                        ) : (
-                          <span className="tb-muted">—</span>
-                        )}
                       </td>
                       <td className="tb-col-price">
                         <strong>£{sell.toFixed(2)}</strong>

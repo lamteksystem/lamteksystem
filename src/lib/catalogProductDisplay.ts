@@ -2,6 +2,7 @@ import { CATALOG_PROGRAM, type CatalogProgram } from '@/lib/catalogProgram'
 import {
   categoryBrowseModeForRow,
   productMatchesBrowseFilter,
+  resolveBrowseFilterContext,
   type CatalogBrowseMode,
 } from '@/lib/categoryTaxonomy'
 import type { ProductCategoryMap } from '@/lib/productCategories'
@@ -281,22 +282,29 @@ export function filterCatalogProducts(
     isTealburyCatalogueChoice(setup.catalogue_choice) &&
     !orderNeedsTealburyKitchenSetup(setup)
 
-  const browseMode: CatalogBrowseMode =
-    applyTealburyKitchenFilters && setup.kitchen_range_id ? 'range' : filters.browseMode
-  const rangeCategoryId = applyTealburyKitchenFilters
-    ? (setup.kitchen_range_id ?? filters.categoryId)
-    : filters.categoryId
+  const { browseMode, categoryId: browseCategoryId } = resolveBrowseFilterContext(
+    filters,
+    categories,
+    {
+      defaultKitchenRangeId:
+        applyTealburyKitchenFilters && filters.categoryId == null
+          ? setup.kitchen_range_id
+          : null,
+    },
+  )
 
   return products.filter((p) => {
     if (filters.catalogProgram && p.catalog_program !== filters.catalogProgram) return false
     if (
-      rangeCategoryId &&
+      browseCategoryId &&
       categories.length > 0 &&
-      !productMatchesBrowseFilter(p, categories, browseMode, rangeCategoryId, pcMap)
+      !productMatchesBrowseFilter(p, categories, browseMode, browseCategoryId, pcMap)
     ) {
       return false
     }
-    if (rangeCategoryId && categories.length === 0 && p.category_id !== rangeCategoryId) return false
+    if (browseCategoryId && categories.length === 0 && p.category_id !== browseCategoryId) {
+      return false
+    }
 
     if (applyTealburyKitchenFilters && setup.door_finish && !productHasDoorFinish(p, setup.door_finish)) {
       return false

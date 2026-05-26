@@ -339,7 +339,6 @@ export default function CatalogProductWorkbench({
     },
   )
   const {
-    columnDefs: workbenchColumnDefs,
     visibleIds: workbenchVisibleIds,
     setColumnVisible,
     setColumnOrder,
@@ -355,13 +354,28 @@ export default function CatalogProductWorkbench({
     return [...scrollable, ...locked]
   }, [workbenchColumnOrder, workbenchVisibleIds])
 
+  const settingsColumnOrder = useMemo(
+    () => workbenchColumnOrder.filter((id) => !CATALOG_WORKBENCH_LOCKED_COLUMN_IDS.has(id)),
+    [workbenchColumnOrder],
+  )
   const settingsColumnDefs = useMemo(
-    () => workbenchColumnDefs.filter((c) => !CATALOG_WORKBENCH_LOCKED_COLUMN_IDS.has(c.id)),
-    [workbenchColumnDefs],
+    () =>
+      settingsColumnOrder
+        .map((id) => CATALOG_WORKBENCH_COLUMNS.find((c) => c.id === id))
+        .filter((c): c is (typeof CATALOG_WORKBENCH_COLUMNS)[number] => !!c),
+    [settingsColumnOrder],
   )
   const settingsVisibleIds = useMemo(
     () => workbenchVisibleIds.filter((id) => !CATALOG_WORKBENCH_LOCKED_COLUMN_IDS.has(id)),
     [workbenchVisibleIds],
+  )
+
+  const handleWorkbenchColumnOrder = useCallback(
+    (orderedConfigurableIds: string[]) => {
+      const locked = workbenchColumnOrder.filter((id) => CATALOG_WORKBENCH_LOCKED_COLUMN_IDS.has(id))
+      setColumnOrder([...orderedConfigurableIds, ...locked])
+    },
+    [workbenchColumnOrder, setColumnOrder],
   )
 
   const updateFilter = useCallback((patch: Partial<WorkbenchFilterState>) => {
@@ -1014,10 +1028,12 @@ export default function CatalogProductWorkbench({
               columnDefs={settingsColumnDefs}
               visibleIds={settingsVisibleIds}
               setColumnVisible={setColumnVisible}
-              order={settingsVisibleIds}
-              setColumnOrder={setColumnOrder}
+              order={settingsColumnOrder}
+              setColumnOrder={handleWorkbenchColumnOrder}
               resetToDefault={resetWorkbenchColumns}
-              tooltip="Product table columns"
+              visibilityControl="radio"
+              lockedColumnsHint="Qty and Add are always shown at the right of the table."
+              tooltip="Product table columns — show, hide, and reorder"
             />
           )}
         </header>

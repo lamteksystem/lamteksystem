@@ -7201,6 +7201,44 @@ button.ordering-wizard-card {
 }
 .admin-column-settings-cog:hover { background: var(--lamtek-gray-light); color: var(--lamtek-text); }
 .admin-column-settings-cog[aria-expanded="true"] { background: var(--lamtek-gold); color: var(--lamtek-black); border-color: var(--lamtek-gold); }
+.admin-column-settings-panel--portal .admin-column-settings-list--radio {
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+}
+.admin-column-settings-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+}
+.admin-column-settings-col-name {
+  font-weight: 500;
+  font-size: 0.88rem;
+}
+.admin-column-settings-visibility {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+.admin-column-settings-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.admin-column-settings-radio input {
+  width: auto;
+  margin: 0;
+}
+.admin-column-settings-list--radio .admin-column-settings-item {
+  align-items: flex-start;
+}
+.admin-column-settings-locked-hint {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+}
 .admin-column-settings-panel {
   position: absolute; top: 100%; right: 0; margin-top: 0.35rem; min-width: 220px;
   padding: 1rem; z-index: 100; box-shadow: 0 4px 16px rgba(0,0,0,0.12);

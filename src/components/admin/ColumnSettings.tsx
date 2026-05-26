@@ -11,6 +11,10 @@ interface ColumnSettingsProps {
   order?: string[]
   setColumnOrder?: (orderedIds: string[]) => void
   resetToDefault?: () => void
+  /** How each column's visibility is toggled. */
+  visibilityControl?: 'checkbox' | 'radio'
+  /** Optional note below locked columns (e.g. qty/action always shown). */
+  lockedColumnsHint?: string
 }
 
 export function ColumnSettings({
@@ -21,6 +25,8 @@ export function ColumnSettings({
   order,
   setColumnOrder,
   resetToDefault,
+  visibilityControl = 'checkbox',
+  lockedColumnsHint,
 }: ColumnSettingsProps) {
   const [open, setOpen] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
@@ -42,11 +48,11 @@ export function ColumnSettings({
       return
     }
     const rect = cogRef.current.getBoundingClientRect()
-    const panelWidth = 260
+    const panelWidth = visibilityControl === 'radio' ? 300 : 260
     let left = rect.right - panelWidth
     left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8))
     setPanelPos({ top: rect.bottom + 6, left })
-  }, [open])
+  }, [open, visibilityControl])
 
   useEffect(() => {
     if (!open) return
@@ -58,7 +64,7 @@ export function ColumnSettings({
     function onReposition() {
       if (!cogRef.current) return
       const rect = cogRef.current.getBoundingClientRect()
-      const panelWidth = 260
+      const panelWidth = visibilityControl === 'radio' ? 300 : 260
       let left = rect.right - panelWidth
       left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8))
       setPanelPos({ top: rect.bottom + 6, left })
@@ -71,7 +77,7 @@ export function ColumnSettings({
       window.removeEventListener('scroll', onReposition, true)
       window.removeEventListener('resize', onReposition)
     }
-  }, [open])
+  }, [open, visibilityControl])
 
   function handleDragStart(e: React.DragEvent, id: string) {
     setDraggedId(id)
@@ -141,10 +147,17 @@ export function ColumnSettings({
             >
               <h4 className="admin-column-settings-title">Columns</h4>
               <p className="admin-muted admin-column-settings-hint">
-                Show or hide columns. {canReorder ? 'Drag to reorder.' : ''}
+                {visibilityControl === 'radio'
+                  ? 'Choose Show or Hide for each column.'
+                  : 'Show or hide columns.'}{' '}
+                {canReorder ? 'Drag to reorder.' : ''}
               </p>
-              <ul className="admin-column-settings-list admin-column-settings-list--draggable">
-                {orderedDefs.map((col) => (
+              <ul
+                className={`admin-column-settings-list admin-column-settings-list--draggable${visibilityControl === 'radio' ? ' admin-column-settings-list--radio' : ''}`}
+              >
+                {orderedDefs.map((col) => {
+                  const isVisible = visibleIds.includes(col.id)
+                  return (
                   <li key={col.id} className="admin-column-settings-li">
                     {dropIndicator?.targetId === col.id && dropIndicator?.position === 'above' && (
                       <div className="admin-column-settings-drop-line" aria-hidden title="Drop above" />
@@ -168,21 +181,57 @@ export function ColumnSettings({
                           <DragHandleIcon />
                         </span>
                       )}
-                      <label className="admin-column-settings-label">
-                        <input
-                          type="checkbox"
-                          checked={visibleIds.includes(col.id)}
-                          onChange={(e) => setColumnVisible(col.id, e.target.checked)}
-                        />
-                        <span>{col.label}</span>
-                      </label>
+                      {visibilityControl === 'radio' ? (
+                        <div className="admin-column-settings-row">
+                          <span className="admin-column-settings-col-name">{col.label}</span>
+                          <div
+                            className="admin-column-settings-visibility"
+                            role="radiogroup"
+                            aria-label={`${col.label} visibility`}
+                          >
+                            <label className="admin-column-settings-radio">
+                              <input
+                                type="radio"
+                                name={`column-vis-${col.id}`}
+                                checked={isVisible}
+                                onChange={() => setColumnVisible(col.id, true)}
+                              />
+                              <span>Show</span>
+                            </label>
+                            <label className="admin-column-settings-radio">
+                              <input
+                                type="radio"
+                                name={`column-vis-${col.id}`}
+                                checked={!isVisible}
+                                onChange={() => setColumnVisible(col.id, false)}
+                              />
+                              <span>Hide</span>
+                            </label>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="admin-column-settings-label">
+                          <input
+                            type="checkbox"
+                            checked={isVisible}
+                            onChange={(e) => setColumnVisible(col.id, e.target.checked)}
+                          />
+                          <span>{col.label}</span>
+                        </label>
+                      )}
                     </div>
                     {dropIndicator?.targetId === col.id && dropIndicator?.position === 'below' && (
                       <div className="admin-column-settings-drop-line" aria-hidden title="Drop below" />
                     )}
                   </li>
-                ))}
+                  )
+                })}
               </ul>
+              {lockedColumnsHint && (
+                <p className="admin-muted admin-column-settings-hint admin-column-settings-locked-hint">
+                  {lockedColumnsHint}
+                </p>
+              )}
               {resetToDefault && (
                 <div className="admin-column-settings-actions">
                   <button

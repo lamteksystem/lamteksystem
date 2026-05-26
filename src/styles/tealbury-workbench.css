@@ -310,7 +310,8 @@
 }
 
 .tb-product-table col.tb-col-code {
-  width: 96px;
+  width: 88px;
+  min-width: 72px;
 }
 
 .tb-product-table col.tb-col-name {
@@ -365,7 +366,17 @@
   text-align: left;
   padding: 0.55rem 0.65rem;
   border-bottom: 2px solid var(--lamtek-gray-light);
+  white-space: normal;
+  line-height: 1.25;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  vertical-align: bottom;
+}
+
+.tb-product-table thead th.tb-col-qty,
+.tb-product-table thead th.tb-col-action {
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 [data-theme='dark'] .tb-product-table thead th {

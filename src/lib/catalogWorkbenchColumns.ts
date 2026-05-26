@@ -30,7 +30,8 @@ export const CATALOG_WORKBENCH_COLUMN_IDS = new Set(CATALOG_WORKBENCH_COLUMNS.ma
 /** Fallback when organisation settings are unavailable. */
 export const CATALOG_WORKBENCH_DEFAULT_VISIBLE_IDS: string[] = [
   'image',
-  'code',
+  'name',
+  'sku',
   'description',
   'price',
   'qty',

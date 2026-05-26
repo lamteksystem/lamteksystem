@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 import type { AssemblyPartTypeRow } from '@/types/database'
 
 export const DEFAULT_ASSEMBLY_PART_TYPES: Pick<AssemblyPartTypeRow, 'code' | 'label' | 'sort_order' | 'is_system'>[] = [
+  { code: 'complete', label: 'Complete', sort_order: 5, is_system: true },
   { code: 'unit', label: 'Unit / carcass / cabinet', sort_order: 10, is_system: true },
   { code: 'door', label: 'Door', sort_order: 20, is_system: true },
   { code: 'drawer', label: 'Drawer', sort_order: 30, is_system: true },
@@ -13,6 +14,29 @@ export const DEFAULT_ASSEMBLY_PART_TYPES: Pick<AssemblyPartTypeRow, 'code' | 'la
 ]
 
 let partTypesCache: AssemblyPartTypeRow[] | null = null
+
+/** Ensures built-in part types exist in lists even if the DB seed lags a migration. */
+export function mergeAssemblyPartTypesWithDefaults(
+  rows: AssemblyPartTypeRow[],
+  options?: { activeOnly?: boolean }
+): AssemblyPartTypeRow[] {
+  const activeOnly = options?.activeOnly ?? false
+  const byCode = new Map(rows.map((r) => [r.code, r]))
+  for (const def of DEFAULT_ASSEMBLY_PART_TYPES) {
+    if (!byCode.has(def.code)) {
+      byCode.set(def.code, {
+        ...def,
+        active: true,
+        created_at: '',
+        updated_at: '',
+      } as AssemblyPartTypeRow)
+    }
+  }
+  const merged = [...byCode.values()].sort(
+    (a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label)
+  )
+  return activeOnly ? merged.filter((t) => t.active) : merged
+}
 
 export function invalidateAssemblyPartTypesCache(): void {
   partTypesCache = null
@@ -59,7 +83,7 @@ export async function fetchAssemblyPartTypes(options?: {
     return activeOnly ? fallback.filter((t) => t.active) : fallback
   }
 
-  const rows = (data ?? []) as AssemblyPartTypeRow[]
+  const rows = mergeAssemblyPartTypesWithDefaults((data ?? []) as AssemblyPartTypeRow[], { activeOnly })
   if (!activeOnly) partTypesCache = rows
   return rows
 }

@@ -291,11 +291,15 @@
   min-width: 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
+  /* Room for sticky qty + action columns at the right edge */
+  padding-right: 2px;
 }
 
 .tb-product-table {
+  --tb-qty-col-w: 120px;
+  --tb-action-col-w: 108px;
   width: 100%;
-  min-width: 1040px;
+  min-width: 1080px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.82rem;
@@ -327,11 +331,11 @@
 }
 
 .tb-product-table col.tb-col-qty {
-  width: 104px;
+  width: var(--tb-qty-col-w);
 }
 
 .tb-product-table col.tb-col-action {
-  width: 72px;
+  width: var(--tb-action-col-w);
 }
 
 .tb-product-table thead th {
@@ -401,12 +405,15 @@
   white-space: nowrap;
 }
 
-/* Keep qty + Add visible when scrolling wide tables */
+/* Keep qty + Add visible when scrolling wide tables (offsets must match col widths) */
 .tb-product-table thead th.tb-col-qty,
 .tb-product-table tbody td.tb-col-qty {
   position: sticky;
-  right: 72px;
-  z-index: 1;
+  right: var(--tb-action-col-w);
+  z-index: 2;
+  width: var(--tb-qty-col-w);
+  min-width: var(--tb-qty-col-w);
+  max-width: var(--tb-qty-col-w);
   background: var(--lamtek-white);
   box-shadow: -4px 0 8px -6px rgba(0, 0, 0, 0.14);
 }
@@ -415,7 +422,10 @@
 .tb-product-table tbody td.tb-col-action {
   position: sticky;
   right: 0;
-  z-index: 2;
+  z-index: 3;
+  width: var(--tb-action-col-w);
+  min-width: var(--tb-action-col-w);
+  max-width: var(--tb-action-col-w);
   background: var(--lamtek-white);
   box-shadow: -4px 0 8px -4px rgba(0, 0, 0, 0.14);
 }
@@ -427,9 +437,13 @@
   background: var(--lamtek-surface);
 }
 
-.tb-product-table thead th.tb-col-qty,
+.tb-product-table thead th.tb-col-qty {
+  z-index: 4;
+  background: #e8eaed;
+}
+
 .tb-product-table thead th.tb-col-action {
-  z-index: 3;
+  z-index: 5;
   background: #e8eaed;
 }
 
@@ -445,7 +459,13 @@
 
 .tb-product-table td.tb-col-qty,
 .tb-product-table td.tb-col-action {
-  overflow: hidden;
+  overflow: visible;
+  vertical-align: middle;
+}
+
+.tb-product-table thead th.tb-col-qty,
+.tb-product-table thead th.tb-col-action {
+  overflow: visible;
 }
 
 .tb-thumb {
@@ -1078,7 +1098,11 @@
 }
 
 .tb-col-qty .qty-stepper--compact {
+  display: inline-flex;
+  width: 100%;
+  max-width: 100%;
   overflow: visible;
+  box-sizing: border-box;
 }
 
 .qty-stepper--compact {
@@ -1087,16 +1111,28 @@
 
 .qty-stepper--compact .qty-stepper-btn {
   flex-shrink: 0;
-  min-width: 1.75rem;
-  padding: 0.2rem 0.35rem;
+  width: 1.65rem;
+  min-width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  font-size: 0.9rem;
 }
 
 .qty-stepper--compact .qty-stepper-input {
-  width: 2.25rem;
-  min-width: 2.25rem;
-  padding: 0.2rem;
-  font-size: 0.85rem;
+  width: 2.1rem;
+  min-width: 2.1rem;
+  max-width: 2.1rem;
+  height: 1.65rem;
+  padding: 0.15rem;
+  font-size: 0.82rem;
   flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.tb-col-action .tb-row-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  max-width: 100%;
 }
 
 .tb-col-action .btn-small {

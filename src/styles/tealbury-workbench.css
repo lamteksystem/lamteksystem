@@ -317,6 +317,23 @@
   width: 140px;
 }
 
+.tb-product-table col.tb-col-sku,
+.tb-product-table col.tb-col-trade-code {
+  width: 100px;
+}
+
+.tb-product-table col.tb-col-category,
+.tb-product-table col.tb-col-door-range,
+.tb-product-table col.tb-col-catalogue {
+  width: 120px;
+}
+
+.tb-product-table col.tb-col-dimensions,
+.tb-product-table col.tb-col-availability,
+.tb-product-table col.tb-col-stock {
+  width: 108px;
+}
+
 .tb-product-table col.tb-col-desc {
   min-width: 160px;
 }
@@ -393,11 +410,27 @@
 
 .tb-col-code,
 .tb-col-name,
+.tb-col-sku,
+.tb-col-trade-code,
+.tb-col-category,
+.tb-col-door-range,
 .tb-col-desc,
+.tb-col-dimensions,
+.tb-col-availability,
+.tb-col-stock,
+.tb-col-catalogue,
 .tb-col-spec,
 .tb-col-props {
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+.tb-desc-body {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tb-cell-clip {

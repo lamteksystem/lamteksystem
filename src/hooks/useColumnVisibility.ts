@@ -3,7 +3,7 @@
  * Supports show/hide, drag-and-drop reorder, and reset to default.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export interface ColumnDef {
@@ -15,33 +15,68 @@ const PREF_KEY_PREFIX = 'admin_columns_'
 
 type StoredPref = { order: string[]; visible: string[] }
 
+export interface UseColumnVisibilityOptions {
+  /** Full column order used when no user preference exists (and for reset). */
+  defaultOrder?: string[]
+  /** Bumps when organisation defaults load so unset users pick them up. */
+  defaultsEpoch?: string | number | null
+}
+
+function mergeOrder(defaultIds: string[], preferred?: string[]): string[] {
+  if (!preferred?.length) return defaultIds
+  const orderIds = preferred.filter((id) => defaultIds.includes(id))
+  const missingOrder = defaultIds.filter((id) => !orderIds.includes(id))
+  return [...orderIds, ...missingOrder]
+}
+
+function filterVisible(defaultIds: string[], visible?: string[]): string[] {
+  if (!visible?.length) return defaultIds
+  return visible.filter((id) => defaultIds.includes(id))
+}
+
 export function useColumnVisibility(
   scope: string,
   defaultColumns: ColumnDef[],
-  defaultVisibleIds?: string[]
+  defaultVisibleIds?: string[],
+  options?: UseColumnVisibilityOptions,
 ) {
   const defaultIds = defaultColumns.map((c) => c.id)
-  const initialVisible = defaultVisibleIds?.length
-    ? defaultVisibleIds.filter((id) => defaultIds.includes(id))
-    : defaultIds
-  const [order, setOrderState] = useState<string[]>(defaultIds)
-  const [visibleSet, setVisibleSetState] = useState<Set<string>>(() => new Set(initialVisible))
+  const resolvedDefaultOrder = useMemo(
+    () => mergeOrder(defaultIds, options?.defaultOrder),
+    [defaultIds, options?.defaultOrder?.join(',')],
+  )
+  const resolvedDefaultVisible = useMemo(() => {
+    const visible = filterVisible(defaultIds, defaultVisibleIds)
+    return visible.length > 0 ? visible : defaultIds
+  }, [defaultIds, defaultVisibleIds?.join(',')])
+
+  const [order, setOrderState] = useState<string[]>(resolvedDefaultOrder)
+  const [visibleSet, setVisibleSetState] = useState<Set<string>>(
+    () => new Set(resolvedDefaultVisible),
+  )
   const [initialised, setInitialised] = useState(false)
+  const usedPersistedPrefsRef = useRef(false)
 
   const visibleIds = useMemo(
     () => order.filter((id) => visibleSet.has(id)),
-    [order, visibleSet]
+    [order, visibleSet],
   )
   const columnDefsInOrder = useMemo(
     () =>
       order
         .map((id) => defaultColumns.find((c) => c.id === id))
         .filter((c): c is ColumnDef => !!c),
-    [order, defaultColumns]
+    [order, defaultColumns],
   )
+
+  const applyOrgDefaults = useCallback(() => {
+    setOrderState(resolvedDefaultOrder)
+    setVisibleSetState(new Set(resolvedDefaultVisible))
+  }, [resolvedDefaultOrder, resolvedDefaultVisible])
 
   useEffect(() => {
     let cancelled = false
+    usedPersistedPrefsRef.current = false
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user || cancelled) {
         setInitialised(true)
@@ -59,27 +94,36 @@ export function useColumnVisibility(
             try {
               const parsed = JSON.parse(data.value as string)
               if (Array.isArray(parsed) && parsed.length > 0) {
-                setOrderState(defaultIds)
-                setVisibleSetState(new Set(parsed as string[]))
+                usedPersistedPrefsRef.current = true
+                setOrderState(mergeOrder(defaultIds, resolvedDefaultOrder))
+                setVisibleSetState(new Set(filterVisible(defaultIds, parsed as string[])))
               } else if (parsed && Array.isArray(parsed.order) && Array.isArray(parsed.visible)) {
-                const orderIds = (parsed as StoredPref).order.filter((id) =>
-                  defaultIds.includes(id)
-                )
-                const missingOrder = defaultIds.filter((id) => !orderIds.includes(id))
-                setOrderState([...orderIds, ...missingOrder])
-                setVisibleSetState(new Set((parsed as StoredPref).visible))
+                usedPersistedPrefsRef.current = true
+                setOrderState(mergeOrder(defaultIds, (parsed as StoredPref).order))
+                setVisibleSetState(new Set(filterVisible(defaultIds, (parsed as StoredPref).visible)))
               }
-            } catch (_) {}
+            } catch {
+              /* use defaults */
+            }
           }
           setInitialised(true)
         })
     })
-    return () => { cancelled = true }
-  }, [scope, defaultIds.join(',')])
+    return () => {
+      cancelled = true
+    }
+  }, [scope, defaultIds.join(','), resolvedDefaultOrder.join(',')])
+
+  useEffect(() => {
+    if (!initialised || usedPersistedPrefsRef.current) return
+    applyOrgDefaults()
+  }, [initialised, applyOrgDefaults, options?.defaultsEpoch])
 
   const persist = useCallback(
     async (payload: StoredPref) => {
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user) return
       await supabase.from('user_preferences').upsert(
         {
@@ -88,10 +132,10 @@ export function useColumnVisibility(
           value: JSON.stringify(payload),
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'user_id,key' }
+        { onConflict: 'user_id,key' },
       )
     },
-    [scope]
+    [scope],
   )
 
   const setColumnVisible = useCallback(
@@ -104,21 +148,19 @@ export function useColumnVisibility(
         return next
       })
     },
-    [order, persist]
+    [order, persist],
   )
 
   const setColumnOrder = useCallback(
     (orderedIds: string[]) => {
-      const valid = orderedIds.filter((id) => defaultIds.includes(id))
-      const missing = defaultIds.filter((id) => !valid.includes(id))
-      const nextOrder = [...valid, ...missing]
+      const nextOrder = mergeOrder(defaultIds, orderedIds)
       setOrderState(nextOrder)
       setVisibleSetState((prev) => {
         persist({ order: nextOrder, visible: [...prev] })
         return prev
       })
     },
-    [defaultIds, persist]
+    [defaultIds, persist],
   )
 
   const setVisibleIds = useCallback(
@@ -126,19 +168,16 @@ export function useColumnVisibility(
       setVisibleSetState(new Set(ids))
       persist({ order, visible: ids })
     },
-    [order, persist]
+    [order, persist],
   )
 
   const resetToDefault = useCallback(() => {
-    setOrderState(defaultIds)
-    setVisibleSetState(new Set(initialVisible))
-    persist({ order: defaultIds, visible: initialVisible })
-  }, [defaultIds, initialVisible, persist])
+    setOrderState(resolvedDefaultOrder)
+    setVisibleSetState(new Set(resolvedDefaultVisible))
+    persist({ order: resolvedDefaultOrder, visible: resolvedDefaultVisible })
+  }, [resolvedDefaultOrder, resolvedDefaultVisible, persist])
 
-  const isVisible = useCallback(
-    (id: string) => visibleSet.has(id),
-    [visibleSet]
-  )
+  const isVisible = useCallback((id: string) => visibleSet.has(id), [visibleSet])
 
   return {
     columnDefs: columnDefsInOrder,
@@ -151,5 +190,7 @@ export function useColumnVisibility(
     resetToDefault,
     isVisible,
     initialised,
+    defaultVisibleIds: resolvedDefaultVisible,
+    defaultOrder: resolvedDefaultOrder,
   }
 }

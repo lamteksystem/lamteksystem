@@ -5083,6 +5083,42 @@ button.ordering-wizard-card {
 .admin-settings-label { font-weight: 500; font-size: 0.95rem; }
 .admin-settings-select { padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--lamtek-gray-light); background: var(--lamtek-surface, white); color: var(--lamtek-text, var(--lamtek-black)); }
 .admin-settings-hint { font-size: 0.85rem; color: var(--lamtek-gray); margin: 0.25rem 0 0; }
+.admin-settings-error { font-size: 0.9rem; color: var(--lamtek-error); margin: 0 0 0.75rem; }
+.admin-settings-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+.admin-settings-column-defaults-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 28rem;
+}
+.admin-settings-column-defaults-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--lamtek-gray-light);
+}
+.admin-settings-column-defaults-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.admin-settings-column-defaults-order {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
 .admin-settings-card--danger { border-color: rgba(220, 38, 38, 0.3); }
 .admin-reset-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.75rem; }
 .admin-reset-confirm-intro { margin: 0 0 1rem; color: var(--lamtek-text); line-height: 1.5; }

@@ -3,23 +3,25 @@ import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, Filter, Layers } from 'lucide-react'
 import type { AssemblyWithLines, CategoryRow, ProductRow } from '@/types/database'
 import { CATALOG_PROGRAM, type CatalogProgram } from '@/lib/catalogProgram'
-import { getProductAvailabilityMeta } from '@/lib/productAvailability'
 import { buildCategoryTreeOptions } from '@/lib/categoryTaxonomy'
 import {
   CATALOG_WORKBENCH_COLUMNS,
+  CATALOG_WORKBENCH_DEFAULT_ORDER_IDS,
   CATALOG_WORKBENCH_DEFAULT_VISIBLE_IDS,
   CATALOG_WORKBENCH_LOCKED_COLUMN_IDS,
+  workbenchTableCellClass,
+  workbenchTableColClass,
+  workbenchTableColumnLabel,
 } from '@/lib/catalogWorkbenchColumns'
+import { fetchCatalogWorkbenchColumnDefaults } from '@/lib/catalogWorkbenchSettings'
+import { renderWorkbenchProductCell } from '@/components/catalog/catalogWorkbenchTableCells'
 import {
   EMPTY_WORKBENCH_FILTERS,
   buildCatalogFacets,
   catalogProgramLabel,
   categoryNameById,
   countWorkbenchBrowseChipProducts,
-  displayProductCode,
   filterCatalogProducts,
-  getPropertiesRows,
-  getSpecificationBullets,
   type WorkbenchFilterState,
 } from '@/lib/catalogProductDisplay'
 import { ColumnSettings } from '@/components/admin/ColumnSettings'
@@ -311,10 +313,30 @@ export default function CatalogProductWorkbench({
     return counts
   }, [browseOptions, scopeProducts, filters, effectiveCategories, chipCountFilterOptions])
 
+  const [orgColumnDefaults, setOrgColumnDefaults] = useState<{
+    order: string[]
+    visible: string[]
+    updatedAt: string | null
+  } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchCatalogWorkbenchColumnDefaults().then((defaults) => {
+      if (!cancelled) setOrgColumnDefaults(defaults)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const columnVisibility = useColumnVisibility(
     `workbench_${preferencesScope}`,
     CATALOG_WORKBENCH_COLUMNS,
-    CATALOG_WORKBENCH_DEFAULT_VISIBLE_IDS,
+    orgColumnDefaults?.visible ?? CATALOG_WORKBENCH_DEFAULT_VISIBLE_IDS,
+    {
+      defaultOrder: orgColumnDefaults?.order ?? CATALOG_WORKBENCH_DEFAULT_ORDER_IDS,
+      defaultsEpoch: orgColumnDefaults?.updatedAt ?? 'loading',
+    },
   )
   const {
     columnDefs: workbenchColumnDefs,
@@ -1054,12 +1076,10 @@ export default function CatalogProductWorkbench({
                 filtered.map((product) => {
                   const isSelected = product.id === selectedProductId
                   const sell = productUnitPrice(product)
-                  const availability = getProductAvailabilityMeta(product)
                   const qty = rowQtyById[product.id] ?? 1
                   const rangeName = product.category_id ? catMap.get(product.category_id) : undefined
-                  const showNameInDesc = !workbenchVisibleIds.includes('name')
-                  const specs = getSpecificationBullets(product)
-                  const props = getPropertiesRows(product)
+                  const categoryLabel = rangeName ?? undefined
+                  const visibleColumnIds = new Set(workbenchVisibleIds)
 
                   return (
                     <tr
@@ -1077,75 +1097,15 @@ export default function CatalogProductWorkbench({
                               : undefined
                           }
                         >
-                          {colId === 'image' &&
-                            (product.image_url ? (
-                              <img src={product.image_url} alt="" className="tb-thumb" loading="lazy" />
-                            ) : (
-                              <span className="tb-thumb tb-thumb--empty">—</span>
-                            ))}
-                          {colId === 'code' && (
-                            <>
-                              <span className="tb-code">{displayProductCode(product)}</span>
-                              {rangeName && <span className="tb-label-tag">{rangeName}</span>}
-                            </>
-                          )}
-                          {colId === 'name' && (
-                            <span className="tb-cell-clip tb-desc-name">{product.name}</span>
-                          )}
-                          {colId === 'description' && (
-                            <>
-                              {showNameInDesc && (
-                                <span className="tb-cell-clip tb-desc-name">{product.name}</span>
-                              )}
-                              {product.sku && product.sku !== displayProductCode(product) && (
-                                <span className="tb-cell-clip tb-desc-sku">SKU {product.sku}</span>
-                              )}
-                              <span
-                                className="tb-cell-clip tb-avail"
-                                title={availability.detail ?? availability.label}
-                              >
-                                {availability.label}
-                              </span>
-                            </>
-                          )}
-                          {colId === 'spec' && (
-                            <ul className="tb-cell-list">
-                              {specs.length === 0 ? (
-                                <li className="tb-muted">—</li>
-                              ) : (
-                                specs.map((line) => (
-                                  <li key={line} className="tb-cell-clip">
-                                    {line}
-                                  </li>
-                                ))
-                              )}
-                            </ul>
-                          )}
-                          {colId === 'props' && (
-                            <ul className="tb-cell-list">
-                              {props.length === 0 ? (
-                                <li className="tb-muted">—</li>
-                              ) : (
-                                props.map((row) => (
-                                  <li key={`${row.label}-${row.value}`} className="tb-cell-clip">
-                                    <span className="tb-muted">{row.label}:</span> {row.value}
-                                  </li>
-                                ))
-                              )}
-                            </ul>
-                          )}
-                          {colId === 'price' && (
-                            <div className="tb-price-cell">
-                              <strong>£{sell.toFixed(2)}</strong>
-                              <span className="tb-muted"> ex VAT</span>
-                              {sell < Number(product.unit_price) && (
-                                <span className="tb-muted tb-price-was">
-                                  {' '}
-                                  was £{Number(product.unit_price).toFixed(2)}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          {colId !== 'qty' &&
+                            colId !== 'action' &&
+                            renderWorkbenchProductCell(colId, {
+                              product,
+                              rangeName,
+                              sell,
+                              visibleColumnIds,
+                              categoryLabel,
+                            })}
                           {colId === 'qty' && (
                             <div className="qty-stepper qty-stepper--compact">
                               <button
@@ -1478,32 +1438,4 @@ export default function CatalogProductWorkbench({
     </article>
     </div>
   )
-}
-
-const WORKBENCH_COL_CLASS: Record<string, string> = {
-  image: 'tb-col-image',
-  code: 'tb-col-code',
-  name: 'tb-col-name',
-  description: 'tb-col-desc',
-  spec: 'tb-col-spec',
-  props: 'tb-col-props',
-  price: 'tb-col-price',
-  qty: 'tb-col-qty',
-  action: 'tb-col-action',
-}
-
-function workbenchTableColClass(colId: string): string {
-  return WORKBENCH_COL_CLASS[colId] ?? `tb-col-${colId}`
-}
-
-function workbenchTableCellClass(colId: string): string {
-  const base = workbenchTableColClass(colId)
-  if (colId === 'qty') return `${base} tb-col-sticky-end tb-col-sticky-qty`
-  if (colId === 'action') return `${base} tb-col-sticky-end tb-col-sticky-action`
-  return base
-}
-
-function workbenchTableColumnLabel(colId: string): string {
-  if (colId === 'action') return 'Add'
-  return CATALOG_WORKBENCH_COLUMNS.find((c) => c.id === colId)?.label ?? colId
 }

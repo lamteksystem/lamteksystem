@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import AdminAssemblyPartTypesSettings from '@/components/admin/AdminAssemblyPartTypesSettings'
+import SettingsCatalogWorkbenchColumns from '@/components/admin/settings/SettingsCatalogWorkbenchColumns'
 import { CATALOGUE_TOOLS, LIVE_CATALOGUE } from '@/lib/catalogueToolsPaths'
 
 /** Settings → Products & inventory: part types registry + catalogue tool shortcuts. */
@@ -36,6 +37,8 @@ export default function SettingsProductsInventoryPanel() {
           </li>
         </ul>
       </fieldset>
+
+      <SettingsCatalogWorkbenchColumns />
 
       <AdminAssemblyPartTypesSettings embedded />
     </div>

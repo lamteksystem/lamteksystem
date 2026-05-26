@@ -19,6 +19,14 @@ export interface MarketingSiteSettingsRow {
   updated_at: string
 }
 
+export interface CatalogWorkbenchSettingsRow {
+  id: number
+  column_order: string[]
+  column_visible: string[]
+  updated_at: string
+  updated_by: string | null
+}
+
 /** Category type code — built-ins: product_type, door_range, universal; custom types allowed. */
 export type CategoryKind = string
 

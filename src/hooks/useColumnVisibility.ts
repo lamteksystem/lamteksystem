@@ -17,11 +17,15 @@ type StoredPref = { order: string[]; visible: string[] }
 
 export function useColumnVisibility(
   scope: string,
-  defaultColumns: ColumnDef[]
+  defaultColumns: ColumnDef[],
+  defaultVisibleIds?: string[]
 ) {
   const defaultIds = defaultColumns.map((c) => c.id)
+  const initialVisible = defaultVisibleIds?.length
+    ? defaultVisibleIds.filter((id) => defaultIds.includes(id))
+    : defaultIds
   const [order, setOrderState] = useState<string[]>(defaultIds)
-  const [visibleSet, setVisibleSetState] = useState<Set<string>>(() => new Set(defaultIds))
+  const [visibleSet, setVisibleSetState] = useState<Set<string>>(() => new Set(initialVisible))
   const [initialised, setInitialised] = useState(false)
 
   const visibleIds = useMemo(
@@ -127,9 +131,9 @@ export function useColumnVisibility(
 
   const resetToDefault = useCallback(() => {
     setOrderState(defaultIds)
-    setVisibleSetState(new Set(defaultIds))
-    persist({ order: defaultIds, visible: defaultIds })
-  }, [defaultIds, persist])
+    setVisibleSetState(new Set(initialVisible))
+    persist({ order: defaultIds, visible: initialVisible })
+  }, [defaultIds, initialVisible, persist])
 
   const isVisible = useCallback(
     (id: string) => visibleSet.has(id),

@@ -4,16 +4,26 @@ import { ChevronLeft, ChevronRight, Filter, Layers } from 'lucide-react'
 import type { AssemblyWithLines, CategoryRow, ProductRow } from '@/types/database'
 import { CATALOG_PROGRAM, type CatalogProgram } from '@/lib/catalogProgram'
 import { getProductAvailabilityMeta } from '@/lib/productAvailability'
-import { buildCategoryTreeOptions, countProductsForBrowseOption } from '@/lib/categoryTaxonomy'
+import { buildCategoryTreeOptions } from '@/lib/categoryTaxonomy'
+import {
+  CATALOG_WORKBENCH_COLUMNS,
+  CATALOG_WORKBENCH_DEFAULT_VISIBLE_IDS,
+  CATALOG_WORKBENCH_LOCKED_COLUMN_IDS,
+} from '@/lib/catalogWorkbenchColumns'
 import {
   EMPTY_WORKBENCH_FILTERS,
   buildCatalogFacets,
   catalogProgramLabel,
   categoryNameById,
+  countWorkbenchBrowseChipProducts,
   displayProductCode,
   filterCatalogProducts,
+  getPropertiesRows,
+  getSpecificationBullets,
   type WorkbenchFilterState,
 } from '@/lib/catalogProductDisplay'
+import { ColumnSettings } from '@/components/admin/ColumnSettings'
+import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import {
   loadFavouriteProductIds,
   loadFilterPresets,
@@ -269,22 +279,68 @@ export default function CatalogProductWorkbench({
     [effectiveProducts, selectedProductId],
   )
 
+  const chipCountFilterOptions = useMemo(
+    () => ({
+      productCategoryMap,
+      completeProductIds,
+      categoryTypes,
+      tealburySetup:
+        tealburySetup &&
+        isTealburyCatalogueChoice(tealburySetup.catalogue_choice) &&
+        !orderNeedsTealburyKitchenSetup(tealburySetup)
+          ? tealburySetup
+          : null,
+    }),
+    [productCategoryMap, completeProductIds, categoryTypes, tealburySetup],
+  )
+
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const opt of browseOptions) {
       counts.set(
         opt.id,
-        countProductsForBrowseOption(
+        countWorkbenchBrowseChipProducts(
           scopeProducts,
-          effectiveCategories,
-          filters.browseMode,
+          filters,
           opt.id,
-          productCategoryMap,
+          effectiveCategories,
+          chipCountFilterOptions,
         ),
       )
     }
     return counts
-  }, [browseOptions, scopeProducts, effectiveCategories, filters.browseMode])
+  }, [browseOptions, scopeProducts, filters, effectiveCategories, chipCountFilterOptions])
+
+  const columnVisibility = useColumnVisibility(
+    `workbench_${preferencesScope}`,
+    CATALOG_WORKBENCH_COLUMNS,
+    CATALOG_WORKBENCH_DEFAULT_VISIBLE_IDS,
+  )
+  const {
+    columnDefs: workbenchColumnDefs,
+    visibleIds: workbenchVisibleIds,
+    setColumnVisible,
+    setColumnOrder,
+    resetToDefault: resetWorkbenchColumns,
+    order: workbenchColumnOrder,
+  } = columnVisibility
+
+  const tableColumnIds = useMemo(() => {
+    const scrollable = workbenchColumnOrder.filter(
+      (id) => workbenchVisibleIds.includes(id) && !CATALOG_WORKBENCH_LOCKED_COLUMN_IDS.has(id),
+    )
+    const locked = workbenchColumnOrder.filter((id) => CATALOG_WORKBENCH_LOCKED_COLUMN_IDS.has(id))
+    return [...scrollable, ...locked]
+  }, [workbenchColumnOrder, workbenchVisibleIds])
+
+  const settingsColumnDefs = useMemo(
+    () => workbenchColumnDefs.filter((c) => !CATALOG_WORKBENCH_LOCKED_COLUMN_IDS.has(c.id)),
+    [workbenchColumnDefs],
+  )
+  const settingsVisibleIds = useMemo(
+    () => workbenchVisibleIds.filter((id) => !CATALOG_WORKBENCH_LOCKED_COLUMN_IDS.has(id)),
+    [workbenchVisibleIds],
+  )
 
   const updateFilter = useCallback((patch: Partial<WorkbenchFilterState>) => {
     setFilters((prev) => ({ ...prev, ...patch }))
@@ -931,6 +987,17 @@ export default function CatalogProductWorkbench({
               <ChevronRight size={18} aria-hidden />
             </button>
           </div>
+          {mainTab === 'products' && (
+            <ColumnSettings
+              columnDefs={settingsColumnDefs}
+              visibleIds={settingsVisibleIds}
+              setColumnVisible={setColumnVisible}
+              order={settingsVisibleIds}
+              setColumnOrder={setColumnOrder}
+              resetToDefault={resetWorkbenchColumns}
+              tooltip="Product table columns"
+            />
+          )}
         </header>
 
         <div className="tb-workbench-tabs">
@@ -954,41 +1021,32 @@ export default function CatalogProductWorkbench({
 
         {mainTab === 'products' ? (
         <div className="tb-table-wrap" ref={tableScrollRef}>
-          <table className="tb-product-table">
+          <table
+            className="tb-product-table"
+            style={{ minWidth: `${Math.max(480, tableColumnIds.length * 96)}px` }}
+          >
             <colgroup>
-              <col className="tb-col-image" />
-              <col className="tb-col-code" />
-              <col className="tb-col-desc" />
-              <col className="tb-col-price" />
-              <col className="tb-col-qty" />
-              <col className="tb-col-action" />
+              {tableColumnIds.map((colId) => (
+                <col key={colId} className={workbenchTableColClass(colId)} />
+              ))}
             </colgroup>
             <thead>
               <tr>
-                <th scope="col" className="tb-col-image">
-                  Image
-                </th>
-                <th scope="col" className="tb-col-code">
-                  Code
-                </th>
-                <th scope="col" className="tb-col-desc">
-                  Description
-                </th>
-                <th scope="col" className="tb-col-price">
-                  Price
-                </th>
-                <th scope="col" className="tb-col-qty">
-                  Qty
-                </th>
-                <th scope="col" className="tb-col-action">
-                  <span className="visually-hidden">Add</span>
-                </th>
+                {tableColumnIds.map((colId) => (
+                  <th key={colId} scope="col" className={workbenchTableCellClass(colId)}>
+                    {colId === 'action' ? (
+                      <span className="visually-hidden">{workbenchTableColumnLabel(colId)}</span>
+                    ) : (
+                      workbenchTableColumnLabel(colId)
+                    )}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="tb-table-empty">
+                  <td colSpan={tableColumnIds.length} className="tb-table-empty">
                     No products match your filters. Try clearing search or choosing another range.
                   </td>
                 </tr>
@@ -999,6 +1057,9 @@ export default function CatalogProductWorkbench({
                   const availability = getProductAvailabilityMeta(product)
                   const qty = rowQtyById[product.id] ?? 1
                   const rangeName = product.category_id ? catMap.get(product.category_id) : undefined
+                  const showNameInDesc = !workbenchVisibleIds.includes('name')
+                  const specs = getSpecificationBullets(product)
+                  const props = getPropertiesRows(product)
 
                   return (
                     <tr
@@ -1006,95 +1067,149 @@ export default function CatalogProductWorkbench({
                       className={isSelected ? 'tb-row-selected' : undefined}
                       onClick={() => setSelectedProductId(product.id)}
                     >
-                      <td className="tb-col-image">
-                        {product.image_url ? (
-                          <img src={product.image_url} alt="" className="tb-thumb" loading="lazy" />
-                        ) : (
-                          <span className="tb-thumb tb-thumb--empty">—</span>
-                        )}
-                      </td>
-                      <td className="tb-col-code">
-                        <span className="tb-code">{displayProductCode(product)}</span>
-                        {rangeName && <span className="tb-label-tag">{rangeName}</span>}
-                      </td>
-                      <td className="tb-col-desc">
-                        <span className="tb-desc-name">{product.name}</span>
-                        {product.sku && product.sku !== displayProductCode(product) && (
-                          <span className="tb-desc-sku">SKU {product.sku}</span>
-                        )}
-                        <span className="tb-avail" title={availability.detail ?? availability.label}>
-                          {availability.label}
-                        </span>
-                      </td>
-                      <td className="tb-col-price">
-                        <strong>£{sell.toFixed(2)}</strong>
-                        <span className="tb-muted"> ex VAT</span>
-                        {sell < Number(product.unit_price) && (
-                          <span className="tb-muted tb-price-was"> was £{Number(product.unit_price).toFixed(2)}</span>
-                        )}
-                      </td>
-                      <td className="tb-col-qty" onClick={(e) => e.stopPropagation()}>
-                        <div className="qty-stepper qty-stepper--compact">
-                          <button
-                            type="button"
-                            className="qty-stepper-btn"
-                            onClick={() =>
-                              setRowQtyById((prev) => ({
-                                ...prev,
-                                [product.id]: Math.max(1, (prev[product.id] ?? 1) - 1),
-                              }))
-                            }
-                          >
-                            −
-                          </button>
-                          <input
-                            className="qty-stepper-input"
-                            inputMode="numeric"
-                            value={qty}
-                            onChange={(e) => {
-                              const n = Number(e.target.value)
-                              setRowQtyById((prev) => ({
-                                ...prev,
-                                [product.id]: Number.isFinite(n) && n > 0 ? Math.floor(n) : 1,
-                              }))
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="qty-stepper-btn"
-                            onClick={() =>
-                              setRowQtyById((prev) => ({
-                                ...prev,
-                                [product.id]: Math.min(99, (prev[product.id] ?? 1) + 1),
-                              }))
-                            }
-                          >
-                            +
-                          </button>
-                        </div>
-                      </td>
-                      <td className="tb-col-action" onClick={(e) => e.stopPropagation()}>
-                        <div className="tb-row-actions">
-                          <button
-                            type="button"
-                            className="btn btn-small tb-btn-add"
-                            onClick={() => addProductToBasket(product, qty)}
-                          >
-                            Add
-                          </button>
-                          {canEditCatalogue && (
-                            <button
-                              type="button"
-                              className="tb-admin-row-edit"
-                              title={`Edit "${product.name}" (admin)`}
-                              aria-label={`Edit ${product.name}`}
-                              onClick={() => setEditingProduct(product)}
-                            >
-                              ✎
-                            </button>
+                      {tableColumnIds.map((colId) => (
+                        <td
+                          key={colId}
+                          className={workbenchTableCellClass(colId)}
+                          onClick={
+                            colId === 'qty' || colId === 'action'
+                              ? (e) => e.stopPropagation()
+                              : undefined
+                          }
+                        >
+                          {colId === 'image' &&
+                            (product.image_url ? (
+                              <img src={product.image_url} alt="" className="tb-thumb" loading="lazy" />
+                            ) : (
+                              <span className="tb-thumb tb-thumb--empty">—</span>
+                            ))}
+                          {colId === 'code' && (
+                            <>
+                              <span className="tb-code">{displayProductCode(product)}</span>
+                              {rangeName && <span className="tb-label-tag">{rangeName}</span>}
+                            </>
                           )}
-                        </div>
-                      </td>
+                          {colId === 'name' && (
+                            <span className="tb-cell-clip tb-desc-name">{product.name}</span>
+                          )}
+                          {colId === 'description' && (
+                            <>
+                              {showNameInDesc && (
+                                <span className="tb-cell-clip tb-desc-name">{product.name}</span>
+                              )}
+                              {product.sku && product.sku !== displayProductCode(product) && (
+                                <span className="tb-cell-clip tb-desc-sku">SKU {product.sku}</span>
+                              )}
+                              <span
+                                className="tb-cell-clip tb-avail"
+                                title={availability.detail ?? availability.label}
+                              >
+                                {availability.label}
+                              </span>
+                            </>
+                          )}
+                          {colId === 'spec' && (
+                            <ul className="tb-cell-list">
+                              {specs.length === 0 ? (
+                                <li className="tb-muted">—</li>
+                              ) : (
+                                specs.map((line) => (
+                                  <li key={line} className="tb-cell-clip">
+                                    {line}
+                                  </li>
+                                ))
+                              )}
+                            </ul>
+                          )}
+                          {colId === 'props' && (
+                            <ul className="tb-cell-list">
+                              {props.length === 0 ? (
+                                <li className="tb-muted">—</li>
+                              ) : (
+                                props.map((row) => (
+                                  <li key={`${row.label}-${row.value}`} className="tb-cell-clip">
+                                    <span className="tb-muted">{row.label}:</span> {row.value}
+                                  </li>
+                                ))
+                              )}
+                            </ul>
+                          )}
+                          {colId === 'price' && (
+                            <div className="tb-price-cell">
+                              <strong>£{sell.toFixed(2)}</strong>
+                              <span className="tb-muted"> ex VAT</span>
+                              {sell < Number(product.unit_price) && (
+                                <span className="tb-muted tb-price-was">
+                                  {' '}
+                                  was £{Number(product.unit_price).toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {colId === 'qty' && (
+                            <div className="qty-stepper qty-stepper--compact">
+                              <button
+                                type="button"
+                                className="qty-stepper-btn"
+                                onClick={() =>
+                                  setRowQtyById((prev) => ({
+                                    ...prev,
+                                    [product.id]: Math.max(1, (prev[product.id] ?? 1) - 1),
+                                  }))
+                                }
+                              >
+                                −
+                              </button>
+                              <input
+                                className="qty-stepper-input"
+                                inputMode="numeric"
+                                value={qty}
+                                onChange={(e) => {
+                                  const n = Number(e.target.value)
+                                  setRowQtyById((prev) => ({
+                                    ...prev,
+                                    [product.id]: Number.isFinite(n) && n > 0 ? Math.floor(n) : 1,
+                                  }))
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="qty-stepper-btn"
+                                onClick={() =>
+                                  setRowQtyById((prev) => ({
+                                    ...prev,
+                                    [product.id]: Math.min(99, (prev[product.id] ?? 1) + 1),
+                                  }))
+                                }
+                              >
+                                +
+                              </button>
+                            </div>
+                          )}
+                          {colId === 'action' && (
+                            <div className="tb-row-actions">
+                              <button
+                                type="button"
+                                className="btn btn-small tb-btn-add"
+                                onClick={() => addProductToBasket(product, qty)}
+                              >
+                                Add
+                              </button>
+                              {canEditCatalogue && (
+                                <button
+                                  type="button"
+                                  className="tb-admin-row-edit"
+                                  title={`Edit "${product.name}" (admin)`}
+                                  aria-label={`Edit ${product.name}`}
+                                  onClick={() => setEditingProduct(product)}
+                                >
+                                  ✎
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      ))}
                     </tr>
                   )
                 })
@@ -1363,4 +1478,32 @@ export default function CatalogProductWorkbench({
     </article>
     </div>
   )
+}
+
+const WORKBENCH_COL_CLASS: Record<string, string> = {
+  image: 'tb-col-image',
+  code: 'tb-col-code',
+  name: 'tb-col-name',
+  description: 'tb-col-desc',
+  spec: 'tb-col-spec',
+  props: 'tb-col-props',
+  price: 'tb-col-price',
+  qty: 'tb-col-qty',
+  action: 'tb-col-action',
+}
+
+function workbenchTableColClass(colId: string): string {
+  return WORKBENCH_COL_CLASS[colId] ?? `tb-col-${colId}`
+}
+
+function workbenchTableCellClass(colId: string): string {
+  const base = workbenchTableColClass(colId)
+  if (colId === 'qty') return `${base} tb-col-sticky-end tb-col-sticky-qty`
+  if (colId === 'action') return `${base} tb-col-sticky-end tb-col-sticky-action`
+  return base
+}
+
+function workbenchTableColumnLabel(colId: string): string {
+  if (colId === 'action') return 'Add'
+  return CATALOG_WORKBENCH_COLUMNS.find((c) => c.id === colId)?.label ?? colId
 }

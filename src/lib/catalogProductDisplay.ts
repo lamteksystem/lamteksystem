@@ -261,6 +261,28 @@ export function getPropertiesRows(product: ProductRow): { label: string; value: 
   return rows.slice(0, 7)
 }
 
+/** Count products for a browse chip, respecting wizard/setup filters but not search or favourites. */
+export function countWorkbenchBrowseChipProducts(
+  products: ProductRow[],
+  filters: WorkbenchFilterState,
+  browseCategoryId: string,
+  categories: CategoryRow[] = [],
+  options?: {
+    productCategoryMap?: ProductCategoryMap
+    completeProductIds?: Set<string>
+    categoryTypes?: CategoryTypeRow[]
+    tealburySetup?: TealburyOrderSetup | null
+  },
+): number {
+  const chipFilters: WorkbenchFilterState = {
+    ...filters,
+    search: '',
+    favouritesOnly: false,
+    categoryId: browseCategoryId,
+  }
+  return filterCatalogProducts(products, chipFilters, undefined, categories, options).length
+}
+
 export function filterCatalogProducts(
   products: ProductRow[],
   filters: WorkbenchFilterState,

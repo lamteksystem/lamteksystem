@@ -204,15 +204,26 @@
   overflow: hidden;
 }
 
-.catalog-picker-body .tb-workbench-right--detail-open .tb-right-pane-detail {
-  flex: 0 1 auto;
-  max-height: min(48%, 440px);
+.catalog-picker-body .tb-right-pane-stack {
+  flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
 }
 
-.catalog-picker-body .tb-workbench-right--detail-open .tb-right-pane-order {
+.catalog-picker-body .tb-right-pane-stack .tb-right-pane-detail {
+  flex: 0 0 auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.catalog-picker-body .tb-right-pane-stack .tb-right-pane-detail .tb-detail,
+.catalog-picker-body .tb-right-pane-stack .tb-right-pane-detail .tb-detail-body {
+  overflow: visible;
+}
+
+.catalog-picker-body .tb-right-pane-stack .tb-right-pane-order--below-detail {
   flex: 1 1 auto;
-  min-height: 8rem;
+  min-height: 6rem;
   max-height: none;
 }
 
@@ -228,8 +239,11 @@
 }
 
 .catalog-picker-body .tb-right-pane-detail {
-  flex: 0 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.catalog-picker-body .tb-right-pane-stack .tb-order-lines-list {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;

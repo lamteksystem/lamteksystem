@@ -909,6 +909,16 @@ export default function CatalogProductWorkbench({
         {mainTab === 'products' ? (
         <div className="tb-table-wrap" ref={tableScrollRef}>
           <table className="tb-product-table">
+            <colgroup>
+              <col className="tb-col-image" />
+              <col className="tb-col-code" />
+              <col className="tb-col-desc" />
+              <col className="tb-col-spec" />
+              <col className="tb-col-props" />
+              <col className="tb-col-price" />
+              <col className="tb-col-qty" />
+              <col className="tb-col-action" />
+            </colgroup>
             <thead>
               <tr>
                 <th scope="col" className="tb-col-image">
@@ -1188,50 +1198,76 @@ export default function CatalogProductWorkbench({
 
         <div className="tb-right-pane-body">
           {showProductDetail && selectedProduct ? (
-            <div className="tb-right-pane-detail">
-              <CatalogProductDetailPanel
-                product={selectedProduct}
-                categories={effectiveCategories}
-                customerUserId={customerUserId}
-                isFavourite={favouriteSet.has(selectedProduct.id)}
-                onToggleFavourite={() => toggleFavourite(selectedProduct.id)}
-                onClose={() => setSelectedProductId(null)}
-                onAddToBasket={addProductToBasket}
-                addButtonLabel={addButtonLabel}
-                adding={committing}
-                onAdminEdit={canEditCatalogue ? () => setEditingProduct(selectedProduct) : undefined}
-              />
+            <div className="tb-right-pane-stack">
+              <div className="tb-right-pane-detail">
+                <CatalogProductDetailPanel
+                  product={selectedProduct}
+                  categories={effectiveCategories}
+                  customerUserId={customerUserId}
+                  isFavourite={favouriteSet.has(selectedProduct.id)}
+                  onToggleFavourite={() => toggleFavourite(selectedProduct.id)}
+                  onClose={() => setSelectedProductId(null)}
+                  onAddToBasket={addProductToBasket}
+                  addButtonLabel={addButtonLabel}
+                  adding={committing}
+                  onAdminEdit={canEditCatalogue ? () => setEditingProduct(selectedProduct) : undefined}
+                />
+              </div>
+              <div className="tb-right-pane-order tb-right-pane-order--below-detail">
+                {immediate ? (
+                  <CatalogOrderLinesPanel
+                    lines={orderLines}
+                    loading={orderLinesLoading}
+                    cartHref={cartHref}
+                  />
+                ) : (
+                  <CatalogProductStagingBasket
+                    lines={staged}
+                    linePersistence={linePersistence}
+                    cartLineCount={cartLineCount}
+                    cartHref={cartHref}
+                    commitLabel={commitLabel}
+                    onQuantityChange={(lineId, quantity) => {
+                      setStaged((prev) => prev.map((l) => (l.id === lineId ? { ...l, quantity } : l)))
+                    }}
+                    onRemove={(lineId) => setStaged((prev) => prev.filter((l) => l.id !== lineId))}
+                    onClear={() => setStaged([])}
+                    onCommit={() => void commitBasket()}
+                    committing={committing}
+                  />
+                )}
+              </div>
             </div>
-          ) : null}
-
-          <div className="tb-right-pane-order">
-            {immediate ? (
-              <CatalogOrderLinesPanel
-                lines={orderLines}
-                loading={orderLinesLoading}
-                cartHref={cartHref}
-              />
-            ) : (
-              <CatalogProductStagingBasket
-                lines={staged}
-                linePersistence={linePersistence}
-                cartLineCount={cartLineCount}
-                cartHref={cartHref}
-                commitLabel={commitLabel}
-                onQuantityChange={(lineId, quantity) => {
-                  setStaged((prev) => prev.map((l) => (l.id === lineId ? { ...l, quantity } : l)))
-                }}
-                onRemove={(lineId) => setStaged((prev) => prev.filter((l) => l.id !== lineId))}
-                onClear={() => setStaged([])}
-                onCommit={() => void commitBasket()}
-                committing={committing}
-              />
-            )}
-          </div>
+          ) : (
+            <div className="tb-right-pane-order">
+              {immediate ? (
+                <CatalogOrderLinesPanel
+                  lines={orderLines}
+                  loading={orderLinesLoading}
+                  cartHref={cartHref}
+                />
+              ) : (
+                <CatalogProductStagingBasket
+                  lines={staged}
+                  linePersistence={linePersistence}
+                  cartLineCount={cartLineCount}
+                  cartHref={cartHref}
+                  commitLabel={commitLabel}
+                  onQuantityChange={(lineId, quantity) => {
+                    setStaged((prev) => prev.map((l) => (l.id === lineId ? { ...l, quantity } : l)))
+                  }}
+                  onRemove={(lineId) => setStaged((prev) => prev.filter((l) => l.id !== lineId))}
+                  onClear={() => setStaged([])}
+                  onCommit={() => void commitBasket()}
+                  committing={committing}
+                />
+              )}
+            </div>
+          )}
         </div>
 
         {!(showProductDetail && selectedProduct) ? (
-          <p className="tb-right-pane-hint">Select a product row to view details above your order lines.</p>
+          <p className="tb-right-pane-hint">Select a product row to view details and add lines below.</p>
         ) : null}
       </aside>
       )}

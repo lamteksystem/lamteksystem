@@ -31,6 +31,8 @@ function row(partial: Partial<PricelistWorkbenchRow>): PricelistWorkbenchRow {
     trade_code: partial.trade_code ?? 'B15',
     selected: false,
     options: {},
+    item_kind: partial.item_kind ?? 'complete',
+    part_type: partial.part_type ?? '',
     ...partial,
   }
 }

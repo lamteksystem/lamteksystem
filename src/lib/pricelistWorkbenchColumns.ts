@@ -2,6 +2,8 @@ import type { ColumnDef } from '@/hooks/useColumnVisibility'
 
 export type WorkbenchColumnId =
   | 'source'
+  | 'item_kind'
+  | 'part_type'
   | 'door_range'
   | 'section'
   | 'trade_code'
@@ -25,9 +27,23 @@ export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
   {
     id: 'source',
     label: 'Source',
-    tip: 'Tealbury customer pricelist (TB) or Lamtek trade kitchen pricelist (LK).',
+    tip: 'TB = Tealbury complete units, LK = Lamtek components, UF = UFORM spec (doors/trim).',
     minWidth: 52,
     defaultWidth: 56,
+  },
+  {
+    id: 'item_kind',
+    label: 'Kind',
+    tip: 'complete = sellable Tealbury unit; component / door / accessory = BOM parts.',
+    minWidth: 72,
+    defaultWidth: 88,
+  },
+  {
+    id: 'part_type',
+    label: 'Part type',
+    tip: 'BOM part type code (unit, door, hinge, …). Blank for complete units.',
+    minWidth: 88,
+    defaultWidth: 100,
   },
   {
     id: 'door_range',

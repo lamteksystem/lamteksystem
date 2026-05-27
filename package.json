@@ -42,6 +42,7 @@
     "import-pricelist": "node --env-file=.env scripts/import-pricelist-pdf.js",
     "import-pricelists": "node --env-file=.env scripts/import-pricelists.mjs",
     "import-lamtek-pricelists": "node --env-file=.env scripts/import-lamtek-trade-pricelists.js",
+    "catalogue:parse-uform-specs": "npx --yes tsx scripts/parse-uform-spec-pdfs.ts",
     "assign-images": "node --env-file=.env scripts/assign-product-images.js",
     "authorize:lamtek": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/authorize-lamtek-context.ps1"
   },

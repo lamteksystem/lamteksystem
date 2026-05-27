@@ -13,15 +13,17 @@ import {
   type WorkbenchColumnId,
 } from '@/lib/pricelistWorkbenchColumns'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import { sourceLabel } from '@/lib/tealburyCatalogueBuild'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import { useColumnWidths } from '@/hooks/useColumnWidths'
-import type { CategoryRow } from '@/types/database'
+import type { AssemblyPartTypeRow, CategoryRow } from '@/types/database'
 
 type EditableField = 'door_range' | 'section' | 'sku' | 'name' | 'description' | 'cost_price' | 'unit_price'
 
 type Props = {
   pageItems: PricelistWorkbenchRow[]
   categories: CategoryRow[]
+  partTypes: AssemblyPartTypeRow[]
   allSelectedOnPage: boolean
   onToggleSelectAllOnPage: (checked: boolean) => void
   onPatchRow: (id: string, patch: Partial<PricelistWorkbenchRow>) => void
@@ -42,6 +44,7 @@ const DBL_CLICK_FIELDS = new Set<EditableField>([
 export default function PricelistWorkbenchTable({
   pageItems,
   categories,
+  partTypes,
   allSelectedOnPage,
   onToggleSelectAllOnPage,
   onPatchRow,
@@ -194,8 +197,28 @@ export default function PricelistWorkbenchTable({
             className={`admin-pricelist-source admin-pricelist-source--${row.source}`}
             title={row.catalog_program}
           >
-            {row.source === 'tealbury' ? 'TB' : 'LK'}
+            {sourceLabel(row.source)}
           </span>
+        )
+      case 'item_kind':
+        return <span className="admin-muted">{row.item_kind || '—'}</span>
+      case 'part_type':
+        if (row.item_kind === 'complete') {
+          return <span className="admin-muted">—</span>
+        }
+        return (
+          <select
+            className="admin-pricelist-category-select"
+            value={row.part_type || ''}
+            onChange={(e) => onPatchRow(row.id, { part_type: e.target.value })}
+          >
+            <option value="">—</option>
+            {partTypes.map((t) => (
+              <option key={t.code} value={t.code}>
+                {t.label}
+              </option>
+            ))}
+          </select>
         )
       case 'door_range':
         return renderEditableText(row, 'door_range', 'admin-pricelist-cell--range')

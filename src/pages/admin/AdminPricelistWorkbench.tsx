@@ -15,7 +15,20 @@ import {
   type PricelistSource,
   type PricelistWorkbenchRow,
 } from '@/lib/pricelistWorkbench'
+import { applyBomToCompleteProduct } from '@/lib/completeUnitBomApply'
 import { parseTealburyPricelistWorkbookAsync } from '@/lib/tealburyPricelistParse'
+import {
+  autoAssignDoorRangeCategories,
+  bootstrapTealburyCatalogueCategories,
+  enrichWorkbenchRowsMetadata,
+  TEALBURY_DOOR_RANGES,
+} from '@/lib/tealburyCatalogueBuild'
+import {
+  parseUformSpecJsonBundle,
+  uformProductsToWorkbenchRows,
+} from '@/lib/uformSpecParse'
+import { useAssemblyPartTypes } from '@/hooks/useAssemblyPartTypes'
+import { supabase } from '@/lib/supabase'
 import PricelistSourceImportProgress, {
   type PricelistSourceImportProgressState,
 } from '@/components/admin/PricelistSourceImportProgress'
@@ -32,6 +45,7 @@ type SourceFilter = 'all' | PricelistSource
 
 export default function AdminPricelistWorkbench() {
   const { allowed: canEdit, loading: permLoading } = usePermission('admin.catalogue', 'edit')
+  const partTypesHook = useAssemblyPartTypes(true)
   const [categories, setCategories] = useState<CategoryRow[]>([])
   const [rows, setRows] = useState<PricelistWorkbenchRow[]>([])
   const [warnings, setWarnings] = useState<string[]>([])
@@ -58,6 +72,7 @@ export default function AdminPricelistWorkbench() {
 
   const tealburyInputRef = useRef<HTMLInputElement>(null)
   const lamtekInputRef = useRef<HTMLInputElement>(null)
+  const uformJsonInputRef = useRef<HTMLInputElement>(null)
 
   const loadCategories = useCallback(async () => {
     const cats = await fetchAllCategories()
@@ -147,9 +162,101 @@ export default function AdminPricelistWorkbench() {
   )
 
   const anyImporting = useMemo(
-    () => (['tealbury', 'lamtek'] as const).some((s) => isSourceImporting(s)),
+    () => (['tealbury', 'lamtek', 'uform'] as const).some((s) => isSourceImporting(s)),
     [isSourceImporting]
   )
+
+  async function runBootstrapCategories() {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await bootstrapTealburyCatalogueCategories()
+      await loadCategories()
+      const parts = [
+        res.created.length ? `Created: ${res.created.join(', ')}` : null,
+        res.existing.length ? `Already existed: ${res.existing.length} categories` : null,
+        res.errors.length ? `Errors: ${res.errors.join('; ')}` : null,
+      ].filter(Boolean)
+      showSuccess('Categories ready', parts.join(' · ') || 'Done.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function ingestUformJson(file: File) {
+    setError(null)
+    setMessage(null)
+    setSourceImportProgress('uform', 10, 'Reading JSON…', file.name)
+    try {
+      const text = await file.text()
+      const bundle = JSON.parse(text) as unknown
+      const products = parseUformSpecJsonBundle(bundle)
+      if (!products.length) {
+        setError('No products in JSON. Run npm run catalogue:parse-uform-specs after adding PDFs to Pricelists and Specifications/uform/specs/')
+        clearImportProgress('uform')
+        return
+      }
+      const workbench = enrichWorkbenchRowsMetadata(uformProductsToWorkbenchRows(products))
+      const withCats = autoAssignDoorRangeCategories(workbench, categories)
+      setRows((prev) => [...prev.filter((r) => r.source !== 'uform'), ...withCats])
+      showSuccess('UFORM spec import', `Loaded ${withCats.length} door/trim row(s) from ${file.name}. Prices are 0 until you add them later.`)
+      setSourceImportProgress('uform', 100, 'Complete', file.name)
+      clearImportProgress('uform', 2000)
+      goToPage(1)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      clearImportProgress('uform')
+    }
+  }
+
+  function runInferPartTypes() {
+    setRows((prev) => enrichWorkbenchRowsMetadata(prev))
+    showSuccess('Part types', 'Inferred part type and kind for all workbench rows.')
+  }
+
+  async function applyBomsToSelectedCompletes() {
+    const targets = rows.filter((r) => r.selected && r.source === 'tealbury' && r.item_kind === 'complete')
+    if (!targets.length) {
+      setError('Select one or more Tealbury complete-unit rows (checkbox), then try again.')
+      return
+    }
+    if (
+      !window.confirm(
+        `Apply standard BOM template to ${targets.length} complete unit(s)? Requires Lamtek + UFORM component products already published.`
+      )
+    ) {
+      return
+    }
+    setBusy(true)
+    const notes: string[] = []
+    let ok = 0
+    for (const row of targets) {
+      const { data: product } = await supabase.from('products').select('*').eq('sku', row.sku.trim()).maybeSingle()
+      if (!product) {
+        notes.push(`${row.sku}: publish this complete unit first`)
+        continue
+      }
+      const res = await applyBomToCompleteProduct({
+        completeProduct: product,
+        tradeCode: row.trade_code || row.sku,
+        doorRange: row.door_range,
+        section: row.section,
+        replaceExisting: true,
+      })
+      if (res.error) notes.push(`${row.sku}: ${res.error}`)
+      else {
+        ok++
+        if (res.warnings.length) notes.push(`${row.sku}: ${res.warnings.join('; ')}`)
+      }
+    }
+    setBusy(false)
+    showSuccess(
+      'BOM apply finished',
+      `Updated ${ok} of ${targets.length} unit(s).` + (notes.length ? ` Notes: ${notes.slice(0, 5).join(' | ')}` : '')
+    )
+  }
 
   async function ingestWorkbook(file: File, source: PricelistSource) {
     if (!/\.xlsx$/i.test(file.name)) {
@@ -188,8 +295,8 @@ export default function AdminPricelistWorkbench() {
         setTimeout(resolve, 0)
       })
 
-      const workbench = fillMissingWorkbenchProductNames(
-        parsed.map((p) => parsedToWorkbenchRow(p, source, cats)),
+      const workbench = enrichWorkbenchRowsMetadata(
+        fillMissingWorkbenchProductNames(parsed.map((p) => parsedToWorkbenchRow(p, source, cats))),
       )
       setRows((prev) => [...prev.filter((r) => r.source !== source), ...workbench])
       setWarnings((prev) => [...prev, ...w.map((line) => `[${source}] ${line}`)])
@@ -352,6 +459,7 @@ export default function AdminPricelistWorkbench() {
 
   const tealburyCount = rows.filter((r) => r.source === 'tealbury').length
   const lamtekCount = rows.filter((r) => r.source === 'lamtek').length
+  const uformCount = rows.filter((r) => r.source === 'uform').length
   const unassignedCount = rows.filter((r) => !r.category_id).length
 
   return (
@@ -362,10 +470,10 @@ export default function AdminPricelistWorkbench() {
           <AdminHelpTip text="Import Tealbury and Lamtek trade Excel pricelists, edit and categorize rows, then export template.xlsx or publish to the live catalogue by SKU." />
         </h1>
         <p className="page-intro">
-          Build a full product list from the <strong>Tealbury customer pricelist</strong> (per door/range sheets +
-          accessories) and the <strong>Lamtek trade kitchen pricelist</strong>. Edit rows, assign categories in bulk,
-          then export the portal template or publish to the catalogue. Output columns match{' '}
-          <code>template.xlsx</code> (category_slug, category_name, name, sku, unit_price, …).
+          Build the <strong>Tealbury Complete</strong> catalogue visually: Lamtek <strong>components</strong> (carcasses,
+          hinges, drawers), Tealbury <strong>complete units</strong> (one row per sellable kitchen), and UFORM{' '}
+          <strong>doors &amp; trim</strong> from spec PDFs. Assign categories and part types, publish (prices can stay at
+          0), then apply standard BOMs to link complete units to their parts.
         </p>
         <p className="admin-muted" style={{ marginTop: '-0.5rem' }}>
           <Link to={LIVE_CATALOGUE.categories}>Categories</Link> ·{' '}
@@ -375,15 +483,46 @@ export default function AdminPricelistWorkbench() {
         </p>
         {rows.length > 0 && (
           <p className="admin-pricelist-stats">
-            {rows.length} draft row(s) · {tealburyCount} Tealbury · {lamtekCount} Lamtek · {unassignedCount} unassigned
+            {rows.length} draft row(s) · {lamtekCount} Lamtek · {uformCount} UFORM · {tealburyCount} Tealbury complete
+            · {unassignedCount} unassigned
           </p>
         )}
       </div>
 
       <PricelistWorkbenchSection
+        id="workbench-setup"
+        title="0. Catalogue setup"
+        summary="Bootstrap categories, then load sources"
+        tip="Run once before first import. Door ranges match the seven UFORM ranges Lamtek supplies for Tealbury Complete."
+        defaultOpen={rows.length === 0}
+      >
+        <p className="admin-muted">
+          Door ranges: {TEALBURY_DOOR_RANGES.join(' · ')}. Place PDF spec sheets in{' '}
+          <code>Pricelists and Specifications/uform/specs/</code>, then run{' '}
+          <code>npm run catalogue:parse-uform-specs</code> locally and import the generated JSON below.
+        </p>
+        <div className="admin-pricelist-action-row" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
+          <button type="button" className="btn btn-outline" disabled={busy} onClick={() => void runBootstrapCategories()}>
+            Bootstrap categories &amp; part types
+          </button>
+          <button type="button" className="btn btn-outline" disabled={busy || !rows.length} onClick={runInferPartTypes}>
+            Infer part types on all rows
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline"
+            disabled={busy || !rows.some((r) => r.selected && r.source === 'tealbury')}
+            onClick={() => void applyBomsToSelectedCompletes()}
+          >
+            Apply BOM to selected Tealbury completes
+          </button>
+        </div>
+      </PricelistWorkbenchSection>
+
+      <PricelistWorkbenchSection
         id="workbench-load"
         title="1. Load workbooks"
-        summary="Upload Tealbury and/or Lamtek trade .xlsx files"
+        summary="Upload Lamtek, Tealbury, and/or UFORM spec JSON"
         tip="Re-importing a source replaces only that source’s rows. Tealbury skips the Pricelist hub sheet when door-range sheets exist."
         defaultOpen={rows.length === 0}
       >
@@ -439,6 +578,29 @@ export default function AdminPricelistWorkbench() {
               <span className="admin-muted">Not loaded</span>
             ) : null}
           </label>
+          <label className="admin-pricelist-upload-card">
+            <span className="admin-pricelist-upload-label">
+              UFORM spec products (.json)
+              <AdminHelpTip text="Generated by npm run catalogue:parse-uform-specs from PDFs in Pricelists and Specifications/uform/specs/. Doors, plinth, cornice, panels per range." />
+            </span>
+            <input
+              ref={uformJsonInputRef}
+              type="file"
+              accept=".json,application/json"
+              disabled={isSourceImporting('uform')}
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) void ingestUformJson(f)
+                e.target.value = ''
+              }}
+            />
+            <PricelistSourceImportProgress progress={importProgress.uform} />
+            {uformCount > 0 && !isSourceImporting('uform') ? (
+              <span className="admin-muted">{uformCount} row(s) loaded</span>
+            ) : !importProgress.uform ? (
+              <span className="admin-muted">Not loaded</span>
+            ) : null}
+          </label>
         </div>
         {rows.length > 0 && (
           <button
@@ -489,6 +651,7 @@ export default function AdminPricelistWorkbench() {
             <PricelistWorkbenchTable
               pageItems={pageItems}
               categories={categories}
+              partTypes={partTypesHook.types}
               allSelectedOnPage={pageItems.length > 0 && pageItems.every((r) => r.selected)}
               onToggleSelectAllOnPage={toggleSelectAllOnPage}
               onPatchRow={patchRow}
@@ -546,8 +709,9 @@ export default function AdminPricelistWorkbench() {
                       }}
                     >
                       <option value="all">All ({rows.length})</option>
-                      <option value="tealbury">Tealbury ({tealburyCount})</option>
-                      <option value="lamtek">Lamtek ({lamtekCount})</option>
+                      <option value="lamtek">Lamtek components ({lamtekCount})</option>
+                      <option value="uform">UFORM doors/trim ({uformCount})</option>
+                      <option value="tealbury">Tealbury complete ({tealburyCount})</option>
                     </select>
                   </label>
                   <label className="admin-pricelist-field">

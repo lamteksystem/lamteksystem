@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import type { CategoryRow, Json } from '@/types/database'
 import { CATALOG_PROGRAM, type CatalogProgram } from '@/lib/catalogProgram'
 import { slugifyCategoryName } from '@/lib/categoryAdmin'
+import { enrichWorkbenchRowMetadata } from '@/lib/tealburyCatalogueBuild'
 import {
   mapTealburyAccessoryToCategory,
   slugifyCategorySegment,
@@ -16,7 +17,7 @@ import {
   type CatalogueExportRow,
 } from '@/lib/catalogue-import-export'
 
-export type PricelistSource = 'tealbury' | 'lamtek'
+export type PricelistSource = 'tealbury' | 'lamtek' | 'uform'
 
 export interface PricelistWorkbenchRow {
   id: string
@@ -39,6 +40,10 @@ export interface PricelistWorkbenchRow {
   trade_code: string
   selected: boolean
   options: Record<string, Json>
+  /** complete (Tealbury sellable), component (Lamtek part), door, accessory (UFORM trim). */
+  item_kind: 'complete' | 'component' | 'door' | 'accessory' | 'other'
+  /** assembly_part_types.code — blank for complete units. */
+  part_type: string
 }
 
 export interface PublishWorkbenchResult {
@@ -67,7 +72,7 @@ function tradeCodeFromParsed(row: TealburyParsedRow): string {
   return idx > 0 ? sku.slice(0, idx) : sku
 }
 
-const UNASSIGNED_CATEGORY = {
+export const UNASSIGNED_CATEGORY = {
   category_id: null as string | null,
   category_slug: '',
   category_name: '',
@@ -206,10 +211,13 @@ export function parsedToWorkbenchRow(
     trade_code,
     selected: false,
     options: { ...parsed.options },
+    item_kind: fileSource === 'tealbury' ? 'complete' : 'component',
+    part_type: '',
   }
 
   const name = deriveWorkbenchProductName(draft)
-  return name ? { ...draft, name } : draft
+  const withName = name ? { ...draft, name } : draft
+  return enrichWorkbenchRowMetadata(withName)
 }
 
 export function workbenchToExportRow(row: PricelistWorkbenchRow): CatalogueExportRow {
@@ -329,6 +337,7 @@ export async function publishWorkbenchRows(
       image_alt: row.image_alt || null,
       is_stock: row.is_stock !== false,
       catalog_program: row.catalog_program,
+      part_type: row.part_type?.trim() || null,
       options: row.options as Json,
     }
 

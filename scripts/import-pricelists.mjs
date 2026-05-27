@@ -50,6 +50,19 @@ function parsePrice(v) {
   return Number.isNaN(n) ? null : Math.round(n * 100) / 100
 }
 
+function inferPartTypeFromRow(row, program) {
+  if (program === 'tealbury') return null
+  const hay = `${row.categoryName || ''} ${row.name || ''} ${row.description || ''}`.toLowerCase()
+  if (/hinge\s*plate|base\s*plate/.test(hay)) return 'hinge_plate'
+  if (/hinge/.test(hay)) return 'hinge'
+  if (/drawer\s*box|drawerbox/.test(hay)) return 'drawer'
+  if (/cutlery|tray/.test(hay)) return 'other'
+  if (/leg/.test(hay)) return 'leg_kit'
+  if (/fitting/.test(hay)) return 'fittings'
+  if (/carcass|base\s*unit|wall\s*unit|tall|cabinet/.test(hay)) return 'unit'
+  return 'other'
+}
+
 function slugifyCategorySegment(name) {
   if (!name || typeof name !== 'string') return 'general'
   const s = name
@@ -707,6 +720,7 @@ async function insertProgramProducts(supabase, rows, program) {
       sort_order: 0,
       stock_quantity: 0,
       catalog_program: program,
+      part_type: inferPartTypeFromRow(row, program),
     })
   }
   for (let i = 0; i < payloads.length; i += CHUNK) {

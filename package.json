@@ -43,6 +43,9 @@
     "import-pricelists": "node --env-file=.env scripts/import-pricelists.mjs",
     "import-lamtek-pricelists": "node --env-file=.env scripts/import-lamtek-trade-pricelists.js",
     "catalogue:parse-uform-specs": "npx --yes tsx scripts/parse-uform-spec-pdfs.ts",
+    "catalogue:import-uform-specs": "node --env-file=.env scripts/import-uform-spec-products.mjs",
+    "catalogue:clear-products": "node --env-file=.env scripts/clear-all-products.mjs",
+    "catalogue:import-pricelists": "node --env-file=.env scripts/import-pricelists.mjs",
     "assign-images": "node --env-file=.env scripts/assign-product-images.js",
     "authorize:lamtek": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/authorize-lamtek-context.ps1"
   },

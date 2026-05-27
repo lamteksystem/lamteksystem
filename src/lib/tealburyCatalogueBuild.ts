@@ -4,19 +4,9 @@
 import { createCategory, fetchAllCategories } from '@/lib/categoryAdmin'
 import type { CategoryRow } from '@/types/database'
 import type { PricelistSource, PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import { TEALBURY_DOOR_RANGES, type TealburyDoorRange } from '@/lib/tealburyDoorRanges'
 
-/** Door ranges Lamtek buys from UFORM for Tealbury Complete. */
-export const TEALBURY_DOOR_RANGES = [
-  'Oakham Soft Matte',
-  'Oakham Gloss',
-  'Dawson',
-  'Knightsbridge Std',
-  'Knightsbridge Prm',
-  'Norwood',
-  'Papplewick',
-] as const
-
-export type TealburyDoorRange = (typeof TEALBURY_DOOR_RANGES)[number]
+export { TEALBURY_DOOR_RANGES, type TealburyDoorRange }
 
 export type WorkbenchItemKind = 'complete' | 'component' | 'door' | 'accessory' | 'other'
 

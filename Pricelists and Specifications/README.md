@@ -21,6 +21,19 @@ Place supplier files here for catalogue build tooling. **These files are not dep
 - Norwood
 - Papplewick
 
+## One-shot local rebuild (agent / developer)
+
+From repo root (requires `.env` with database + Supabase service role):
+
+```bash
+npm run catalogue:clear-products -- --yes
+npm run catalogue:import-pricelists -- --yes --lamtek "Pricelists and Specifications/Lamtek Trade Kitchen Pricelist - 1-49 Titus Hinges.xlsx" --tealbury "Pricelists and Specifications/Tealbury Pricelist Customer Draft.xlsx"
+npm run catalogue:parse-uform-specs
+npm run catalogue:import-uform-specs -- --yes
+```
+
+This wipes **all products** but keeps **categories** and **BOM part types**.
+
 ## Admin workflow
 
 1. **Admin → Catalogue tools → Pricelist workbench**

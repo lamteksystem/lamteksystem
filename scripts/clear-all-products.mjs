@@ -2,7 +2,7 @@
  * Remove every row from public.products (and dependent catalogue rows) so you can re-import.
  *
  * Does: clear marketing carousel product ids, delete assembly_lines + assemblies, delete all products.
- * Preserves: categories, orders (order_lines.product_id → null), return lines, pick list item refs.
+ * Preserves: categories, assembly_part_types, orders (order headers kept; order_lines cleared).
  *
  * Connection: same as scripts/push-migrations.mjs (DATABASE_URL / DATABASE_POOLER_URL / SUPABASE_DB_URL / .secrets/database_url).
  *
@@ -76,6 +76,9 @@ where id = 'default';
 
 delete from public.assembly_lines;
 delete from public.assemblies;
+delete from public.product_categories where product_id is not null;
+delete from public.product_stock where product_id is not null;
+delete from public.order_lines where id is not null;
 
 delete from public.products;
 

@@ -3,10 +3,15 @@
  * PDF → text is done in scripts/parse-uform-spec-pdfs.mjs (Node + pdf-parse).
  */
 import { slugifyCategorySegment } from '@/lib/tealburyPricelistParse'
-import { TEALBURY_DOOR_RANGES, type TealburyDoorRange } from '@/lib/tealburyCatalogueBuild'
+import { TEALBURY_DOOR_RANGES, type TealburyDoorRange } from '@/lib/tealburyDoorRanges'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
-import { UNASSIGNED_CATEGORY } from '@/lib/pricelistWorkbench'
+
+const UNASSIGNED_CATEGORY = {
+  category_id: null as string | null,
+  category_slug: '',
+  category_name: '',
+}
 
 /** Map PDF filename stems to portal door-range names (extend when new specs arrive). */
 export const UFORM_SPEC_FILENAME_TO_RANGE: Record<string, TealburyDoorRange> = {

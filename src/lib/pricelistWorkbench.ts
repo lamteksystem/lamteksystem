@@ -3,6 +3,7 @@
  * catalogue template rows (category_slug, sku, unit_price, …) before publish.
  */
 import { supabase } from '@/lib/supabase'
+import { saveProductCategories } from '@/lib/productCategories'
 import type { CategoryRow, Json } from '@/types/database'
 import { CATALOG_PROGRAM, type CatalogProgram } from '@/lib/catalogProgram'
 import { slugifyCategoryName } from '@/lib/categoryAdmin'
@@ -345,14 +346,32 @@ export async function publishWorkbenchRows(
     }
 
     const { data: existing } = await supabase.from('products').select('id').eq('sku', sku).maybeSingle()
+    let productId = existing?.id ?? null
     if (existing?.id) {
       const { error: upErr } = await supabase.from('products').update(payload).eq('id', existing.id)
       if (upErr) result.errors.push(`Update ${sku}: ${upErr.message}`)
       else result.updated++
     } else {
-      const { error: insErr } = await supabase.from('products').insert(payload)
+      const { data: inserted, error: insErr } = await supabase
+        .from('products')
+        .insert(payload)
+        .select('id')
+        .maybeSingle()
       if (insErr) result.errors.push(`Insert ${sku}: ${insErr.message}`)
-      else result.inserted++
+      else {
+        result.inserted++
+        productId = inserted?.id ?? null
+      }
+    }
+
+    if (productId && catId) {
+      const extraRaw = row.options.extra_category_id
+      const extraId = typeof extraRaw === 'string' && extraRaw.trim() ? extraRaw.trim() : null
+      const sellable = row.options.sellable_standalone === true
+      if (sellable && extraId && extraId !== catId) {
+        const { error: catErr } = await saveProductCategories(productId, [catId, extraId], catId)
+        if (catErr) result.errors.push(`Categories ${sku}: ${catErr}`)
+      }
     }
   }
 

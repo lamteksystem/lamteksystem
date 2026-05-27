@@ -103,12 +103,7 @@ export default function AdminLiveCategories() {
           Loading categories…
         </p>
       ) : (
-        <section className="card admin-card admin-taxonomy-section--categories" style={{ marginTop: '1.25rem' }}>
-          <h2 className="admin-modal-form-section-title">Categories</h2>
-          <p className="admin-muted admin-taxonomy-section-intro">
-            Add parent categories (leave Parent empty) or sub-categories. Edit type and parent in the
-            table; double-click a slug to change it.
-          </p>
+        <div className="admin-categories-workbench-wrap" style={{ marginTop: '1.25rem' }}>
           <CatalogueCategoriesManager
             categories={categories}
             products={products}
@@ -118,7 +113,7 @@ export default function AdminLiveCategories() {
             variant="embedded"
             canEdit={canEditCatalogue}
           />
-        </section>
+        </div>
       )}
     </section>
   )

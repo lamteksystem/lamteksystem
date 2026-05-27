@@ -11,6 +11,7 @@ export type WorkbenchColumnId =
   | 'name'
   | 'description'
   | 'category'
+  | 'standalone'
   | 'cost_price'
   | 'unit_price'
   | 'active'
@@ -90,9 +91,17 @@ export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
   {
     id: 'category',
     label: 'Category',
-    tip: 'Portal category assigned for browse/filter. Use bulk Assign category or smart commands.',
+    tip: 'Primary portal category for browse/filter and publish.',
     minWidth: 130,
     defaultWidth: 150,
+  },
+  {
+    id: 'standalone',
+    label: 'Also standalone',
+    tip:
+      'When a Lamtek component is also sold on its own (e.g. carcass), pick the browse category here. Both categories are saved on publish.',
+    minWidth: 120,
+    defaultWidth: 140,
   },
   {
     id: 'cost_price',

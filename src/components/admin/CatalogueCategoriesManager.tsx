@@ -3,20 +3,17 @@
  * it's collapsed by default and tucks away under the rest of the catalogue UI. Supports
  * create / rename / change parent / change kind / delete with inline validation.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { CATEGORIES_TABLE_COLUMNS, categoriesColumnWidth } from '@/lib/categoriesTableColumns'
-import { useColumnWidths } from '@/hooks/useColumnWidths'
+import { useMemo, useState, type FormEvent } from 'react'
+import CategoriesWorkbenchTable from '@/components/admin/CategoriesWorkbenchTable'
+import PricelistWorkbenchSection from '@/components/admin/PricelistWorkbenchSection'
+import { DEFAULT_CATEGORIES_FILTERS, type CategoriesTableFilters } from '@/lib/categoriesWorkbenchFilters'
 import { Link } from 'react-router-dom'
-import ListPager from '@/components/admin/ListPager'
-import { useListPagination } from '@/lib/listPagination'
 import {
   createCategory,
   deleteCategory,
-  normalizeCategorySlug,
   slugifyCategoryName,
   updateCategory,
 } from '@/lib/categoryAdmin'
-import { categoryKindLabel, inferCategoryKindFromName } from '@/lib/categoryTaxonomy'
 import { getProductCategoryIds, type ProductCategoryMap } from '@/lib/productCategories'
 import { useCategoryTypes } from '@/hooks/useCategoryTypes'
 import type { CategoryKind, CategoryRow, CategoryTypeRow, ProductRow } from '@/types/database'
@@ -53,8 +50,7 @@ export default function CatalogueCategoriesManager({
   variant = 'inline',
   canEdit = true,
 }: CatalogueCategoriesManagerProps) {
-  const [search, setSearch] = useState('')
-  const [editingSlugId, setEditingSlugId] = useState<string | null>(null)
+  const [tableFilters, setTableFilters] = useState<CategoriesTableFilters>(DEFAULT_CATEGORIES_FILTERS)
   const [newName, setNewName] = useState('')
   const [newSlug, setNewSlug] = useState('')
   const [newParentId, setNewParentId] = useState('')
@@ -65,56 +61,6 @@ export default function CatalogueCategoriesManager({
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [message, setMessage] = useState<Message | null>(null)
-  const { widths: columnWidths, setWidth, persistWidths } = useColumnWidths('admin-categories')
-  const [resizingColId, setResizingColId] = useState<string | null>(null)
-  const resizeStartRef = useRef({ x: 0, width: 0 })
-  const columnWidthsRef = useRef(columnWidths)
-  columnWidthsRef.current = columnWidths
-
-  useEffect(() => {
-    if (!resizingColId) return
-    const onMove = (e: MouseEvent) => {
-      const delta = e.clientX - resizeStartRef.current.x
-      const col = CATEGORIES_TABLE_COLUMNS.find((c) => c.id === resizingColId)
-      const min = col?.minWidth ?? 60
-      setWidth(resizingColId, Math.max(min, resizeStartRef.current.width + delta))
-    }
-    const onUp = () => {
-      setResizingColId(null)
-      void persistWidths(columnWidthsRef.current)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [resizingColId, setWidth, persistWidths])
-
-  const renderResizableTh = useCallback(
-    (colId: (typeof CATEGORIES_TABLE_COLUMNS)[number]['id'], label: string, title: string) => {
-      const w = categoriesColumnWidth(colId, columnWidths)
-      return (
-        <th key={colId} style={{ width: w, minWidth: w }} title={title}>
-          <span className="admin-th-label">{label}</span>
-          {colId !== 'actions' ? (
-            <span
-              className="admin-th-resizer"
-              role="separator"
-              aria-label={`Resize ${label} column`}
-              onMouseDown={(e) => {
-                e.preventDefault()
-                resizeStartRef.current = { x: e.clientX, width: w }
-                setResizingColId(colId)
-              }}
-            />
-          ) : null}
-        </th>
-      )
-    },
-    [columnWidths],
-  )
-
   const parents = useMemo(
     () => categories.filter((c) => !c.parent_id).sort((a, b) => a.name.localeCompare(b.name)),
     [categories],
@@ -138,26 +84,11 @@ export default function CatalogueCategoriesManager({
     return counts
   }, [categories])
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const sorted = [...categories].sort((a, b) => a.name.localeCompare(b.name))
-    if (!q) return sorted
-    return sorted.filter((c) => c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q))
-  }, [categories, search])
-
-  const {
-    pageItems: pagedCategories,
-    totalItems: filteredTotal,
-    totalPages,
-    currentPage,
-    pageSize,
-    setPageSize,
-    rangeStart,
-    rangeEnd,
-    goToPage,
-  } = useListPagination(filtered, { resetDeps: [search] })
-
   const slugPreview = newSlug.trim() || (newName.trim() ? slugifyCategoryName(newName) : '')
+
+  function patchTableFilters(patch: Partial<CategoriesTableFilters>) {
+    setTableFilters((prev) => ({ ...prev, ...patch }))
+  }
 
   const totalProductsWithCategory = useMemo(
     () =>
@@ -341,197 +272,40 @@ export default function CatalogueCategoriesManager({
         </form>
         )}
 
-        <div className="admin-catalogue-categories-list-toolbar">
-          <h3 className="admin-modal-form-section-title">
-            All categories ({filteredTotal}
-            {filteredTotal !== categories.length ? ` of ${categories.length}` : ''})
-          </h3>
-          <input
-            type="search"
-            className="admin-categories-search"
-            placeholder="Search name or slug…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        {filteredTotal === 0 ? (
-          <p className="admin-muted">No categories match your search.</p>
-        ) : (
-          <>
-          <table className="admin-catalogue-categories-table admin-catalogue-categories-table--resizable">
-            <thead>
-              <tr>
-                {renderResizableTh('name', 'Name', 'The category name shown to staff and customers')}
-                {renderResizableTh('slug', 'Slug', 'URL-friendly identifier')}
-                {renderResizableTh('parent', 'Parent', 'Empty if top-level')}
-                {renderResizableTh('type', 'Type', 'Product category / Kitchen range / Cross-range')}
-                {renderResizableTh('products', 'Products', 'Product count')}
-                {renderResizableTh('subs', 'Subs', 'Sub-category count')}
-                {renderResizableTh('actions', '', 'Actions')}
-              </tr>
-            </thead>
-            <tbody>
-              {pagedCategories.map((c) => {
-                const parent = c.parent_id ? categories.find((p) => p.id === c.parent_id) : null
-                const kind = c.category_kind ?? inferCategoryKindFromName(c.name)
-                const productCount = productCountByCategory.get(c.id) ?? 0
-                const childCount = childCountByParent.get(c.id) ?? 0
-                const isBusy = busyId === c.id
-                const hasReferences = productCount > 0 || childCount > 0
-                return (
-                  <tr
-                    key={c.id}
-                    className={isBusy ? 'admin-catalogue-categories-row--busy' : undefined}
-                    title={`${categoryKindLabel(kind, categoryTypes)} · ${productCount} product${productCount === 1 ? '' : 's'}${
-                      parent ? ` · sub-category of ${parent.name}` : ' · top level'
-                    }`}
-                  >
-                    <td>
-                      {canEdit ? (
-                        <input
-                          type="text"
-                          defaultValue={c.name}
-                          disabled={isBusy}
-                          onBlur={(e) => {
-                            const v = e.target.value.trim()
-                            if (v && v !== c.name) void patch(c.id, { name: v })
-                          }}
-                          title="Rename this category. Saved when you click away."
-                          aria-label={`Rename ${c.name}`}
-                        />
-                      ) : (
-                        c.name
-                      )}
-                    </td>
-                    <td>
-                      {canEdit && editingSlugId === c.id ? (
-                        <input
-                          type="text"
-                          className="admin-catalogue-categories-slug-input"
-                          defaultValue={c.slug}
-                          autoFocus
-                          disabled={isBusy}
-                          onBlur={(e) => {
-                            setEditingSlugId(null)
-                            const next = normalizeCategorySlug(e.target.value)
-                            if (next && next !== c.slug) void patch(c.id, { slug: next })
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-                            if (e.key === 'Escape') setEditingSlugId(null)
-                          }}
-                          aria-label={`Edit slug for ${c.name}`}
-                        />
-                      ) : (
-                        <code
-                          className={`admin-catalogue-categories-slug${canEdit ? ' admin-catalogue-categories-slug--editable' : ''}`}
-                          onDoubleClick={
-                            canEdit && !isBusy
-                              ? () => setEditingSlugId(c.id)
-                              : undefined
-                          }
-                          title={
-                            canEdit
-                              ? 'Double-click to edit slug'
-                              : c.slug
-                          }
-                        >
-                          {c.slug}
-                        </code>
-                      )}
-                    </td>
-                    <td>
-                      {canEdit ? (
-                        <select
-                          defaultValue={c.parent_id ?? ''}
-                          disabled={isBusy}
-                          onChange={(e) =>
-                            void patch(c.id, { parent_id: e.target.value || null })
-                          }
-                          title="Move under a parent category, or set to Top level (parent category)"
-                        >
-                          <option value="">Top level (parent)</option>
-                          {parents
-                            .filter((p) => p.id !== c.id)
-                            .map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                        </select>
-                      ) : parent ? (
-                        parent.name
-                      ) : (
-                        <span className="admin-muted">Top level</span>
-                      )}
-                    </td>
-                    <td>
-                      {canEdit ? (
-                        <select
-                          defaultValue={kind}
-                          disabled={isBusy}
-                          onChange={(e) => void patch(c.id, { category_kind: e.target.value })}
-                          title={`Currently: ${categoryKindLabel(kind, categoryTypes)}`}
-                        >
-                          {categoryTypes.map((t) => (
-                            <option key={t.code} value={t.code}>
-                              {t.label}
-                              {!t.active ? ' (hidden)' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        categoryKindLabel(kind, categoryTypes)
-                      )}
-                    </td>
-                    <td className="admin-catalogue-categories-count" title={`${productCount} product(s) in this category`}>
-                      {productCount}
-                    </td>
-                    <td className="admin-catalogue-categories-count" title={`${childCount} sub-categor(y/ies)`}>
-                      {childCount}
-                    </td>
-                    <td>
-                      {canEdit ? (
-                        <button
-                          type="button"
-                          className="admin-link-button admin-danger"
-                          disabled={isBusy}
-                          onClick={() => void remove(c)}
-                          title={
-                            hasReferences
-                              ? `Delete "${c.name}" — ${productCount} product(s) and ${childCount} sub-categor(y/ies) will be updated`
-                              : `Delete "${c.name}"`
-                          }
-                        >
-                          Delete
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          <ListPager
-            totalItems={filteredTotal}
-            totalPages={totalPages}
-            currentPage={currentPage}
-            pageSize={pageSize}
-            rangeStart={rangeStart}
-            rangeEnd={rangeEnd}
-            onPageChange={goToPage}
-            onPageSizeChange={setPageSize}
-            itemLabel={filteredTotal === 1 ? 'category' : 'categories'}
-            ariaLabel="Category list"
-          />
-          </>
-        )}
+        <CategoriesWorkbenchTable
+          categories={categories}
+          categoryTypes={categoryTypes}
+          productCountByCategory={productCountByCategory}
+          childCountByParent={childCountByParent}
+          canEdit={canEdit}
+          busyId={busyId}
+          onPatch={(id, body) => void patch(id, body)}
+          onRemove={(c) => void remove(c)}
+          filters={tableFilters}
+          onFiltersChange={patchTableFilters}
+        />
       </div>
   )
 
+  const workbenchList = (
+    <PricelistWorkbenchSection
+      id="categories-workbench"
+      title="Edit categories"
+      summary={`${categories.length} categories · search, filter, and sort like the pricelist workbench`}
+      tip="Resize columns via the header edges. Hover the side arrows to auto-scroll horizontally."
+      defaultOpen
+      badge={categories.length}
+    >
+      {body}
+    </PricelistWorkbenchSection>
+  )
+
   if (variant === 'embedded') {
-    return <div className="admin-catalogue-categories-manager admin-catalogue-categories-manager--embedded">{body}</div>
+    return (
+      <div className="admin-catalogue-categories-manager admin-catalogue-categories-manager--embedded admin-categories-workbench">
+        {workbenchList}
+      </div>
+    )
   }
 
   return (

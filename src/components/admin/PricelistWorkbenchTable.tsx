@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { ColumnSettings } from '@/components/admin/ColumnSettings'
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import {
@@ -39,6 +39,10 @@ type Props = {
   onToggleSelectAllOnPage: (checked: boolean) => void
   onPatchRow: (id: string, patch: Partial<PricelistWorkbenchRow>) => void
   onDeleteRow: (id: string) => void
+  scrollRef?: RefObject<HorizontalScrollHandle>
+  onScrollStateChange?: (state: HorizontalScrollState) => void
+  /** Hide toolbar scroll arrows when parent renders them in the section header. */
+  hideToolbarScrollArrows?: boolean
 }
 
 const COLUMN_DEFS = PRICELIST_WORKBENCH_COLUMNS.map(({ id, label }) => ({ id, label }))
@@ -70,6 +74,9 @@ export default function PricelistWorkbenchTable({
   onToggleSelectAllOnPage,
   onPatchRow,
   onDeleteRow,
+  scrollRef: scrollRefProp,
+  onScrollStateChange: onScrollStateChangeProp,
+  hideToolbarScrollArrows = false,
 }: Props) {
   const { columnDefs, visibleIds, setColumnVisible, setColumnOrder, resetToDefault, isVisible, order } =
     useColumnVisibility('pricelist-workbench', COLUMN_DEFS, PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS)
@@ -80,11 +87,19 @@ export default function PricelistWorkbenchTable({
   const resizeStartRef = useRef({ x: 0, width: 0 })
   const columnWidthsRef = useRef(columnWidths)
   columnWidthsRef.current = columnWidths
-  const scrollRef = useRef<HorizontalScrollHandle>(null)
+  const internalScrollRef = useRef<HorizontalScrollHandle>(null)
+  const scrollRef = scrollRefProp ?? internalScrollRef
   const [scrollState, setScrollState] = useState<HorizontalScrollState>({
     canScrollLeft: false,
     canScrollRight: false,
   })
+  const handleScrollStateChange = useCallback(
+    (state: HorizontalScrollState) => {
+      setScrollState(state)
+      onScrollStateChangeProp?.(state)
+    },
+    [onScrollStateChangeProp],
+  )
 
   const visibleCols = useMemo(
     () =>
@@ -309,6 +324,60 @@ export default function PricelistWorkbenchTable({
             ))}
           </select>
         )
+      case 'standalone': {
+        const sellable = row.options.sellable_standalone === true
+        const extraId =
+          typeof row.options.extra_category_id === 'string' ? row.options.extra_category_id : ''
+        return (
+          <div className="admin-pricelist-standalone-cell">
+            <label className="admin-pricelist-standalone-check">
+              <input
+                type="checkbox"
+                checked={sellable}
+                onChange={(e) => {
+                  const on = e.target.checked
+                  onPatchRow(row.id, {
+                    options: {
+                      ...row.options,
+                      sellable_standalone: on,
+                      ...(on
+                        ? {}
+                        : { extra_category_id: null, extra_category_name: '' }),
+                    },
+                  })
+                }}
+                aria-label="Also sellable standalone"
+              />
+              <span className="admin-muted">Standalone</span>
+            </label>
+            {sellable ? (
+              <select
+                className="admin-pricelist-category-select"
+                value={extraId}
+                onChange={(e) => {
+                  const cat = categories.find((c) => c.id === e.target.value)
+                  onPatchRow(row.id, {
+                    options: {
+                      ...row.options,
+                      sellable_standalone: true,
+                      extra_category_id: cat?.id ?? null,
+                      extra_category_name: cat?.name ?? '',
+                    },
+                  })
+                }}
+                title="Browse category when sold on its own (e.g. Carcasses)"
+              >
+                <option value="">— Browse category —</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.parent_id ? `— ${c.name}` : c.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+          </div>
+        )
+      }
       case 'cost_price': {
         const isEditing = editing?.id === row.id && editing.field === 'cost_price'
         if (isEditing) {
@@ -419,21 +488,23 @@ export default function PricelistWorkbenchTable({
           Double-click cells to edit. Scroll horizontally with the bar below or the arrow buttons.
         </span>
       </div>
-      <HorizontalScrollToolbarArrows
-        canScrollLeft={scrollState.canScrollLeft}
-        canScrollRight={scrollState.canScrollRight}
-        onScrollLeft={() => scrollRef.current?.scrollLeft()}
-        onScrollRight={() => scrollRef.current?.scrollRight()}
-        className="admin-pricelist-scroll-arrows"
-      />
+      {!hideToolbarScrollArrows ? (
+        <HorizontalScrollToolbarArrows
+          canScrollLeft={scrollState.canScrollLeft}
+          canScrollRight={scrollState.canScrollRight}
+          onScrollLeft={() => scrollRef.current?.scrollLeft()}
+          onScrollRight={() => scrollRef.current?.scrollRight()}
+          className="admin-pricelist-scroll-arrows"
+        />
+      ) : null}
     </div>
     <HorizontalScrollWithArrows
       ref={scrollRef}
-      fixedArrows={false}
+      fixedArrows
       className="admin-horizontal-scroll-wrap--pricelist-table"
       innerClassName="admin-pricelist-table-scroll"
       contentStyle={{ minWidth: tableWidthPx }}
-      onScrollStateChange={setScrollState}
+      onScrollStateChange={handleScrollStateChange}
     >
       <div
         className="admin-table-wrap admin-pricelist-table-wrap"

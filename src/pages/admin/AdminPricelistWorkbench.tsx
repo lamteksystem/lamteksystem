@@ -38,6 +38,13 @@ import { deleteRowsByIds } from '@/lib/pricelistWorkbenchRules'
 import PricelistWorkbenchSmartPanel from '@/components/admin/PricelistWorkbenchSmartPanel'
 import PricelistWorkbenchSection from '@/components/admin/PricelistWorkbenchSection'
 import PricelistWorkbenchTable from '@/components/admin/PricelistWorkbenchTable'
+import PricelistWorkbenchTableToolbar from '@/components/admin/PricelistWorkbenchTableToolbar'
+import type { HorizontalScrollHandle, HorizontalScrollState } from '@/components/admin/HorizontalScrollWithArrows'
+import {
+  DEFAULT_WORKBENCH_FILTERS,
+  filterAndSortWorkbenchRows,
+  type WorkbenchTableFilters,
+} from '@/lib/pricelistWorkbenchFilters'
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import { clearWorkbenchDraft, loadWorkbenchDraft, saveWorkbenchDraft } from '@/lib/pricelistWorkbenchDraft'
 import type { WorkbenchWarning } from '@/lib/pricelistWorkbenchWarnings'
@@ -46,8 +53,6 @@ import WorkbenchActionReportModal, {
   type WorkbenchActionReport,
 } from '@/components/admin/WorkbenchActionReportModal'
 import type { CategoryRow } from '@/types/database'
-
-type SourceFilter = 'all' | PricelistSource
 
 export default function AdminPricelistWorkbench() {
   const { allowed: canEdit, loading: permLoading } = usePermission('admin.catalogue', 'edit')
@@ -75,12 +80,17 @@ export default function AdminPricelistWorkbench() {
     setError(null)
   }
 
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
-  const [doorFilter, setDoorFilter] = useState('')
-  const [sectionFilter, setSectionFilter] = useState('')
-  const [search, setSearch] = useState('')
-  const [onlyUnassigned, setOnlyUnassigned] = useState(false)
+  const [tableFilters, setTableFilters] = useState<WorkbenchTableFilters>(DEFAULT_WORKBENCH_FILTERS)
   const [bulkCategoryId, setBulkCategoryId] = useState('')
+  const tableScrollRef = useRef<HorizontalScrollHandle>(null)
+  const [tableScrollState, setTableScrollState] = useState<HorizontalScrollState>({
+    canScrollLeft: false,
+    canScrollRight: false,
+  })
+
+  function patchTableFilters(patch: Partial<WorkbenchTableFilters>) {
+    setTableFilters((prev) => ({ ...prev, ...patch }))
+  }
 
   const tealburyInputRef = useRef<HTMLInputElement>(null)
   const lamtekInputRef = useRef<HTMLInputElement>(null)
@@ -152,22 +162,10 @@ export default function AdminPricelistWorkbench() {
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [rows])
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return rows.filter((r) => {
-      if (sourceFilter !== 'all' && r.source !== sourceFilter) return false
-      if (doorFilter && r.door_range !== doorFilter) return false
-      if (sectionFilter && r.section !== sectionFilter) return false
-      if (onlyUnassigned && r.category_id) return false
-      if (!q) return true
-      return (
-        r.sku.toLowerCase().includes(q) ||
-        r.name.toLowerCase().includes(q) ||
-        r.section.toLowerCase().includes(q) ||
-        r.category_name.toLowerCase().includes(q)
-      )
-    })
-  }, [rows, sourceFilter, doorFilter, sectionFilter, onlyUnassigned, search])
+  const filtered = useMemo(
+    () => filterAndSortWorkbenchRows(rows, tableFilters),
+    [rows, tableFilters],
+  )
 
   const {
     pageItems,
@@ -178,7 +176,7 @@ export default function AdminPricelistWorkbench() {
     rangeStart,
     rangeEnd,
     goToPage,
-  } = useListPagination(filtered, { defaultPageSize: 50 })
+  } = useListPagination(filtered, { defaultPageSize: 50, resetDeps: [tableFilters] })
 
   const selectedCount = useMemo(() => rows.filter((r) => r.selected).length, [rows])
   const filteredSelectedCount = useMemo(() => filtered.filter((r) => r.selected).length, [filtered])
@@ -770,9 +768,24 @@ export default function AdminPricelistWorkbench() {
             id="workbench-table"
             title="2. Edit products"
             summary={`${filtered.length} filtered · page ${currentPage} of ${totalPages}`}
-            tip="Resize and show/hide columns via the gear control. Scroll left/right with the arrow buttons or the scrollbar under the table. Double-click cells to edit."
+            tip="Resize and show/hide columns via the gear control. Hover the side arrows to auto-scroll. Double-click cells to edit."
             defaultOpen
             badge={filtered.length}
+            headerExtra={
+              <PricelistWorkbenchTableToolbar
+                filters={tableFilters}
+                onChange={patchTableFilters}
+                doorRanges={doorRanges}
+                sections={sections}
+                categories={categories}
+                partTypes={partTypesHook.types}
+                filteredCount={filtered.length}
+                totalCount={rows.length}
+                scrollState={tableScrollState}
+                onScrollLeft={() => tableScrollRef.current?.scrollLeft()}
+                onScrollRight={() => tableScrollRef.current?.scrollRight()}
+              />
+            }
           >
             <PricelistWorkbenchTable
               pageItems={pageItems}
@@ -782,6 +795,9 @@ export default function AdminPricelistWorkbench() {
               onToggleSelectAllOnPage={toggleSelectAllOnPage}
               onPatchRow={patchRow}
               onDeleteRow={deleteRow}
+              scrollRef={tableScrollRef}
+              onScrollStateChange={setTableScrollState}
+              hideToolbarScrollArrows
             />
             <ListPager
               totalItems={filtered.length}
@@ -798,103 +814,16 @@ export default function AdminPricelistWorkbench() {
 
           <PricelistWorkbenchSection
             id="workbench-tools"
-            title="3. Filter, bulk actions & smart commands"
-            summary="Narrow the list, assign categories, delete rows, or run plain-English commands"
-            tip="Bulk actions apply to filtered rows or ticked selection. Smart commands can assign categories, clean names, delete, and more."
+            title="3. Bulk actions & smart commands"
+            summary="Assign categories, delete rows, or run plain-English commands on the filtered list"
+            tip="Use the search and filters in section 2. Bulk actions apply to filtered rows or ticked selection."
             defaultOpen={false}
           >
             <div className="admin-pricelist-tools-layout">
-              <div className="admin-pricelist-panel admin-pricelist-panel--filters">
-                <h3>
-                  Filters
-                  <AdminHelpTip text="Filters affect the table and most bulk actions. Selection checkboxes persist across pages." />
-                </h3>
-                <div className="admin-pricelist-filter-grid">
-                  <label className="admin-pricelist-field admin-pricelist-field--wide">
-                    <span>
-                      Search
-                      <AdminHelpTip text="Matches SKU, product name, section label, or assigned category name." />
-                    </span>
-                    <input
-                      type="search"
-                      value={search}
-                      onChange={(e) => {
-                        setSearch(e.target.value)
-                        goToPage(1)
-                      }}
-                      placeholder="SKU, name, section…"
-                    />
-                  </label>
-                  <label className="admin-pricelist-field">
-                    <span>Source</span>
-                    <select
-                      value={sourceFilter}
-                      onChange={(e) => {
-                        setSourceFilter(e.target.value as SourceFilter)
-                        goToPage(1)
-                      }}
-                    >
-                      <option value="all">All ({rows.length})</option>
-                      <option value="lamtek">Lamtek components ({lamtekCount})</option>
-                      <option value="uform">UFORM doors/trim ({uformCount})</option>
-                      <option value="tealbury">Tealbury complete ({tealburyCount})</option>
-                    </select>
-                  </label>
-                  <label className="admin-pricelist-field">
-                    <span>Door / range</span>
-                    <select
-                      value={doorFilter}
-                      onChange={(e) => {
-                        setDoorFilter(e.target.value)
-                        goToPage(1)
-                      }}
-                    >
-                      <option value="">All ranges</option>
-                      {doorRanges.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="admin-pricelist-field">
-                    <span>Section</span>
-                    <select
-                      value={sectionFilter}
-                      onChange={(e) => {
-                        setSectionFilter(e.target.value)
-                        goToPage(1)
-                      }}
-                    >
-                      <option value="">All sections</option>
-                      {sections.slice(0, 200).map((s) => (
-                        <option key={s} value={s}>
-                          {s.length > 48 ? `${s.slice(0, 48)}…` : s}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="admin-pricelist-field admin-pricelist-field--check">
-                    <input
-                      type="checkbox"
-                      checked={onlyUnassigned}
-                      onChange={(e) => {
-                        setOnlyUnassigned(e.target.checked)
-                        goToPage(1)
-                      }}
-                    />
-                    <span>
-                      Unassigned only ({unassignedCount})
-                      <AdminHelpTip text="Show only rows without a portal category — useful before bulk assign or publish." />
-                    </span>
-                  </label>
-                </div>
-                <p className="admin-muted admin-pricelist-filter-summary">
-                  Table shows {rangeStart}–{rangeEnd} of {filtered.length} filtered
-                  {selectedCount > 0 ? ` · ${selectedCount} selected` : ''}
-                </p>
-              </div>
-
+              <p className="admin-muted admin-pricelist-filter-summary">
+                Table shows {rangeStart}–{rangeEnd} of {filtered.length} filtered
+                {selectedCount > 0 ? ` · ${selectedCount} selected` : ''}
+              </p>
               <div className="admin-pricelist-panel admin-pricelist-panel--bulk">
                 <h3>
                   Selection &amp; bulk actions

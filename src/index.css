@@ -5040,6 +5040,10 @@ button.ordering-wizard-card {
   width: 100%;
   margin: 0 auto;
   background: var(--lamtek-bg);
+  box-sizing: border-box;
+}
+.admin-app--sidebar-collapsed .admin-main {
+  max-width: none;
 }
 
 /* Admin settings page */
@@ -6714,26 +6718,34 @@ button.ordering-wizard-card {
 .admin-th-label { display: inline-flex; align-items: center; gap: 0.15rem; flex-wrap: wrap; }
 .admin-th-help .admin-help-tip-icon { width: 0.9rem; height: 0.9rem; font-size: 0.6rem; }
 
-/* Collapsible workbench sections */
+/* Collapsible workbench sections (chevron-only toggle) */
 .admin-workbench-section { margin-bottom: 1rem; }
-.admin-workbench-section-summary {
+.admin-workbench-section-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.5rem 1rem;
-  cursor: pointer;
-  list-style: none;
-  user-select: none;
+  align-items: flex-start;
+  gap: 0.5rem 0.75rem;
 }
-.admin-workbench-section-summary::-webkit-details-marker { display: none; }
+.admin-workbench-section-header-main {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.admin-workbench-section-header-extra {
+  flex: 2 1 20rem;
+  min-width: 0;
+}
 .admin-workbench-section-title {
   font-size: 1.05rem;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+  margin: 0;
 }
-.admin-workbench-section-summary-text { font-size: 0.85rem; }
+.admin-workbench-section-summary-text {
+  font-size: 0.85rem;
+  margin: 0.2rem 0 0;
+}
 .admin-workbench-section-badge {
   font-size: 0.75rem;
   font-weight: 600;
@@ -6742,7 +6754,88 @@ button.ordering-wizard-card {
   background: color-mix(in srgb, var(--lamtek-gold) 18%, transparent);
   color: var(--lamtek-gold);
 }
-.admin-workbench-section-body { margin-top: 0.85rem; }
+.admin-workbench-section-chevron {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--lamtek-gray-light);
+  border-radius: 6px;
+  background: var(--lamtek-bg);
+  color: var(--lamtek-text);
+  cursor: pointer;
+}
+.admin-workbench-section-chevron:hover {
+  border-color: var(--lamtek-gold);
+  color: var(--lamtek-gold);
+}
+.admin-workbench-section-body { margin-top: 0.85rem; width: 100%; }
+.admin-pricelist-table-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+.admin-pricelist-table-toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.35rem 0.5rem;
+}
+.admin-pricelist-toolbar-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.72rem;
+}
+.admin-pricelist-toolbar-field--search {
+  flex: 1 1 10rem;
+  min-width: 9rem;
+}
+.admin-pricelist-toolbar-field--search input {
+  min-width: 10rem;
+}
+.admin-pricelist-toolbar-field input,
+.admin-pricelist-toolbar-field select {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.4rem;
+  max-width: 9.5rem;
+}
+.admin-pricelist-toolbar-field--search input {
+  max-width: none;
+  width: 100%;
+}
+.admin-pricelist-toolbar-label {
+  font-weight: 600;
+  color: var(--lamtek-text-muted, var(--lamtek-gray));
+  white-space: nowrap;
+}
+.admin-pricelist-toolbar-sort-row {
+  display: flex;
+  gap: 0.25rem;
+}
+.admin-pricelist-toolbar-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  padding-bottom: 0.2rem;
+  white-space: nowrap;
+}
+.admin-pricelist-table-toolbar-scroll {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.admin-pricelist-table-toolbar-count {
+  font-size: 0.78rem;
+}
 .admin-pricelist-stats {
   margin: 0.35rem 0 0;
   font-size: 0.88rem;
@@ -7200,14 +7293,6 @@ button.ordering-wizard-card {
 .admin-pricelist-range { max-width: 8rem; font-size: 0.78rem; color: var(--lamtek-text-muted, var(--lamtek-gray)); }
 .admin-pricelist-warnings { margin: 0.5rem 0 0; padding-left: 1.25rem; font-size: 0.88rem; }
 .admin-pricelist-error { margin-top: 0.75rem; max-height: 12rem; overflow: auto; }
-.admin-pricelist-table-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.65rem 1rem;
-  margin-bottom: 0.65rem;
-}
 .admin-pricelist-table-toolbar-start {
   display: flex;
   flex-wrap: wrap;
@@ -7267,6 +7352,19 @@ button.ordering-wizard-card {
   overflow: visible;
   max-width: none;
   max-height: none;
+}
+.admin-pricelist-standalone-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 7rem;
+}
+.admin-pricelist-standalone-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 .admin-pricelist-cell-edit {
   display: block;

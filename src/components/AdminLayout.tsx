@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Outlet, Link, useNavigate, useLocation, NavLink } from 'react-router-dom'
+import { Link, useNavigate, useLocation, NavLink } from 'react-router-dom'
+import AdminRouteOutlet from '@/components/admin/AdminRouteOutlet'
 import { supabase } from '@/lib/supabase'
 import { useStaff } from '@/hooks/useStaff'
 import { useImpersonation } from '@/contexts/ImpersonationContext'
@@ -1050,7 +1051,7 @@ export default function AdminLayout() {
                 </div>
               </div>
             ) : (
-              <Outlet key={location.key} />
+              <AdminRouteOutlet />
             )}
           </div>
         </main>

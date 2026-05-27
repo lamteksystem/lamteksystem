@@ -46,6 +46,7 @@
     "catalogue:import-uform-specs": "node --env-file=.env scripts/import-uform-spec-products.mjs",
     "catalogue:clear-products": "node --env-file=.env scripts/clear-all-products.mjs",
     "catalogue:import-pricelists": "node --env-file=.env scripts/import-pricelists.mjs",
+    "catalogue:rebuild-workbench": "node --env-file=.env scripts/catalogue-rebuild-workbench.mjs",
     "assign-images": "node --env-file=.env scripts/assign-product-images.js",
     "authorize:lamtek": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/authorize-lamtek-context.ps1"
   },

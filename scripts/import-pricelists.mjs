@@ -6,8 +6,8 @@
  *   Hub is skipped, each range sheet is imported separately and SKU becomes `CODE · SheetName`.
  * - Lamtek trade kitchen: single sheet with Code / Size / Description + finish columns and TOC section markers.
  *
- * Per-program purge: only deletes existing products with the matching `catalog_program`, so importing
- * Tealbury never wipes Lamtek and vice versa.
+ * Writes to **catalogue_workbench_drafts** (staged workbench) — does NOT publish to live products.
+ * Use Admin → Pricelist workbench → Publish when ready.
  *
  * Usage:
  *   node --env-file=.env scripts/import-pricelists.mjs --dry-run --tealbury "C:\...\Tealbury.xlsx"
@@ -19,8 +19,14 @@
  */
 
 import fs from 'fs'
-import { createClient } from '@supabase/supabase-js'
 import * as XLSX from 'xlsx'
+import {
+  createSupabaseAdmin,
+  fetchCategories,
+  loadWorkbenchDraft,
+  parsedToWorkbenchRow,
+  saveWorkbenchDraft,
+} from './lib/workbench-draft.mjs'
 
 const COST_FACTOR = 0.75
 const CHUNK = 200
@@ -745,15 +751,6 @@ async function main() {
     process.exit(1)
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SVC = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!SUPABASE_URL || !SVC) {
-    console.error('Set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY in .env')
-    process.exit(1)
-  }
-
-  const supabase = createClient(SUPABASE_URL, SVC, { auth: { persistSession: false, autoRefreshToken: false } })
-
   const programs = []
   if (lamtekPath) {
     if (!fs.existsSync(lamtekPath)) {
@@ -768,7 +765,7 @@ async function main() {
       console.log('  sample:')
       rows.slice(0, 5).forEach((p) => console.log('    ', p.sku, '|', p.name.slice(0, 80), '| £' + p.unitPrice))
     }
-    programs.push({ program: 'lamtek', rows })
+    programs.push({ program: 'lamtek', rows, warnings })
   }
   if (tealburyPath) {
     if (!fs.existsSync(tealburyPath)) {
@@ -783,11 +780,11 @@ async function main() {
       console.log('  sample:')
       rows.slice(0, 5).forEach((p) => console.log('    ', p.sku, '|', p.name.slice(0, 80), '| £' + p.unitPrice))
     }
-    programs.push({ program: 'tealbury', rows })
+    programs.push({ program: 'tealbury', rows, warnings })
   }
 
   if (dryRun) {
-    console.log('\nDRY RUN: no changes written. Re-run with --yes to import.')
+    console.log('\nDRY RUN: no changes written. Re-run with --yes to load workbench draft.')
     return
   }
   if (!yes) {
@@ -795,14 +792,23 @@ async function main() {
     process.exit(1)
   }
 
-  for (const { program, rows } of programs) {
-    console.log(`\n== Importing ${program} (${rows.length} products) ==`)
-    await purgeProgram(supabase, program)
-    await insertProgramProducts(supabase, rows, program)
-    console.log(`  done: ${program}.`)
+  const supabase = await createSupabaseAdmin()
+  const categories = await fetchCategories(supabase)
+  const existing = await loadWorkbenchDraft(supabase)
+  let draftRows = Array.isArray(existing.rows) ? [...existing.rows] : []
+  let allWarnings = Array.isArray(existing.warnings) ? [...existing.warnings] : []
+
+  for (const { program, rows, warnings: parseWarnings } of programs) {
+    console.log(`\n== Loading ${program} into workbench (${rows.length} row(s)) ==`)
+    draftRows = draftRows.filter((r) => r.source !== program)
+    const built = rows.map((p) => parsedToWorkbenchRow(p, program, categories))
+    draftRows.push(...built)
+    if (parseWarnings?.length) allWarnings.push(...parseWarnings.slice(0, 20))
+    console.log(`  workbench now has ${draftRows.length} total row(s).`)
   }
 
-  console.log('\nAll imports complete.')
+  await saveWorkbenchDraft(supabase, draftRows, allWarnings)
+  console.log('\nWorkbench draft saved. Open Admin → Pricelist workbench to review, then Publish.')
 }
 
 main().catch((err) => {

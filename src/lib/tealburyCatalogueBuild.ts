@@ -1,9 +1,10 @@
 /**
  * Tealbury Complete catalogue build: door ranges, part-type inference, category bootstrap.
  */
-import { createCategory, fetchAllCategories } from '@/lib/categoryAdmin'
+import { createCategory, fetchAllCategories, updateCategory } from '@/lib/categoryAdmin'
+import { ACCESSORIES_SUBCATEGORY_NAMES } from '@/lib/coreCatalogueCategories'
 import type { CategoryRow } from '@/types/database'
-import type { PricelistSource, PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
 import { TEALBURY_DOOR_RANGES, type TealburyDoorRange } from '@/lib/tealburyDoorRanges'
 
 export { TEALBURY_DOOR_RANGES, type TealburyDoorRange }
@@ -71,51 +72,55 @@ export interface BootstrapCategoriesResult {
   errors: string[]
 }
 
-/** Ensure door-range categories + common component groupings exist. */
+/** Ensure Accessories parent + Cutlery Trays / Lighting / Misc only (no import section categories). */
 export async function bootstrapTealburyCatalogueCategories(): Promise<BootstrapCategoriesResult> {
   const result: BootstrapCategoriesResult = { created: [], existing: [], errors: [] }
   const existing = await fetchAllCategories()
   const byName = new Map(existing.map((c) => [c.name.trim().toLowerCase(), c]))
 
-  async function ensure(name: string, kind: CategoryRow['category_kind']) {
+  async function ensure(
+    name: string,
+    kind: CategoryRow['category_kind'],
+    parentId: string | null = null,
+  ): Promise<CategoryRow | null> {
     const key = name.trim().toLowerCase()
-    if (byName.has(key)) {
+    const hit = [...byName.values()].find(
+      (c) => c.name.trim().toLowerCase() === key && (parentId ? c.parent_id === parentId : !c.parent_id),
+    )
+    if (hit) {
       result.existing.push(name)
-      return
+      return hit
     }
-    const { category, error } = await createCategory({ name, category_kind: kind })
+    const { category, error } = await createCategory({
+      name,
+      category_kind: kind,
+      parent_id: parentId,
+    })
     if (error || !category) {
       result.errors.push(`${name}: ${error ?? 'failed'}`)
-      return
+      return null
     }
     byName.set(key, category)
     result.created.push(name)
+    return category
   }
 
-  for (const range of TEALBURY_DOOR_RANGES) {
-    await ensure(range, 'door_range')
+  const accessoriesRow =
+    existing.find((c) => c.name.trim().toLowerCase() === 'accessories' && !c.parent_id) ??
+    (await ensure('Accessories', 'product_type'))
+  const accessoriesId = accessoriesRow?.id ?? null
+  if (!accessoriesId) return result
+
+  for (const sub of ACCESSORIES_SUBCATEGORY_NAMES) {
+    await ensure(sub, 'product_type', accessoriesId)
   }
 
-  const componentGroups = [
-    'Base units',
-    'Wall units',
-    'Tall units',
-    'Hinges',
-    'Hinge plates',
-    'Drawer boxes',
-    'Cutlery trays',
-    'Leg kits',
-    'Fittings',
-    'Doors',
-    'Plinth',
-    'Cornice & pelmet',
-    'Panels & posts',
-  ]
-  for (const g of componentGroups) {
-    await ensure(g, 'product_type')
+  const topLighting = existing.find(
+    (c) => c.name.trim().toLowerCase() === 'lighting' && !c.parent_id,
+  )
+  if (topLighting && topLighting.parent_id !== accessoriesId) {
+    await updateCategory(topLighting.id, { parent_id: accessoriesId })
   }
-
-  await ensure('Tealbury Complete', 'product_type')
 
   return result
 }
@@ -140,8 +145,4 @@ export function autoAssignDoorRangeCategories(
   })
 }
 
-export function sourceLabel(source: PricelistSource | 'uform'): string {
-  if (source === 'tealbury') return 'TB'
-  if (source === 'lamtek') return 'LK'
-  return 'UF'
-}
+export { catalogueSourceAbbrev as sourceAbbrev, catalogueSourceLabel as sourceLabel } from '@/lib/catalogueSourceLabel'

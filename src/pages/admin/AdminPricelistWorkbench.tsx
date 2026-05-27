@@ -39,6 +39,7 @@ import PricelistWorkbenchSmartPanel from '@/components/admin/PricelistWorkbenchS
 import PricelistWorkbenchSection from '@/components/admin/PricelistWorkbenchSection'
 import PricelistWorkbenchTable from '@/components/admin/PricelistWorkbenchTable'
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
+import { clearWorkbenchDraft, loadWorkbenchDraft, saveWorkbenchDraft } from '@/lib/pricelistWorkbenchDraft'
 import type { CategoryRow } from '@/types/database'
 
 type SourceFilter = 'all' | PricelistSource
@@ -56,6 +57,10 @@ export default function AdminPricelistWorkbench() {
   const [message, setMessage] = useState<string | null>(null)
   const [messageTitle, setMessageTitle] = useState('Done')
   const [error, setError] = useState<string | null>(null)
+  const [draftLoaded, setDraftLoaded] = useState(false)
+  const [draftSaving, setDraftSaving] = useState(false)
+  const [draftUpdatedAt, setDraftUpdatedAt] = useState<string | null>(null)
+  const skipNextSaveRef = useRef(true)
 
   function showSuccess(title: string, text: string) {
     setMessageTitle(title)
@@ -82,6 +87,47 @@ export default function AdminPricelistWorkbench() {
   useEffect(() => {
     void loadCategories()
   }, [loadCategories])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const draft = await loadWorkbenchDraft()
+        if (cancelled) return
+        if (draft.rows.length) {
+          setRows(enrichWorkbenchRowsMetadata(draft.rows))
+        }
+        if (draft.warnings.length) setWarnings(draft.warnings)
+        setDraftUpdatedAt(draft.updated_at)
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        if (!cancelled) {
+          skipNextSaveRef.current = true
+          setDraftLoaded(true)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!draftLoaded) return
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false
+      return
+    }
+    const timer = window.setTimeout(() => {
+      setDraftSaving(true)
+      void saveWorkbenchDraft(rows, warnings)
+        .then(() => setDraftUpdatedAt(new Date().toISOString()))
+        .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+        .finally(() => setDraftSaving(false))
+    }, 600)
+    return () => window.clearTimeout(timer)
+  }, [rows, warnings, draftLoaded])
 
   const doorRanges = useMemo(() => {
     const set = new Set<string>()
@@ -177,7 +223,7 @@ export default function AdminPricelistWorkbench() {
         res.existing.length ? `Already existed: ${res.existing.length} categories` : null,
         res.errors.length ? `Errors: ${res.errors.join('; ')}` : null,
       ].filter(Boolean)
-      showSuccess('Categories ready', parts.join(' · ') || 'Done.')
+      showSuccess('Accessories ready', parts.join(' · ') || 'Done.')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -492,30 +538,51 @@ export default function AdminPricelistWorkbench() {
       <PricelistWorkbenchSection
         id="workbench-setup"
         title="0. Catalogue setup"
-        summary="Bootstrap categories, then load sources"
-        tip="Run once before first import. Door ranges match the seven UFORM ranges Lamtek supplies for Tealbury Complete."
+        summary="Optional helpers before you publish"
+        tip="Imports stay in this workbench until you click Publish. Live catalogue products are not changed by uploading spreadsheets here."
         defaultOpen={rows.length === 0}
       >
+        <p className="admin-callout admin-callout--info">
+          <strong>Draft only.</strong> Rows here are staged in the database until you publish. The live customer
+          catalogue is updated only from section 3 (Publish). Assign each row to an existing category (Carcasses,
+          Doors, Accessories → Cutlery Trays, etc.) — imports never create new categories automatically.
+          {draftUpdatedAt ? (
+            <>
+              {' '}
+              Draft last saved {new Date(draftUpdatedAt).toLocaleString()}
+              {draftSaving ? ' (saving…)' : ''}.
+            </>
+          ) : null}
+        </p>
         <p className="admin-muted">
-          Door ranges: {TEALBURY_DOOR_RANGES.join(' · ')}. Place PDF spec sheets in{' '}
-          <code>Pricelists and Specifications/uform/specs/</code>, then run{' '}
-          <code>npm run catalogue:parse-uform-specs</code> locally and import the generated JSON below.
+          Tealbury door ranges in spreadsheets: {TEALBURY_DOOR_RANGES.join(' · ')}. UFORM PDF specs:{' '}
+          <code>Pricelists and Specifications/uform/specs/</code> → <code>npm run catalogue:parse-uform-specs</code>{' '}
+          → import JSON below.
         </p>
         <div className="admin-pricelist-action-row" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
-          <button type="button" className="btn btn-outline" disabled={busy} onClick={() => void runBootstrapCategories()}>
-            Bootstrap categories &amp; part types
-          </button>
-          <button type="button" className="btn btn-outline" disabled={busy || !rows.length} onClick={runInferPartTypes}>
-            Infer part types on all rows
-          </button>
-          <button
-            type="button"
-            className="btn btn-outline"
-            disabled={busy || !rows.some((r) => r.selected && r.source === 'tealbury')}
-            onClick={() => void applyBomsToSelectedCompletes()}
-          >
-            Apply BOM to selected Tealbury completes
-          </button>
+          <span className="admin-pricelist-setup-action">
+            <button type="button" className="btn btn-outline" disabled={busy} onClick={() => void runBootstrapCategories()}>
+              Ensure Accessories categories
+            </button>
+            <AdminHelpTip text="Creates only the Accessories parent plus Cutlery Trays, Lighting, and Misc if missing. Does not add spreadsheet section categories or door-range categories." />
+          </span>
+          <span className="admin-pricelist-setup-action">
+            <button type="button" className="btn btn-outline" disabled={busy || !rows.length} onClick={runInferPartTypes}>
+              Infer part types on all rows
+            </button>
+            <AdminHelpTip text="Guesses BOM part type (unit, hinge, door, …) and row kind (complete vs component) from section/name text. Use before publish and before applying BOMs." />
+          </span>
+          <span className="admin-pricelist-setup-action">
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={busy || !rows.some((r) => r.selected && r.source === 'tealbury')}
+              onClick={() => void applyBomsToSelectedCompletes()}
+            >
+              Apply BOM to selected Tealbury completes
+            </button>
+            <AdminHelpTip text="BOM = Bill of Materials: the list of Lamtek parts (carcass, hinges, doors, etc.) that make up one Tealbury complete unit. This links published complete products to component SKUs using the default high-line base template." />
+          </span>
         </div>
       </PricelistWorkbenchSection>
 
@@ -614,6 +681,7 @@ export default function AdminPricelistWorkbench() {
                 setWarnings([])
                 setMessage(null)
                 setError(null)
+                void clearWorkbenchDraft()
               }
             }}
           >

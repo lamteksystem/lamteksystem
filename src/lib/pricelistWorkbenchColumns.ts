@@ -1,7 +1,7 @@
 import type { ColumnDef } from '@/hooks/useColumnVisibility'
 
 export type WorkbenchColumnId =
-  | 'source'
+  | 'catalog_source'
   | 'item_kind'
   | 'part_type'
   | 'door_range'
@@ -25,11 +25,11 @@ export type WorkbenchColumnDef = ColumnDef & {
 
 export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
   {
-    id: 'source',
-    label: 'Source',
-    tip: 'TB = Tealbury complete units, LK = Lamtek components, UF = UFORM spec (doors/trim).',
-    minWidth: 52,
-    defaultWidth: 56,
+    id: 'catalog_source',
+    label: 'Catalogue',
+    tip: 'Original pricelist the row was imported from: Tealbury, Lamtek, or Uform.',
+    minWidth: 88,
+    defaultWidth: 96,
   },
   {
     id: 'item_kind',
@@ -130,6 +130,11 @@ export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
     defaultWidth: 92,
   },
 ]
+
+/** Columns visible on first use (Catalogue column hidden until enabled in column settings). */
+export const PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS = PRICELIST_WORKBENCH_COLUMNS.filter(
+  (c) => c.id !== 'catalog_source',
+).map((c) => c.id)
 
 export function workbenchColumnWidth(
   id: string,

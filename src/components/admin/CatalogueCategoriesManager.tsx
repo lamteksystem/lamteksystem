@@ -3,7 +3,9 @@
  * it's collapsed by default and tucks away under the rest of the catalogue UI. Supports
  * create / rename / change parent / change kind / delete with inline validation.
  */
-import { useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { CATEGORIES_TABLE_COLUMNS, categoriesColumnWidth } from '@/lib/categoriesTableColumns'
+import { useColumnWidths } from '@/hooks/useColumnWidths'
 import { Link } from 'react-router-dom'
 import ListPager from '@/components/admin/ListPager'
 import { useListPagination } from '@/lib/listPagination'
@@ -63,6 +65,55 @@ export default function CatalogueCategoriesManager({
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [message, setMessage] = useState<Message | null>(null)
+  const { widths: columnWidths, setWidth, persistWidths } = useColumnWidths('admin-categories')
+  const [resizingColId, setResizingColId] = useState<string | null>(null)
+  const resizeStartRef = useRef({ x: 0, width: 0 })
+  const columnWidthsRef = useRef(columnWidths)
+  columnWidthsRef.current = columnWidths
+
+  useEffect(() => {
+    if (!resizingColId) return
+    const onMove = (e: MouseEvent) => {
+      const delta = e.clientX - resizeStartRef.current.x
+      const col = CATEGORIES_TABLE_COLUMNS.find((c) => c.id === resizingColId)
+      const min = col?.minWidth ?? 60
+      setWidth(resizingColId, Math.max(min, resizeStartRef.current.width + delta))
+    }
+    const onUp = () => {
+      setResizingColId(null)
+      void persistWidths(columnWidthsRef.current)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [resizingColId, setWidth, persistWidths])
+
+  const renderResizableTh = useCallback(
+    (colId: (typeof CATEGORIES_TABLE_COLUMNS)[number]['id'], label: string, title: string) => {
+      const w = categoriesColumnWidth(colId, columnWidths)
+      return (
+        <th key={colId} style={{ width: w, minWidth: w }} title={title}>
+          <span className="admin-th-label">{label}</span>
+          {colId !== 'actions' ? (
+            <span
+              className="admin-th-resizer"
+              role="separator"
+              aria-label={`Resize ${label} column`}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                resizeStartRef.current = { x: e.clientX, width: w }
+                setResizingColId(colId)
+              }}
+            />
+          ) : null}
+        </th>
+      )
+    },
+    [columnWidths],
+  )
 
   const parents = useMemo(
     () => categories.filter((c) => !c.parent_id).sort((a, b) => a.name.localeCompare(b.name)),
@@ -308,18 +359,16 @@ export default function CatalogueCategoriesManager({
           <p className="admin-muted">No categories match your search.</p>
         ) : (
           <>
-          <table className="admin-catalogue-categories-table">
+          <table className="admin-catalogue-categories-table admin-catalogue-categories-table--resizable">
             <thead>
               <tr>
-                <th title="The category name shown to staff and customers">Name</th>
-                <th title="URL-friendly identifier — used in links and saved filters">Slug</th>
-                <th title="Empty if this is a top-level category">Parent</th>
-                <th title="Product category / Kitchen range / Cross-range">Type</th>
-                <th title="How many products currently sit in this category (across primary and multi-category assignments)">
-                  Products
-                </th>
-                <th title="How many sub-categories live under this category">Subs</th>
-                <th aria-hidden="true"></th>
+                {renderResizableTh('name', 'Name', 'The category name shown to staff and customers')}
+                {renderResizableTh('slug', 'Slug', 'URL-friendly identifier')}
+                {renderResizableTh('parent', 'Parent', 'Empty if top-level')}
+                {renderResizableTh('type', 'Type', 'Product category / Kitchen range / Cross-range')}
+                {renderResizableTh('products', 'Products', 'Product count')}
+                {renderResizableTh('subs', 'Subs', 'Sub-category count')}
+                {renderResizableTh('actions', '', 'Actions')}
               </tr>
             </thead>
             <tbody>

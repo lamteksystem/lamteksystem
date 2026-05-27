@@ -23,16 +23,13 @@ Place supplier files here for catalogue build tooling. **These files are not dep
 
 ## One-shot local rebuild (agent / developer)
 
-From repo root (requires `.env` with database + Supabase service role):
+Imports go to the **Pricelist workbench draft** only — not the live catalogue until you click **Publish** in Admin.
 
 ```bash
-npm run catalogue:clear-products -- --yes
-npm run catalogue:import-pricelists -- --yes --lamtek "Pricelists and Specifications/Lamtek Trade Kitchen Pricelist - 1-49 Titus Hinges.xlsx" --tealbury "Pricelists and Specifications/Tealbury Pricelist Customer Draft.xlsx"
-npm run catalogue:parse-uform-specs
-npm run catalogue:import-uform-specs -- --yes
+npm run catalogue:rebuild-workbench -- --yes
 ```
 
-This wipes **all products** but keeps **categories** and **BOM part types**.
+Or step by step: `catalogue:clear-products`, prune categories on **Categories** page, `catalogue:import-pricelists`, `catalogue:parse-uform-specs`, `catalogue:import-uform-specs`.
 
 ## Admin workflow
 

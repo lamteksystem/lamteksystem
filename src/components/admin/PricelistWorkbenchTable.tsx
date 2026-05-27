@@ -9,11 +9,12 @@ import {
 } from '@/components/admin/HorizontalScrollWithArrows'
 import {
   PRICELIST_WORKBENCH_COLUMNS,
+  PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS,
   workbenchColumnWidth,
   type WorkbenchColumnId,
 } from '@/lib/pricelistWorkbenchColumns'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
-import { sourceLabel } from '@/lib/tealburyCatalogueBuild'
+import { catalogueSourceLabel } from '@/lib/catalogueSourceLabel'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import { useColumnWidths } from '@/hooks/useColumnWidths'
 import type { AssemblyPartTypeRow, CategoryRow } from '@/types/database'
@@ -51,7 +52,7 @@ export default function PricelistWorkbenchTable({
   onDeleteRow,
 }: Props) {
   const { columnDefs, visibleIds, setColumnVisible, setColumnOrder, resetToDefault, isVisible, order } =
-    useColumnVisibility('pricelist-workbench', COLUMN_DEFS)
+    useColumnVisibility('pricelist-workbench', COLUMN_DEFS, PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS)
   const { widths: columnWidths, setWidth, persistWidths } = useColumnWidths('pricelist-workbench')
   const [resizingColId, setResizingColId] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null)
@@ -67,6 +68,7 @@ export default function PricelistWorkbenchTable({
   const visibleCols = useMemo(
     () =>
       order
+        .map((id) => (id === 'source' ? 'catalog_source' : id))
         .map((id) => PRICELIST_WORKBENCH_COLUMNS.find((c) => c.id === id))
         .filter((c): c is (typeof PRICELIST_WORKBENCH_COLUMNS)[number] => !!c && isVisible(c.id)),
     [order, isVisible]
@@ -191,13 +193,13 @@ export default function PricelistWorkbenchTable({
 
   function renderCell(row: PricelistWorkbenchRow, colId: WorkbenchColumnId) {
     switch (colId) {
-      case 'source':
+      case 'catalog_source':
         return (
           <span
             className={`admin-pricelist-source admin-pricelist-source--${row.source}`}
-            title={row.catalog_program}
+            title={`Program: ${row.catalog_program}`}
           >
-            {sourceLabel(row.source)}
+            {catalogueSourceLabel(row.source)}
           </span>
         )
       case 'item_kind':

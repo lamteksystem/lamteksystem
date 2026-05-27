@@ -549,6 +549,42 @@ A **complete** Tealbury unit is not one physical box in the warehouse — it is 
 
 **Lamtek guided / assembly ordering:** Legacy **assemblies** in the Lamtek ordering wizard are separate rows in the database; linking a sellable **product** to an assembly (via **product_id** on the assembly) is how Admin ties a catalogue SKU to a BOM. If “complete” lines have no make-up, ops cannot infer pick quantities from stock.
 
+### 14.7 Pricelist workbench (Tealbury + Lamtek + Uform)
+
+Path: **Catalogue → Product & category tools → Pricelist workbench** (`/admin/catalogue-tools/pricelist-workbench`).
+
+**Draft vs live catalogue**
+
+| Stage | What happens |
+|-------|----------------|
+| **Load** (Excel / Uform JSON) | Rows go into a **shared workbench draft** — not the customer catalogue yet. |
+| **Edit** | Assign **categories** (existing names only — imports do not create categories), fix **Kind** (complete / component / door / drawer front), **part types**, prices. |
+| **Publish** | Section 3 writes selected rows to **live products** (upsert by SKU). |
+| **Apply BOM** | Only after publish — links a **published** Tealbury complete to component SKUs. |
+
+**Column settings (cog)**
+
+- Show/hide columns; preference is saved per user.
+- **Catalogue** column (Tealbury / Lamtek / Uform) is hidden by default — turn it on when reviewing mixed imports.
+- Drag column edges to resize; widths are remembered after you resize.
+
+**Parser notices**
+
+- **Duplicate SKU merged** (Lamtek): same trade code appeared twice (e.g. kitchen + bedroom). One row is kept; lowest price wins. Usually correct — not two products.
+- **Pricelist sheet skipped** (Tealbury): the hub tab only contains **formulas** pointing at door-range tabs. Prices come from **No Doors**, **Dawson**, etc. You are not missing data if those tabs exist.
+
+**Setup buttons (section 0)**
+
+| Button | Purpose |
+|--------|---------|
+| **Ensure Accessories categories** | Creates **Accessories** parent + **Cutlery Trays**, **Lighting**, **Misc** children if missing; ensures **Drawer Fronts** parent exists. |
+| **Infer part types** | Fills **Kind** and **part type** from section/name text (run before publish). |
+| **Apply BOM to selected Tealbury completes** | After **Publish**, selects Tealbury **complete** rows and applies the default high-line BOM template. |
+
+**BOM** = Bill of Materials — carcass, hinges, doors, etc. that make up one sellable complete unit.
+
+**Categories hygiene:** Use **Manage categories** (`/admin/catalogue/categories`) for the core taxonomy (Carcasses, Doors, Accessories, …). **Remove import-generated categories** deletes spreadsheet section names (e.g. “Tealbury — Highline…”) but keeps the core list.
+
 ---
 
 ## 15. Admin — stock, locations, delivery windows

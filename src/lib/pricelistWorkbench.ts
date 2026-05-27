@@ -41,7 +41,7 @@ export interface PricelistWorkbenchRow {
   selected: boolean
   options: Record<string, Json>
   /** complete (Tealbury sellable), component (Lamtek part), door, accessory (UFORM trim). */
-  item_kind: 'complete' | 'component' | 'door' | 'accessory' | 'other'
+  item_kind: 'complete' | 'component' | 'door' | 'drawer_front' | 'accessory' | 'other'
   /** assembly_part_types.code — blank for complete units. */
   part_type: string
 }
@@ -89,6 +89,9 @@ export function suggestCategoryForPricelistRow(
   const sectionTrim = section.trim()
   if (sectionTrim) candidates.push(sectionTrim)
 
+  if (/drawer\s*front/i.test(sectionTrim)) {
+    candidates.unshift('Drawer Fronts')
+  }
   if (source === 'tealbury' && /accessor/i.test(section) && accessoryHint) {
     const mapped = mapTealburyAccessoryToCategory(accessoryHint.description, accessoryHint.code)
     if (mapped) candidates.unshift(mapped)

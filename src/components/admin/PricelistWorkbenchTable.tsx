@@ -14,12 +14,22 @@ import {
   type WorkbenchColumnId,
 } from '@/lib/pricelistWorkbenchColumns'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import type { WorkbenchItemKind } from '@/lib/tealburyCatalogueBuild'
 import { catalogueSourceLabel } from '@/lib/catalogueSourceLabel'
+import { suggestWorkbenchColumnWidths } from '@/lib/workbenchAutoColumnWidths'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import { useColumnWidths } from '@/hooks/useColumnWidths'
 import type { AssemblyPartTypeRow, CategoryRow } from '@/types/database'
 
-type EditableField = 'door_range' | 'section' | 'sku' | 'name' | 'description' | 'cost_price' | 'unit_price'
+type EditableField =
+  | 'door_range'
+  | 'section'
+  | 'trade_code'
+  | 'sku'
+  | 'name'
+  | 'description'
+  | 'cost_price'
+  | 'unit_price'
 
 type Props = {
   pageItems: PricelistWorkbenchRow[]
@@ -35,12 +45,22 @@ const COLUMN_DEFS = PRICELIST_WORKBENCH_COLUMNS.map(({ id, label }) => ({ id, la
 const DBL_CLICK_FIELDS = new Set<EditableField>([
   'door_range',
   'section',
+  'trade_code',
   'sku',
   'name',
   'description',
   'cost_price',
   'unit_price',
 ])
+
+const ITEM_KIND_OPTIONS: { value: WorkbenchItemKind; label: string }[] = [
+  { value: 'complete', label: 'Complete' },
+  { value: 'component', label: 'Component' },
+  { value: 'door', label: 'Door' },
+  { value: 'drawer_front', label: 'Drawer front' },
+  { value: 'accessory', label: 'Accessory' },
+  { value: 'other', label: 'Other' },
+]
 
 export default function PricelistWorkbenchTable({
   pageItems,
@@ -53,7 +73,8 @@ export default function PricelistWorkbenchTable({
 }: Props) {
   const { columnDefs, visibleIds, setColumnVisible, setColumnOrder, resetToDefault, isVisible, order } =
     useColumnVisibility('pricelist-workbench', COLUMN_DEFS, PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS)
-  const { widths: columnWidths, setWidth, persistWidths } = useColumnWidths('pricelist-workbench')
+  const { widths: columnWidths, setWidth, persistWidths, initialised: widthsInit } = useColumnWidths('pricelist-workbench')
+  const userResizedRef = useRef(false)
   const [resizingColId, setResizingColId] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null)
   const resizeStartRef = useRef({ x: 0, width: 0 })
@@ -74,6 +95,16 @@ export default function PricelistWorkbenchTable({
     [order, isVisible]
   )
 
+  const visibleColIds = useMemo(() => visibleCols.map((c) => c.id), [visibleCols])
+
+  useEffect(() => {
+    if (!widthsInit || userResizedRef.current || pageItems.length === 0) return
+    const suggested = suggestWorkbenchColumnWidths(pageItems, visibleColIds)
+    for (const [id, w] of Object.entries(suggested)) {
+      if (!columnWidths[id]) setWidth(id, w)
+    }
+  }, [widthsInit, pageItems, visibleColIds.join(','), columnWidths, setWidth])
+
   const tableWidthPx = useMemo(
     () => 40 + visibleCols.reduce((sum, c) => sum + workbenchColumnWidth(c.id, columnWidths), 0),
     [visibleCols, columnWidths]
@@ -89,6 +120,7 @@ export default function PricelistWorkbenchTable({
       setWidth(resizingColId, newW)
     }
     const onUp = () => {
+      userResizedRef.current = true
       persistWidths(columnWidthsRef.current)
       setResizingColId(null)
     }
@@ -203,7 +235,24 @@ export default function PricelistWorkbenchTable({
           </span>
         )
       case 'item_kind':
-        return <span className="admin-muted">{row.item_kind || '—'}</span>
+        return (
+          <select
+            className="admin-pricelist-category-select"
+            value={row.item_kind || ''}
+            onChange={(e) =>
+              onPatchRow(row.id, {
+                item_kind: e.target.value as WorkbenchItemKind,
+              })
+            }
+          >
+            <option value="">—</option>
+            {ITEM_KIND_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )
       case 'part_type':
         if (row.item_kind === 'complete') {
           return <span className="admin-muted">—</span>
@@ -227,7 +276,7 @@ export default function PricelistWorkbenchTable({
       case 'section':
         return renderEditableText(row, 'section', 'admin-pricelist-cell--section')
       case 'trade_code':
-        return <span className="admin-pricelist-trade-code">{row.trade_code || '—'}</span>
+        return renderEditableText(row, 'trade_code', 'admin-pricelist-trade-code')
       case 'sku':
         return renderEditableText(row, 'sku')
       case 'name':

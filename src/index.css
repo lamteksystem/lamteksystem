@@ -5718,6 +5718,24 @@ button.ordering-wizard-card {
   text-align: left;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
 }
+.admin-modal--notice-warning .admin-notice-modal-title {
+  color: var(--color-warning, #b45309);
+}
+.admin-pricelist-action-report-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+  max-height: 240px;
+  overflow-y: auto;
+  font-size: 0.9rem;
+}
+.admin-pricelist-warnings-detail .admin-callout {
+  margin-bottom: 0.75rem;
+}
+.admin-pricelist-setup-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
 .admin-modal--notice-success .admin-notice-modal-title {
   color: var(--lamtek-success, #15803d);
 }

@@ -40,6 +40,11 @@ import PricelistWorkbenchSection from '@/components/admin/PricelistWorkbenchSect
 import PricelistWorkbenchTable from '@/components/admin/PricelistWorkbenchTable'
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import { clearWorkbenchDraft, loadWorkbenchDraft, saveWorkbenchDraft } from '@/lib/pricelistWorkbenchDraft'
+import type { WorkbenchWarning } from '@/lib/pricelistWorkbenchWarnings'
+import PricelistWorkbenchWarningsPanel from '@/components/admin/PricelistWorkbenchWarningsPanel'
+import WorkbenchActionReportModal, {
+  type WorkbenchActionReport,
+} from '@/components/admin/WorkbenchActionReportModal'
 import type { CategoryRow } from '@/types/database'
 
 type SourceFilter = 'all' | PricelistSource
@@ -49,7 +54,9 @@ export default function AdminPricelistWorkbench() {
   const partTypesHook = useAssemblyPartTypes(true)
   const [categories, setCategories] = useState<CategoryRow[]>([])
   const [rows, setRows] = useState<PricelistWorkbenchRow[]>([])
-  const [warnings, setWarnings] = useState<string[]>([])
+  const [warnings, setWarnings] = useState<WorkbenchWarning[]>([])
+  const [setupAction, setSetupAction] = useState<string | null>(null)
+  const [actionReport, setActionReport] = useState<WorkbenchActionReport | null>(null)
   const [busy, setBusy] = useState(false)
   const [importProgress, setImportProgress] = useState<
     Partial<Record<PricelistSource, PricelistSourceImportProgressState>>
@@ -213,21 +220,31 @@ export default function AdminPricelistWorkbench() {
   )
 
   async function runBootstrapCategories() {
+    setSetupAction('categories')
     setBusy(true)
     setError(null)
     try {
       const res = await bootstrapTealburyCatalogueCategories()
       await loadCategories()
-      const parts = [
+      const lines = [
         res.created.length ? `Created: ${res.created.join(', ')}` : null,
-        res.existing.length ? `Already existed: ${res.existing.length} categories` : null,
-        res.errors.length ? `Errors: ${res.errors.join('; ')}` : null,
-      ].filter(Boolean)
-      showSuccess('Accessories ready', parts.join(' · ') || 'Done.')
+        res.existing.length ? `Already present: ${res.existing.join(', ')}` : null,
+        ...res.errors,
+      ].filter((x): x is string => !!x)
+      setActionReport({
+        title: 'Categories ready',
+        summary:
+          res.created.length > 0
+            ? `Created ${res.created.length} categor${res.created.length === 1 ? 'y' : 'ies'} with correct parent links where applicable.`
+            : 'No new categories were needed — your taxonomy already includes Accessories, its sub-categories, and Drawer Fronts.',
+        lines,
+        variant: res.errors.length ? 'warn' : 'ok',
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
+      setSetupAction(null)
     }
   }
 
@@ -257,9 +274,30 @@ export default function AdminPricelistWorkbench() {
     }
   }
 
-  function runInferPartTypes() {
-    setRows((prev) => enrichWorkbenchRowsMetadata(prev))
-    showSuccess('Part types', 'Inferred part type and kind for all workbench rows.')
+  async function runInferPartTypes() {
+    setSetupAction('infer')
+    setBusy(true)
+    setError(null)
+    try {
+      await new Promise((r) => window.setTimeout(r, 120))
+      const before = rows.length
+      const next = enrichWorkbenchRowsMetadata(rows)
+      setRows(next)
+      const kinds = new Map<string, number>()
+      for (const r of next) {
+        const k = r.item_kind || 'other'
+        kinds.set(k, (kinds.get(k) ?? 0) + 1)
+      }
+      setActionReport({
+        title: 'Part types inferred',
+        summary: `Updated kind and part type on ${before} workbench row(s).`,
+        lines: [...kinds.entries()].map(([k, n]) => `${k}: ${n} row(s)`),
+        variant: 'ok',
+      })
+    } finally {
+      setBusy(false)
+      setSetupAction(null)
+    }
   }
 
   async function applyBomsToSelectedCompletes() {
@@ -270,38 +308,53 @@ export default function AdminPricelistWorkbench() {
     }
     if (
       !window.confirm(
-        `Apply standard BOM template to ${targets.length} complete unit(s)? Requires Lamtek + UFORM component products already published.`
+        `Apply standard BOM template to ${targets.length} complete unit(s)?\n\nThis only works on units already published to the live catalogue, with Lamtek/Uform components published too. Your catalogue is still in workbench draft until you Publish.`
       )
     ) {
       return
     }
+    setSetupAction('bom')
     setBusy(true)
+    setError(null)
     const notes: string[] = []
     let ok = 0
-    for (const row of targets) {
-      const { data: product } = await supabase.from('products').select('*').eq('sku', row.sku.trim()).maybeSingle()
-      if (!product) {
-        notes.push(`${row.sku}: publish this complete unit first`)
-        continue
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const row = targets[i]
+        const { data: product } = await supabase.from('products').select('*').eq('sku', row.sku.trim()).maybeSingle()
+        if (!product) {
+          notes.push(`${row.sku}: not in live catalogue — use Publish first`)
+          continue
+        }
+        const res = await applyBomToCompleteProduct({
+          completeProduct: product,
+          tradeCode: row.trade_code || row.sku,
+          doorRange: row.door_range,
+          section: row.section,
+          replaceExisting: true,
+        })
+        if (res.error) notes.push(`${row.sku}: ${res.error}`)
+        else {
+          ok++
+          if (res.warnings.length) notes.push(`${row.sku}: ${res.warnings.join('; ')}`)
+        }
+        if (i % 3 === 0) await new Promise((r) => window.setTimeout(r, 0))
       }
-      const res = await applyBomToCompleteProduct({
-        completeProduct: product,
-        tradeCode: row.trade_code || row.sku,
-        doorRange: row.door_range,
-        section: row.section,
-        replaceExisting: true,
+      setActionReport({
+        title: ok > 0 ? 'BOM apply finished' : 'BOM could not be applied',
+        summary:
+          ok > 0
+            ? `Linked BOM lines on ${ok} of ${targets.length} published complete unit(s).`
+            : `None of the ${targets.length} selected unit(s) are in the live catalogue yet. Publish from section 3, then run this again.`,
+        lines: notes,
+        variant: ok > 0 ? 'ok' : 'warn',
       })
-      if (res.error) notes.push(`${row.sku}: ${res.error}`)
-      else {
-        ok++
-        if (res.warnings.length) notes.push(`${row.sku}: ${res.warnings.join('; ')}`)
-      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+      setSetupAction(null)
     }
-    setBusy(false)
-    showSuccess(
-      'BOM apply finished',
-      `Updated ${ok} of ${targets.length} unit(s).` + (notes.length ? ` Notes: ${notes.slice(0, 5).join(' | ')}` : '')
-    )
   }
 
   async function ingestWorkbook(file: File, source: PricelistSource) {
@@ -345,7 +398,7 @@ export default function AdminPricelistWorkbench() {
         fillMissingWorkbenchProductNames(parsed.map((p) => parsedToWorkbenchRow(p, source, cats))),
       )
       setRows((prev) => [...prev.filter((r) => r.source !== source), ...workbench])
-      setWarnings((prev) => [...prev, ...w.map((line) => `[${source}] ${line}`)])
+      setWarnings((prev) => [...prev, ...w])
       showSuccess(
         'Import complete',
         `Loaded ${workbench.length} ${source === 'tealbury' ? 'Tealbury' : 'Lamtek trade'} row(s) from ${file.name}. ` +
@@ -561,14 +614,24 @@ export default function AdminPricelistWorkbench() {
         </p>
         <div className="admin-pricelist-action-row" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
           <span className="admin-pricelist-setup-action">
-            <button type="button" className="btn btn-outline" disabled={busy} onClick={() => void runBootstrapCategories()}>
-              Ensure Accessories categories
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={busy}
+              onClick={() => void runBootstrapCategories()}
+            >
+              {setupAction === 'categories' ? 'Working…' : 'Ensure Accessories categories'}
             </button>
             <AdminHelpTip text="Creates only the Accessories parent plus Cutlery Trays, Lighting, and Misc if missing. Does not add spreadsheet section categories or door-range categories." />
           </span>
           <span className="admin-pricelist-setup-action">
-            <button type="button" className="btn btn-outline" disabled={busy || !rows.length} onClick={runInferPartTypes}>
-              Infer part types on all rows
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={busy || !rows.length}
+              onClick={() => void runInferPartTypes()}
+            >
+              {setupAction === 'infer' ? 'Inferring…' : 'Infer part types on all rows'}
             </button>
             <AdminHelpTip text="Guesses BOM part type (unit, hinge, door, …) and row kind (complete vs component) from section/name text. Use before publish and before applying BOMs." />
           </span>
@@ -579,7 +642,7 @@ export default function AdminPricelistWorkbench() {
               disabled={busy || !rows.some((r) => r.selected && r.source === 'tealbury')}
               onClick={() => void applyBomsToSelectedCompletes()}
             >
-              Apply BOM to selected Tealbury completes
+              {setupAction === 'bom' ? 'Applying BOM…' : 'Apply BOM to selected Tealbury completes'}
             </button>
             <AdminHelpTip text="BOM = Bill of Materials: the list of Lamtek parts (carcass, hinges, doors, etc.) that make up one Tealbury complete unit. This links published complete products to component SKUs using the default high-line base template." />
           </span>
@@ -697,12 +760,7 @@ export default function AdminPricelistWorkbench() {
           tip="Non-fatal import messages from the Excel parser (skipped rows, ambiguous codes, etc.)."
           defaultOpen={false}
         >
-          <ul className="admin-pricelist-warnings">
-            {warnings.slice(0, 40).map((w, i) => (
-              <li key={i}>{w}</li>
-            ))}
-          </ul>
-          {warnings.length > 40 ? <p className="admin-muted">…and {warnings.length - 40} more.</p> : null}
+          <PricelistWorkbenchWarningsPanel warnings={warnings} />
         </PricelistWorkbenchSection>
       )}
 
@@ -995,6 +1053,7 @@ export default function AdminPricelistWorkbench() {
         variant="success"
         onClose={() => setMessage(null)}
       />
+      <WorkbenchActionReportModal report={actionReport} onClose={() => setActionReport(null)} />
       {error && (
         <pre className="admin-error admin-pricelist-error" style={{ whiteSpace: 'pre-wrap' }}>
           {error}

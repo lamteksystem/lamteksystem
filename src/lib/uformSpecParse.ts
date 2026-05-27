@@ -38,7 +38,7 @@ export interface UformSpecParsedProduct {
   height_mm: number | null
   width_mm: number | null
   depth_mm: number | null
-  kind: 'door' | 'accessory'
+  kind: 'door' | 'drawer_front' | 'accessory'
 }
 
 const SIZE_LINE =
@@ -91,8 +91,12 @@ export function parseUformSpecText(text: string, fileStem: string): UformSpecPar
   }
 
   for (const line of lines) {
-    if (/^STANDARD\s+DRAWERFRONTS/i.test(line) || /^STANDARD\s+DOORS/i.test(line)) {
-      section = 'Doors & drawer fronts'
+    if (/^STANDARD\s+DRAWERFRONTS/i.test(line)) {
+      section = 'Drawer Fronts'
+      continue
+    }
+    if (/^STANDARD\s+DOORS/i.test(line)) {
+      section = 'Doors'
       continue
     }
     if (/^STANDARD\s+ACCESSORIES/i.test(line)) {
@@ -103,8 +107,12 @@ export function parseUformSpecText(text: string, fileStem: string): UformSpecPar
       section = 'Plinth'
       continue
     }
-    if (/^CORNICE/i.test(line) || /^PLAIN END PANEL/i.test(line)) {
-      section = line.length < 40 ? line : 'Accessories'
+    if (/^CORNICE/i.test(line)) {
+      section = line.length < 40 ? line : 'Cornice & Pelmet'
+      continue
+    }
+    if (/^PLAIN END PANEL/i.test(line)) {
+      section = 'Panels'
       continue
     }
 
@@ -114,7 +122,8 @@ export function parseUformSpecText(text: string, fileStem: string): UformSpecPar
       const w = parseInt(sizeMatch[2], 10)
       const d = sizeMatch[3] ? parseInt(sizeMatch[3], 10) : null
       if (h < 50 || w < 50) continue
-      const name = `${door_range} ${section.includes('drawer') ? 'Drawer front' : 'Door'} ${h}×${w} mm`
+      const isDrawerFront = /drawer\s*front/i.test(section)
+      const name = `${door_range} ${isDrawerFront ? 'Drawer front' : 'Door'} ${h}×${w} mm`
       push({
         door_range,
         section,
@@ -124,7 +133,7 @@ export function parseUformSpecText(text: string, fileStem: string): UformSpecPar
         height_mm: h,
         width_mm: w,
         depth_mm: d,
-        kind: 'door',
+        kind: isDrawerFront ? 'drawer_front' : 'door',
       })
       continue
     }
@@ -174,8 +183,10 @@ export function uformProductsToWorkbenchRows(
     door_range: p.door_range,
     trade_code: '',
     selected: false,
-    item_kind: p.kind === 'door' ? 'door' : 'accessory',
-    part_type: p.kind === 'door' ? 'door' : 'other',
+    item_kind:
+      p.kind === 'drawer_front' ? 'drawer_front' : p.kind === 'door' ? 'door' : 'accessory',
+    part_type:
+      p.kind === 'drawer_front' ? 'drawer' : p.kind === 'door' ? 'door' : 'other',
     options: {
       uform_spec: true,
       height_mm: p.height_mm,

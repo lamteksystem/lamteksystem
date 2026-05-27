@@ -2,14 +2,17 @@
  * Tealbury Complete catalogue build: door ranges, part-type inference, category bootstrap.
  */
 import { createCategory, fetchAllCategories, updateCategory } from '@/lib/categoryAdmin'
-import { ACCESSORIES_SUBCATEGORY_NAMES } from '@/lib/coreCatalogueCategories'
+import {
+  ACCESSORIES_SUBCATEGORY_NAMES,
+  DRAWER_FRONTS_PARENT_NAME,
+} from '@/lib/coreCatalogueCategories'
 import type { CategoryRow } from '@/types/database'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
 import { TEALBURY_DOOR_RANGES, type TealburyDoorRange } from '@/lib/tealburyDoorRanges'
 
 export { TEALBURY_DOOR_RANGES, type TealburyDoorRange }
 
-export type WorkbenchItemKind = 'complete' | 'component' | 'door' | 'accessory' | 'other'
+export type WorkbenchItemKind = 'complete' | 'component' | 'door' | 'drawer_front' | 'accessory' | 'other'
 
 const LAMTEK_SECTION_PART_TYPE: [RegExp, string][] = [
   [/hinge\s*plate|base\s*plate/i, 'hinge_plate'],
@@ -33,11 +36,12 @@ const UFORM_SECTION_PART_TYPE: [RegExp, string][] = [
   [/door|slab/i, 'door'],
 ]
 
-export function inferWorkbenchItemKind(row: Pick<PricelistWorkbenchRow, 'source' | 'section' | 'name' | 'options'>): WorkbenchItemKind {
+export function inferWorkbenchItemKind(row: Pick<PricelistWorkbenchRow, 'source' | 'section' | 'name' | 'options' | 'sku'>): WorkbenchItemKind {
   if (row.source === 'tealbury') return 'complete'
   if (row.source === 'uform') {
-    const sec = `${row.section} ${row.name}`.toLowerCase()
-    if (/door|drawer\s*front|slab/.test(sec)) return 'door'
+    const sec = `${row.section} ${row.name} ${row.sku}`.toLowerCase()
+    if (/drawer\s*front|drawerfront|-df-|kind":"drawer_front/i.test(sec)) return 'drawer_front'
+    if (/\bdoor\b|slab|-dr-/.test(sec) && !/drawer/.test(sec)) return 'door'
     if (/plinth|cornice|panel|post|pelmet|moulding|accessor/.test(sec)) return 'accessory'
     return 'other'
   }
@@ -114,6 +118,8 @@ export async function bootstrapTealburyCatalogueCategories(): Promise<BootstrapC
   for (const sub of ACCESSORIES_SUBCATEGORY_NAMES) {
     await ensure(sub, 'product_type', accessoriesId)
   }
+
+  await ensure(DRAWER_FRONTS_PARENT_NAME, 'product_type')
 
   const topLighting = existing.find(
     (c) => c.name.trim().toLowerCase() === 'lighting' && !c.parent_id,

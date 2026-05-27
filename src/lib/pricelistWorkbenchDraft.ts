@@ -1,11 +1,12 @@
 import { supabase } from '@/lib/supabase'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import { parseWarningsJson, type WorkbenchWarning } from '@/lib/pricelistWorkbenchWarnings'
 
 const DRAFT_ID = 'global'
 
 export interface WorkbenchDraftBundle {
   rows: PricelistWorkbenchRow[]
-  warnings: string[]
+  warnings: WorkbenchWarning[]
   updated_at: string | null
 }
 
@@ -18,7 +19,7 @@ export async function loadWorkbenchDraft(): Promise<WorkbenchDraftBundle> {
   if (error) throw error
   if (!data) return { rows: [], warnings: [], updated_at: null }
   const rows = Array.isArray(data.rows) ? (data.rows as PricelistWorkbenchRow[]) : []
-  const warnings = Array.isArray(data.warnings) ? (data.warnings as string[]) : []
+  const warnings = parseWarningsJson(data.warnings)
   return {
     rows,
     warnings,
@@ -28,7 +29,7 @@ export async function loadWorkbenchDraft(): Promise<WorkbenchDraftBundle> {
 
 export async function saveWorkbenchDraft(
   rows: PricelistWorkbenchRow[],
-  warnings: string[] = []
+  warnings: WorkbenchWarning[] = []
 ): Promise<void> {
   const {
     data: { user },

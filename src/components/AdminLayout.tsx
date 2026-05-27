@@ -1050,7 +1050,7 @@ export default function AdminLayout() {
                 </div>
               </div>
             ) : (
-              <Outlet key={location.pathname + location.search} />
+              <Outlet key={location.key} />
             )}
           </div>
         </main>

@@ -14,8 +14,12 @@ export const CORE_CATALOGUE_CATEGORY_NAMES = [
   'Shelves & Interiors',
   'Wirework',
   'Accessories',
+  'Drawer Fronts',
 ] as const
 
 export const ACCESSORIES_SUBCATEGORY_NAMES = ['Cutlery Trays', 'Lighting', 'Misc'] as const
+
+/** Parent category for Uform/Lamtek drawer front products (no default children). */
+export const DRAWER_FRONTS_PARENT_NAME = 'Drawer Fronts' as const
 
 export type CoreCatalogueCategoryName = (typeof CORE_CATALOGUE_CATEGORY_NAMES)[number]

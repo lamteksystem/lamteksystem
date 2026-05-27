@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 import { parseTealburyPricelistWorkbook, type TealburyParsedRow } from '@/lib/tealburyPricelistParse'
 import { resolveExistingCategoryId } from '@/lib/resolveExistingCategory'
+import type { WorkbenchWarning } from '@/lib/pricelistWorkbenchWarnings'
+import PricelistWorkbenchWarningsPanel from '@/components/admin/PricelistWorkbenchWarningsPanel'
 import type { CategoryRow, Json } from '@/types/database'
 
 const CHUNK = 200
@@ -48,7 +50,7 @@ async function purgeTealburyCatalogue(): Promise<void> {
 export default function CatalogueTealburyImportBlock() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [parsed, setParsed] = useState<TealburyParsedRow[] | null>(null)
-  const [warnings, setWarnings] = useState<string[]>([])
+  const [warnings, setWarnings] = useState<WorkbenchWarning[]>([])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -229,12 +231,7 @@ export default function CatalogueTealburyImportBlock() {
       {warnings.length > 0 && (
         <div style={{ marginTop: '1rem' }}>
           <h4 className="admin-muted">Parser notices</h4>
-          <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem', fontSize: '0.9rem' }}>
-            {warnings.slice(0, 25).map((w, i) => (
-              <li key={i}>{w}</li>
-            ))}
-          </ul>
-          {warnings.length > 25 ? <p className="admin-muted">…and {warnings.length - 25} more.</p> : null}
+          <PricelistWorkbenchWarningsPanel warnings={warnings} />
         </div>
       )}
 

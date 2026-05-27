@@ -11,6 +11,7 @@
  */
 import * as XLSX from 'xlsx'
 import type { Json } from '@/types/database'
+import type { WorkbenchWarning } from '@/lib/pricelistWorkbenchWarnings'
 
 const COST_FACTOR = 0.75
 
@@ -598,7 +599,7 @@ function parseBedroomMatrix(data: unknown[][], sheetLabel: string): TealburyPars
   }))
 }
 
-function mergeBySku(rows: TealburyParsedRow[], warnings: string[]): TealburyParsedRow[] {
+function mergeBySku(rows: TealburyParsedRow[], warnings: WorkbenchWarning[]): TealburyParsedRow[] {
   const bySku = new Map<string, TealburyParsedRow>()
   for (const row of rows) {
     const code = row.sku
@@ -606,8 +607,23 @@ function mergeBySku(rows: TealburyParsedRow[], warnings: string[]): TealburyPars
       bySku.set(code, { ...row, options: { ...row.options } })
       continue
     }
-    warnings.push(`Duplicate SKU merged: ${code}`)
     const k = bySku.get(code)!
+    const existingDup = warnings.find((w) => w.type === 'duplicate_sku_merged' && w.sku === code)
+    if (existingDup?.type === 'duplicate_sku_merged') {
+      existingDup.mergedCount += 1
+      existingDup.mergedNames.push(row.name)
+      existingDup.mergedSections.push(row.categoryName)
+    } else {
+      warnings.push({
+        type: 'duplicate_sku_merged',
+        sku: code,
+        keptName: k.name,
+        keptSection: k.categoryName,
+        mergedCount: 1,
+        mergedNames: [row.name],
+        mergedSections: [row.categoryName],
+      })
+    }
     k.description = `${k.description}\n---\n${row.description}`
     k.unitPrice = Math.min(k.unitPrice, row.unitPrice)
     k.cost_price = Math.round(k.unitPrice * COST_FACTOR * 100) / 100
@@ -690,7 +706,7 @@ function importRowsFromSheet(
   sheetName: string,
   data: unknown[][],
   ctx: ReturnType<typeof buildTealburyImportContext>,
-  warnings: string[]
+  warnings: WorkbenchWarning[]
 ): TealburyParsedRow[] {
   if (shouldSkipTealburyAuxSheet(sheetName, data)) return []
 
@@ -698,9 +714,7 @@ function importRowsFromSheet(
   const customerCount = customerRowCounts.get(sheetName) ?? 0
   if (customerCount > 0) {
     if (skipPricelistHub && isTealburyPricelistHubSheet(sheetName)) {
-      warnings.push(
-        `Sheet "${sheetName}": skipped (workbook hub with INDIRECT/VLOOKUP). Imported static prices from per-range sheets instead.`
-      )
+      warnings.push({ type: 'sheet_skipped', sheet: sheetName, reason: 'hub_formulas' })
       return []
     }
     const appendDoorRange = tealburyShouldAppendDoorRange(sheetName, productiveCustomerSheets, skipPricelistHub)
@@ -710,21 +724,22 @@ function importRowsFromSheet(
   const kitchen = parseKitchenMatrix(data, sheetName)
   const bedroom = parseBedroomMatrix(data, sheetName)
   if (!kitchen.length && !bedroom.length) {
-    warnings.push(
-      `Sheet "${sheetName}": no Tealbury customer tables (CODE / H (MM) / PRICE) or Lamtek kitchen/bedroom tables detected.`
-    )
+    warnings.push({
+      type: 'generic',
+      message: `Sheet "${sheetName}": no Tealbury customer tables (CODE / H (MM) / PRICE) or Lamtek kitchen/bedroom tables detected.`,
+    })
     return []
   }
   return [...kitchen, ...bedroom]
 }
 
-function finalizeParsedRows(collected: TealburyParsedRow[], warnings: string[]): TealburyParsedRow[] {
+function finalizeParsedRows(collected: TealburyParsedRow[], warnings: WorkbenchWarning[]): TealburyParsedRow[] {
   const merged = mergeBySku(collected, warnings)
   return merged.map(finalizeTealburyRowPricing)
 }
 
-function parseWorkbook(wb: XLSX.WorkBook): { rows: TealburyParsedRow[]; warnings: string[] } {
-  const warnings: string[] = []
+function parseWorkbook(wb: XLSX.WorkBook): { rows: TealburyParsedRow[]; warnings: WorkbenchWarning[] } {
+  const warnings: WorkbenchWarning[] = []
   const collected: TealburyParsedRow[] = []
   const sheetPayloads = buildSheetPayloads(wb)
   const ctx = buildTealburyImportContext(sheetPayloads)
@@ -736,7 +751,7 @@ function parseWorkbook(wb: XLSX.WorkBook): { rows: TealburyParsedRow[]; warnings
   return { rows: finalizeParsedRows(collected, warnings), warnings }
 }
 
-export function parseTealburyPricelistWorkbook(buf: ArrayBuffer): { rows: TealburyParsedRow[]; warnings: string[] } {
+export function parseTealburyPricelistWorkbook(buf: ArrayBuffer): { rows: TealburyParsedRow[]; warnings: WorkbenchWarning[] } {
   const wb = XLSX.read(buf, { type: 'array', cellDates: true })
   return parseWorkbook(wb)
 }
@@ -745,7 +760,7 @@ export function parseTealburyPricelistWorkbook(buf: ArrayBuffer): { rows: Tealbu
 export async function parseTealburyPricelistWorkbookAsync(
   buf: ArrayBuffer,
   onProgress?: (progress: PricelistParseProgress) => void
-): Promise<{ rows: TealburyParsedRow[]; warnings: string[] }> {
+): Promise<{ rows: TealburyParsedRow[]; warnings: WorkbenchWarning[] }> {
   const report = (percent: number, label: string) => onProgress?.({ percent, label })
 
   report(5, 'Reading workbook…')
@@ -754,7 +769,7 @@ export async function parseTealburyPricelistWorkbookAsync(
 
   report(12, 'Loading sheets…')
   await yieldToUi()
-  const warnings: string[] = []
+  const warnings: WorkbenchWarning[] = []
   const collected: TealburyParsedRow[] = []
   const sheetPayloads = buildSheetPayloads(wb)
   const totalSheets = sheetPayloads.length

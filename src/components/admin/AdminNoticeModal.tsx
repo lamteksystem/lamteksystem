@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 type Props = {
   open: boolean
   title: string
-  message: string
-  variant?: 'success' | 'info'
+  message: ReactNode
+  variant?: 'success' | 'info' | 'warning'
   onClose: () => void
 }
 

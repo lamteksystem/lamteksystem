@@ -31,7 +31,13 @@ function mergeOrder(defaultIds: string[], preferred?: string[]): string[] {
 
 function filterVisible(defaultIds: string[], visible?: string[]): string[] {
   if (!visible?.length) return defaultIds
-  return visible.filter((id) => defaultIds.includes(id))
+  const migrated = visible.map((id) => (id === 'source' ? 'catalog_source' : id))
+  return migrated.filter((id) => defaultIds.includes(id))
+}
+
+function migrateOrderIds(order: string[], defaultIds: string[]): string[] {
+  const mapped = order.map((id) => (id === 'source' ? 'catalog_source' : id))
+  return mergeOrder(defaultIds, mapped)
 }
 
 export function useColumnVisibility(
@@ -99,8 +105,9 @@ export function useColumnVisibility(
                 setVisibleSetState(new Set(filterVisible(defaultIds, parsed as string[])))
               } else if (parsed && Array.isArray(parsed.order) && Array.isArray(parsed.visible)) {
                 usedPersistedPrefsRef.current = true
-                setOrderState(mergeOrder(defaultIds, (parsed as StoredPref).order))
-                setVisibleSetState(new Set(filterVisible(defaultIds, (parsed as StoredPref).visible)))
+                const stored = parsed as StoredPref
+                setOrderState(migrateOrderIds(stored.order, defaultIds))
+                setVisibleSetState(new Set(filterVisible(defaultIds, stored.visible)))
               }
             } catch {
               /* use defaults */
@@ -140,11 +147,17 @@ export function useColumnVisibility(
 
   const setColumnVisible = useCallback(
     (id: string, visible: boolean) => {
+      const colId = id === 'source' ? 'catalog_source' : id
+      let nextOrder = order
+      if (visible && !order.includes(colId)) {
+        nextOrder = [...order, colId]
+        setOrderState(nextOrder)
+      }
       setVisibleSetState((prev) => {
         const next = new Set(prev)
-        if (visible) next.add(id)
-        else next.delete(id)
-        persist({ order, visible: [...next] })
+        if (visible) next.add(colId)
+        else next.delete(colId)
+        persist({ order: nextOrder, visible: [...next] })
         return next
       })
     },

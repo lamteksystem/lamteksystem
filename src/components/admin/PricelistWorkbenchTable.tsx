@@ -76,7 +76,7 @@ export default function PricelistWorkbenchTable({
 }: Props) {
   const { columnDefs, visibleIds, setColumnVisible, setColumnOrder, resetToDefault, isVisible, order } =
     useColumnVisibility('pricelist-workbench', COLUMN_DEFS, PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS)
-  const { widths: columnWidths, setWidth, persistWidths, initialised: widthsInit } = useColumnWidths('pricelist-workbench')
+  const { widths: columnWidths, setWidth, persistWidths, initialised: widthsInit } = useColumnWidths('pricelist-workbench-v2')
   const userResizedRef = useRef(false)
   const [resizingColId, setResizingColId] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null)

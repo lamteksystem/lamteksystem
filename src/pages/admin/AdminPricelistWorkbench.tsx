@@ -39,6 +39,7 @@ import PricelistWorkbenchSmartPanel from '@/components/admin/PricelistWorkbenchS
 import PricelistWorkbenchSection from '@/components/admin/PricelistWorkbenchSection'
 import PricelistWorkbenchTable from '@/components/admin/PricelistWorkbenchTable'
 import PricelistWorkbenchTableToolbar from '@/components/admin/PricelistWorkbenchTableToolbar'
+import type { HorizontalScrollHandle, HorizontalScrollState } from '@/components/admin/HorizontalScrollWithArrows'
 import {
   DEFAULT_WORKBENCH_FILTERS,
   filterAndSortWorkbenchRows,
@@ -81,6 +82,11 @@ export default function AdminPricelistWorkbench() {
 
   const [tableFilters, setTableFilters] = useState<WorkbenchTableFilters>(DEFAULT_WORKBENCH_FILTERS)
   const [bulkCategoryId, setBulkCategoryId] = useState('')
+  const tableScrollRef = useRef<HorizontalScrollHandle>(null)
+  const [tableScrollState, setTableScrollState] = useState<HorizontalScrollState>({
+    canScrollLeft: false,
+    canScrollRight: false,
+  })
 
   function patchTableFilters(patch: Partial<WorkbenchTableFilters>) {
     setTableFilters((prev) => ({ ...prev, ...patch }))
@@ -775,6 +781,10 @@ export default function AdminPricelistWorkbench() {
               partTypes={partTypesHook.types}
               filteredCount={filtered.length}
               totalCount={rows.length}
+              canScrollLeft={tableScrollState.canScrollLeft}
+              canScrollRight={tableScrollState.canScrollRight}
+              onScrollLeft={() => tableScrollRef.current?.scrollLeft()}
+              onScrollRight={() => tableScrollRef.current?.scrollRight()}
             />
             <PricelistWorkbenchTable
               pageItems={pageItems}
@@ -784,6 +794,8 @@ export default function AdminPricelistWorkbench() {
               onToggleSelectAllOnPage={toggleSelectAllOnPage}
               onPatchRow={patchRow}
               onDeleteRow={deleteRow}
+              scrollRef={tableScrollRef}
+              onScrollStateChange={setTableScrollState}
             />
             {rows.length > 0 && filtered.length === 0 ? (
               <p className="admin-muted" style={{ marginTop: '0.5rem' }}>

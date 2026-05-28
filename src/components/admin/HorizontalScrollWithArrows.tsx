@@ -75,9 +75,9 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
     }, [onScrollStateChange])
 
     const updateArrowLayout = useCallback(() => {
-      const wrap = wrapRef.current
-      if (!wrap) return
-      const rect = wrap.getBoundingClientRect()
+      const base = scrollRef.current ?? wrapRef.current
+      if (!base) return
+      const rect = base.getBoundingClientRect()
       const vh = window.innerHeight
       const visible =
         overlayArrows &&
@@ -87,10 +87,9 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
         rect.height > 24
       const visibleTop = Math.max(24, rect.top)
       const visibleBottom = Math.min(vh - 24, rect.bottom)
-      const centerY =
-        visibleTop < visibleBottom
-          ? visibleTop + (visibleBottom - visibleTop) * 0.62
-          : vh / 2
+      const centerY = visibleTop < visibleBottom
+        ? Math.min(visibleBottom - 24, visibleTop + Math.max(96, (visibleBottom - visibleTop) * 0.72))
+        : vh / 2
       setArrowLayout({
         visible,
         top: centerY,

@@ -3,7 +3,6 @@ import { ColumnSettings } from '@/components/admin/ColumnSettings'
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import {
   HorizontalScrollWithArrows,
-  HorizontalScrollToolbarArrows,
   type HorizontalScrollHandle,
   type HorizontalScrollState,
 } from '@/components/admin/HorizontalScrollWithArrows'
@@ -86,13 +85,8 @@ export default function PricelistWorkbenchTable({
   columnWidthsRef.current = columnWidths
   const internalScrollRef = useRef<HorizontalScrollHandle>(null)
   const scrollRef = scrollRefProp ?? internalScrollRef
-  const [scrollState, setScrollState] = useState<HorizontalScrollState>({
-    canScrollLeft: false,
-    canScrollRight: false,
-  })
   const handleScrollStateChange = useCallback(
     (state: HorizontalScrollState) => {
-      setScrollState(state)
       onScrollStateChangeProp?.(state)
     },
     [onScrollStateChangeProp],
@@ -116,6 +110,33 @@ export default function PricelistWorkbenchTable({
       if (!columnWidths[id]) setWidth(id, w)
     }
   }, [widthsInit, pageItems, visibleColIds.join(','), columnWidths, setWidth])
+
+  useEffect(() => {
+    if (!widthsInit) return
+    const hardCaps: Record<string, number> = {
+      description: 520,
+      name: 360,
+      section: 320,
+      standalone: 320,
+      sku: 300,
+      category: 260,
+    }
+    let changed = false
+    const next: Record<string, number> = { ...columnWidths }
+    for (const [id, raw] of Object.entries(columnWidths)) {
+      const cap = hardCaps[id] ?? 260
+      if (raw > cap || raw < 40) {
+        changed = true
+        next[id] = Math.max(40, Math.min(raw, cap))
+      }
+    }
+    if (changed) {
+      setTimeout(() => {
+        Object.entries(next).forEach(([id, w]) => setWidth(id, w))
+        void persistWidths(next)
+      }, 0)
+    }
+  }, [widthsInit, columnWidths, setWidth, persistWidths])
 
   const tableWidthPx = useMemo(
     () => 40 + visibleCols.reduce((sum, c) => sum + workbenchColumnWidth(c.id, columnWidths), 0),
@@ -485,13 +506,6 @@ export default function PricelistWorkbenchTable({
           Double-click cells to edit. Scroll horizontally with the bar below or the arrow buttons.
         </span>
       </div>
-      <HorizontalScrollToolbarArrows
-        canScrollLeft={scrollState.canScrollLeft}
-        canScrollRight={scrollState.canScrollRight}
-        onScrollLeft={() => scrollRef.current?.scrollLeft()}
-        onScrollRight={() => scrollRef.current?.scrollRight()}
-        className="admin-pricelist-scroll-arrows"
-      />
     </div>
     <HorizontalScrollWithArrows
       ref={scrollRef}

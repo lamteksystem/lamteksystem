@@ -6850,6 +6850,10 @@ button.ordering-wizard-card {
   padding-bottom: 0.2rem;
   white-space: nowrap;
 }
+.admin-pricelist-table-toolbar-filters .admin-pricelist-scroll-arrows {
+  margin-left: auto;
+  align-self: center;
+}
 .admin-pricelist-table-toolbar-scroll {
   display: flex;
   align-items: center;

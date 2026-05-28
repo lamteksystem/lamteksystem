@@ -8,6 +8,22 @@ import { supabase } from '@/lib/supabase'
 const PREF_PREFIX = 'admin_columns_'
 const PREF_SUFFIX = '_widths'
 
+function sanitizeWidths(input: Record<string, unknown>): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const [key, raw] of Object.entries(input)) {
+    const n =
+      typeof raw === 'number'
+        ? raw
+        : typeof raw === 'string'
+          ? Number.parseFloat(raw)
+          : Number.NaN
+    if (!Number.isFinite(n)) continue
+    // Defensive bounds: ignore runaway values from stale persisted prefs.
+    out[key] = Math.max(40, Math.min(700, n))
+  }
+  return out
+}
+
 export function useColumnWidths(scope: string) {
   const [widths, setWidthsState] = useState<Record<string, number>>({})
   const [initialised, setInitialised] = useState(false)
@@ -29,8 +45,8 @@ export function useColumnWidths(scope: string) {
           if (cancelled) return
           if (data?.value) {
             try {
-              const parsed = JSON.parse(data.value as string) as Record<string, number>
-              if (parsed && typeof parsed === 'object') setWidthsState(parsed)
+              const parsed = JSON.parse(data.value as string) as Record<string, unknown>
+              if (parsed && typeof parsed === 'object') setWidthsState(sanitizeWidths(parsed))
             } catch (_) {}
           }
           setInitialised(true)
@@ -58,7 +74,8 @@ export function useColumnWidths(scope: string) {
 
   const setWidth = useCallback(
     (columnId: string, widthPx: number) => {
-      setWidthsState((prev) => ({ ...prev, [columnId]: widthPx }))
+      const safe = Math.max(40, Math.min(700, widthPx))
+      setWidthsState((prev) => ({ ...prev, [columnId]: safe }))
     },
     []
   )

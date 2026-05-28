@@ -64,16 +64,16 @@ const ITEM_KIND_OPTIONS: { value: WorkbenchItemKind; label: string }[] = [
 
 const BASELINE_WIDTHS: Record<string, number> = {
   catalog_source: 96,
-  item_kind: 88,
-  part_type: 100,
-  door_range: 120,
-  section: 150,
-  trade_code: 90,
-  sku: 150,
-  name: 220,
-  description: 260,
-  category: 160,
-  standalone: 180,
+  item_kind: 80,
+  part_type: 90,
+  door_range: 108,
+  section: 128,
+  trade_code: 80,
+  sku: 130,
+  name: 180,
+  description: 220,
+  category: 130,
+  standalone: 150,
   cost_price: 88,
   unit_price: 92,
   active: 56,
@@ -94,7 +94,7 @@ export default function PricelistWorkbenchTable({
 }: Props) {
   const { columnDefs, visibleIds, setColumnVisible, setColumnOrder, resetToDefault, isVisible, order } =
     useColumnVisibility('pricelist-workbench', COLUMN_DEFS, PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS)
-  const { widths: columnWidths, setWidth, persistWidths, initialised: widthsInit } = useColumnWidths('pricelist-workbench-v3')
+  const { widths: columnWidths, setWidth, persistWidths, initialised: widthsInit } = useColumnWidths('pricelist-workbench-v4')
   const userResizedRef = useRef(false)
   const [resizingColId, setResizingColId] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null)
@@ -131,12 +131,12 @@ export default function PricelistWorkbenchTable({
   useEffect(() => {
     if (!widthsInit) return
     const hardCaps: Record<string, number> = {
-      description: 520,
-      name: 360,
-      section: 320,
-      standalone: 320,
-      sku: 300,
-      category: 260,
+      description: 300,
+      name: 240,
+      section: 220,
+      standalone: 220,
+      sku: 200,
+      category: 180,
     }
     let changed = false
     const next: Record<string, number> = { ...columnWidths }

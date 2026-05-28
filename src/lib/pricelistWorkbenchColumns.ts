@@ -155,15 +155,15 @@ export function workbenchColumnWidth(
   // Guard against persisted runaway widths from older sessions.
   const max =
     id === 'description'
-      ? 520
+      ? 300
       : id === 'name'
-        ? 360
+        ? 240
         : id === 'section'
-          ? 320
+          ? 220
           : id === 'standalone'
-            ? 320
+            ? 220
             : id === 'sku'
-              ? 300
-              : 260
+              ? 200
+              : 180
   return Math.max(def?.minWidth ?? 60, Math.min(raw, max))
 }

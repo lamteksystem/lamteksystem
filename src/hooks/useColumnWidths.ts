@@ -19,7 +19,7 @@ function sanitizeWidths(input: Record<string, unknown>): Record<string, number> 
           : Number.NaN
     if (!Number.isFinite(n)) continue
     // Defensive bounds: ignore runaway values from stale persisted prefs.
-    out[key] = Math.max(40, Math.min(700, n))
+    out[key] = Math.max(40, Math.min(320, n))
   }
   return out
 }
@@ -74,7 +74,7 @@ export function useColumnWidths(scope: string) {
 
   const setWidth = useCallback(
     (columnId: string, widthPx: number) => {
-      const safe = Math.max(40, Math.min(700, widthPx))
+      const safe = Math.max(40, Math.min(320, widthPx))
       setWidthsState((prev) => ({ ...prev, [columnId]: safe }))
     },
     []

@@ -85,9 +85,12 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
         rect.bottom > 24 &&
         rect.width > 48 &&
         rect.height > 24
+      const visibleTop = Math.max(24, rect.top)
+      const visibleBottom = Math.min(vh - 24, rect.bottom)
+      const centerY = visibleTop < visibleBottom ? (visibleTop + visibleBottom) / 2 : vh / 2
       setArrowLayout({
         visible,
-        top: rect.top + rect.height / 2,
+        top: centerY,
         left: Math.max(ARROW_INSET_PX, rect.left + ARROW_INSET_PX),
         right: Math.max(ARROW_INSET_PX, window.innerWidth - rect.right + ARROW_INSET_PX),
       })
@@ -142,12 +145,10 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
       obs.observe(wrap)
       window.addEventListener('scroll', updateArrowLayout, true)
       window.addEventListener('resize', updateArrowLayout)
-      const interval = setInterval(updateArrowLayout, 120)
       return () => {
         obs.disconnect()
         window.removeEventListener('scroll', updateArrowLayout, true)
         window.removeEventListener('resize', updateArrowLayout)
-        clearInterval(interval)
       }
     }, [updateArrowLayout, overlayArrows])
 

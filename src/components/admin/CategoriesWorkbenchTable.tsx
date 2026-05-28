@@ -264,11 +264,11 @@ export default function CategoriesWorkbenchTable({
           >
             <div
               className="admin-table-wrap admin-catalogue-categories-table-wrap"
-              style={{ width: tableWidthPx, minWidth: tableWidthPx }}
+              style={{ width: `max(100%, ${tableWidthPx}px)`, minWidth: tableWidthPx }}
             >
               <table
                 className="admin-table admin-catalogue-categories-table admin-catalogue-categories-table--resizable admin-table--sticky-header"
-                style={{ width: tableWidthPx, minWidth: tableWidthPx }}
+                style={{ width: `max(100%, ${tableWidthPx}px)`, minWidth: tableWidthPx }}
               >
                 <thead>
                   <tr>{visibleCols.map((c) => renderHeader(c.id as CategoriesColumnId))}</tr>

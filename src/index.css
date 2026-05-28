@@ -4396,9 +4396,7 @@ button.ordering-wizard-card {
   color: var(--lamtek-on-dark, #f3f4f6);
   display: flex;
   flex-direction: column;
-  transition: width 0.14s ease-out;
-  will-change: width;
-  contain: layout paint;
+  transition: none;
   box-shadow: var(--lamtek-shadow-md);
 }
 
@@ -6729,6 +6727,17 @@ button.ordering-wizard-card {
 .admin-categories-workbench-wrap {
   width: 100%;
   max-width: 100%;
+}
+.admin-pricelist-workbench > * {
+  width: 100%;
+  max-width: 100%;
+}
+.admin-pricelist-workbench .admin-modal-card,
+.admin-pricelist-workbench .admin-page-header,
+.admin-pricelist-workbench .admin-workbench-section-body {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .admin-pricelist-workbench .admin-workbench-section-header-extra {
   flex: 1 1 100%;

@@ -2,9 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ColumnSettings } from '@/components/admin/ColumnSettings'
 import {
   HorizontalScrollWithArrows,
-  HorizontalScrollToolbarArrows,
   type HorizontalScrollHandle,
-  type HorizontalScrollState,
 } from '@/components/admin/HorizontalScrollWithArrows'
 import ListPager from '@/components/admin/ListPager'
 import {
@@ -61,10 +59,6 @@ export default function CategoriesWorkbenchTable({
   const columnWidthsRef = useRef(columnWidths)
   columnWidthsRef.current = columnWidths
   const scrollRef = useRef<HorizontalScrollHandle>(null)
-  const [scrollState, setScrollState] = useState<HorizontalScrollState>({
-    canScrollLeft: false,
-    canScrollRight: false,
-  })
 
   const parents = useMemo(
     () => categories.filter((c) => !c.parent_id).sort((a, b) => a.name.localeCompare(b.name)),
@@ -254,13 +248,6 @@ export default function CategoriesWorkbenchTable({
           <span className="admin-muted admin-pricelist-table-toolbar-count">
             {filteredTotal} of {categories.length}
           </span>
-          <HorizontalScrollToolbarArrows
-            canScrollLeft={scrollState.canScrollLeft}
-            canScrollRight={scrollState.canScrollRight}
-            onScrollLeft={() => scrollRef.current?.scrollLeft()}
-            onScrollRight={() => scrollRef.current?.scrollRight()}
-            className="admin-pricelist-scroll-arrows"
-          />
         </div>
       </div>
 
@@ -270,11 +257,10 @@ export default function CategoriesWorkbenchTable({
         <>
           <HorizontalScrollWithArrows
             ref={scrollRef}
-            fixedArrows
+            overlayArrows
             className="admin-horizontal-scroll-wrap--pricelist-table admin-horizontal-scroll-wrap--categories"
             innerClassName="admin-pricelist-table-scroll"
             contentStyle={{ minWidth: tableWidthPx }}
-            onScrollStateChange={setScrollState}
           >
             <div
               className="admin-table-wrap admin-catalogue-categories-table-wrap"

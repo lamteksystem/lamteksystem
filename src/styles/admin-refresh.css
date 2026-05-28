@@ -52,9 +52,15 @@
   z-index: 1;
   flex: 1;
   width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   padding: clamp(1rem, 2.2vw, 1.75rem);
+  box-sizing: border-box;
+}
+
+.admin-app .admin-route-outlet-host {
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Sidebar: slight depth + faint brand wash */

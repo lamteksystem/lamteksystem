@@ -580,7 +580,7 @@ export default function AdminCatalogue() {
         </div>
         <HorizontalScrollWithArrows
           ref={catalogueScrollRef}
-          fixedArrows={false}
+          overlayArrows={false}
           onScrollStateChange={setCatalogueScrollState}
           className={
             viewType === 'table'

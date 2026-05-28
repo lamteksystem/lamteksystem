@@ -5036,14 +5036,11 @@ button.ordering-wizard-card {
 .admin-main {
   flex: 1;
   padding: var(--lamtek-space-6);
-  max-width: 1400px;
+  max-width: none;
   width: 100%;
-  margin: 0 auto;
+  margin: 0;
   background: var(--lamtek-bg);
   box-sizing: border-box;
-}
-.admin-app--sidebar-collapsed .admin-main {
-  max-width: none;
 }
 
 /* Admin settings page */
@@ -6719,7 +6716,23 @@ button.ordering-wizard-card {
 .admin-th-help .admin-help-tip-icon { width: 0.9rem; height: 0.9rem; font-size: 0.6rem; }
 
 /* Collapsible workbench sections (chevron-only toggle) */
-.admin-workbench-section { margin-bottom: 1rem; }
+.admin-workbench-section {
+  margin-bottom: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.admin-pricelist-workbench,
+.admin-categories-workbench,
+.admin-categories-workbench-wrap {
+  width: 100%;
+  max-width: 100%;
+}
+.admin-pricelist-workbench .admin-workbench-section-header-extra {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
+}
 .admin-workbench-section-header {
   display: flex;
   flex-wrap: wrap;
@@ -7808,21 +7821,16 @@ button.ordering-wizard-card {
   opacity: 0.5;
   cursor: not-allowed;
 }
-/* Fixed to viewport so buttons stay on screen when scrolling; visible only when table in view (JS) */
-.admin-scroll-arrow--fixed {
+/* Overlay arrows track the scroll region (position set in JS from getBoundingClientRect) */
+.admin-scroll-arrow--overlay {
   position: fixed;
-  top: 50%;
+  z-index: 120;
   transform: translateY(-50%);
-  z-index: 100;
+  pointer-events: auto;
 }
-.admin-app .admin-scroll-arrow--fixed.admin-scroll-arrow--left {
-  left: 276px;
-}
-.admin-app .admin-scroll-arrow--fixed.admin-scroll-arrow--right {
-  right: 1rem;
-}
-.admin-app--sidebar-collapsed .admin-scroll-arrow--fixed.admin-scroll-arrow--left {
-  left: 72px;
+.admin-scroll-arrow--overlay.admin-scroll-arrow--left,
+.admin-scroll-arrow--overlay.admin-scroll-arrow--right {
+  margin: 0;
 }
 .admin-scroll-arrow--left { }
 .admin-scroll-arrow--right { }

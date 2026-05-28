@@ -1,9 +1,5 @@
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import {
-  HorizontalScrollToolbarArrows,
-  type HorizontalScrollState,
-} from '@/components/admin/HorizontalScrollWithArrows'
-import {
   DEFAULT_WORKBENCH_FILTERS,
   type SortDir,
   type WorkbenchSortKey,
@@ -20,9 +16,6 @@ type Props = {
   partTypes: AssemblyPartTypeRow[]
   filteredCount: number
   totalCount: number
-  scrollState: HorizontalScrollState
-  onScrollLeft: () => void
-  onScrollRight: () => void
 }
 
 const SORT_OPTIONS: { value: WorkbenchSortKey; label: string }[] = [
@@ -45,9 +38,6 @@ export default function PricelistWorkbenchTableToolbar({
   partTypes,
   filteredCount,
   totalCount,
-  scrollState,
-  onScrollLeft,
-  onScrollRight,
 }: Props) {
   return (
     <div className="admin-pricelist-table-toolbar">
@@ -181,18 +171,9 @@ export default function PricelistWorkbenchTableToolbar({
         >
           Reset filters
         </button>
-      </div>
-      <div className="admin-pricelist-table-toolbar-scroll">
         <span className="admin-muted admin-pricelist-table-toolbar-count">
           {filteredCount} of {totalCount}
         </span>
-        <HorizontalScrollToolbarArrows
-          canScrollLeft={scrollState.canScrollLeft}
-          canScrollRight={scrollState.canScrollRight}
-          onScrollLeft={onScrollLeft}
-          onScrollRight={onScrollRight}
-          className="admin-pricelist-scroll-arrows"
-        />
       </div>
     </div>
   )

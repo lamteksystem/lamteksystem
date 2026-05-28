@@ -3,7 +3,6 @@ import { ColumnSettings } from '@/components/admin/ColumnSettings'
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import {
   HorizontalScrollWithArrows,
-  HorizontalScrollToolbarArrows,
   type HorizontalScrollHandle,
   type HorizontalScrollState,
 } from '@/components/admin/HorizontalScrollWithArrows'
@@ -41,8 +40,6 @@ type Props = {
   onDeleteRow: (id: string) => void
   scrollRef?: RefObject<HorizontalScrollHandle>
   onScrollStateChange?: (state: HorizontalScrollState) => void
-  /** Hide toolbar scroll arrows when parent renders them in the section header. */
-  hideToolbarScrollArrows?: boolean
 }
 
 const COLUMN_DEFS = PRICELIST_WORKBENCH_COLUMNS.map(({ id, label }) => ({ id, label }))
@@ -76,7 +73,6 @@ export default function PricelistWorkbenchTable({
   onDeleteRow,
   scrollRef: scrollRefProp,
   onScrollStateChange: onScrollStateChangeProp,
-  hideToolbarScrollArrows = false,
 }: Props) {
   const { columnDefs, visibleIds, setColumnVisible, setColumnOrder, resetToDefault, isVisible, order } =
     useColumnVisibility('pricelist-workbench', COLUMN_DEFS, PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS)
@@ -89,13 +85,8 @@ export default function PricelistWorkbenchTable({
   columnWidthsRef.current = columnWidths
   const internalScrollRef = useRef<HorizontalScrollHandle>(null)
   const scrollRef = scrollRefProp ?? internalScrollRef
-  const [scrollState, setScrollState] = useState<HorizontalScrollState>({
-    canScrollLeft: false,
-    canScrollRight: false,
-  })
   const handleScrollStateChange = useCallback(
     (state: HorizontalScrollState) => {
-      setScrollState(state)
       onScrollStateChangeProp?.(state)
     },
     [onScrollStateChangeProp],
@@ -488,19 +479,10 @@ export default function PricelistWorkbenchTable({
           Double-click cells to edit. Scroll horizontally with the bar below or the arrow buttons.
         </span>
       </div>
-      {!hideToolbarScrollArrows ? (
-        <HorizontalScrollToolbarArrows
-          canScrollLeft={scrollState.canScrollLeft}
-          canScrollRight={scrollState.canScrollRight}
-          onScrollLeft={() => scrollRef.current?.scrollLeft()}
-          onScrollRight={() => scrollRef.current?.scrollRight()}
-          className="admin-pricelist-scroll-arrows"
-        />
-      ) : null}
     </div>
     <HorizontalScrollWithArrows
       ref={scrollRef}
-      fixedArrows
+      overlayArrows
       className="admin-horizontal-scroll-wrap--pricelist-table"
       innerClassName="admin-pricelist-table-scroll"
       contentStyle={{ minWidth: tableWidthPx }}

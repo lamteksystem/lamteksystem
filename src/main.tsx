@@ -21,7 +21,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         basename={import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}
         future={{
           v7_relativeSplatPath: true,
-          v7_startTransition: true,
+          // Off: deferred route updates left the previous admin page visible while the URL changed.
+          v7_startTransition: false,
         }}
       >
         <ImpersonationProvider>

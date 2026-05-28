@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useLocation, NavLink } from 'react-router-dom'
-import AdminRouteOutlet from '@/components/admin/AdminRouteOutlet'
+import AdminMainContent from '@/components/admin/AdminMainContent'
 import { supabase } from '@/lib/supabase'
 import { useStaff } from '@/hooks/useStaff'
 import { useImpersonation } from '@/contexts/ImpersonationContext'
@@ -1051,7 +1051,7 @@ export default function AdminLayout() {
                 </div>
               </div>
             ) : (
-              <AdminRouteOutlet />
+              <AdminMainContent />
             )}
           </div>
         </main>

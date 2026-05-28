@@ -2,8 +2,16 @@ import { forwardRef, useRef, useState, useEffect, useCallback, useImperativeHand
 
 const ARROW_SCROLL_AMOUNT = 280
 const AUTOSCROLL_SPEED_PX_PER_MS = 0.2
+const ARROW_INSET_PX = 10
 
 type ScrollDirection = 'left' | 'right' | null
+
+type OverlayArrowLayout = {
+  visible: boolean
+  top: number
+  left: number
+  right: number
+}
 
 export type HorizontalScrollState = {
   canScrollLeft: boolean
@@ -23,9 +31,9 @@ interface HorizontalScrollWithArrowsProps {
   innerClassName?: string
   /** Applied to the content wrapper (e.g. minWidth matching table column sum) */
   contentStyle?: React.CSSProperties
-  /** Fixed viewport arrows (default true). Set false when using toolbar arrows. */
-  fixedArrows?: boolean
-  /** Called when horizontal scroll limits change (for toolbar buttons). */
+  /** Overlay arrows tracked to this scroll region (default true). */
+  overlayArrows?: boolean
+  /** Called when horizontal scroll limits change (for optional toolbar buttons). */
   onScrollStateChange?: (state: HorizontalScrollState) => void
 }
 
@@ -36,7 +44,7 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
       className = '',
       innerClassName = '',
       contentStyle,
-      fixedArrows = true,
+      overlayArrows = true,
       onScrollStateChange,
     },
     ref
@@ -46,7 +54,12 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
     const [scrollDirection, setScrollDirection] = useState<ScrollDirection>(null)
     const [canScrollLeft, setCanScrollLeft] = useState(false)
     const [canScrollRight, setCanScrollRight] = useState(false)
-    const [arrowsVisible, setArrowsVisible] = useState(false)
+    const [arrowLayout, setArrowLayout] = useState<OverlayArrowLayout>({
+      visible: false,
+      top: 0,
+      left: 0,
+      right: 0,
+    })
     const rafRef = useRef<number | null>(null)
     const lastTickRef = useRef<number>(0)
 
@@ -61,13 +74,24 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
       onScrollStateChange?.({ canScrollLeft: left, canScrollRight: right })
     }, [onScrollStateChange])
 
-    const updateArrowsVisible = useCallback(() => {
+    const updateArrowLayout = useCallback(() => {
       const wrap = wrapRef.current
       if (!wrap) return
       const rect = wrap.getBoundingClientRect()
       const vh = window.innerHeight
-      setArrowsVisible(rect.top < vh && rect.bottom > 0 && rect.width > 0 && rect.height > 0)
-    }, [])
+      const visible =
+        overlayArrows &&
+        rect.top < vh - 24 &&
+        rect.bottom > 24 &&
+        rect.width > 48 &&
+        rect.height > 24
+      setArrowLayout({
+        visible,
+        top: rect.top + rect.height / 2,
+        left: Math.max(ARROW_INSET_PX, rect.left + ARROW_INSET_PX),
+        right: Math.max(ARROW_INSET_PX, window.innerWidth - rect.right + ARROW_INSET_PX),
+      })
+    }, [overlayArrows])
 
     const scrollLeftFn = useCallback(() => {
       const el = scrollRef.current
@@ -110,22 +134,22 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
     }, [updateScrollState])
 
     useEffect(() => {
-      if (!fixedArrows) return
-      updateArrowsVisible()
+      if (!overlayArrows) return
+      updateArrowLayout()
       const wrap = wrapRef.current
       if (!wrap) return
-      const obs = new ResizeObserver(updateArrowsVisible)
+      const obs = new ResizeObserver(updateArrowLayout)
       obs.observe(wrap)
-      window.addEventListener('scroll', updateArrowsVisible, true)
-      window.addEventListener('resize', updateArrowsVisible)
-      const interval = setInterval(updateArrowsVisible, 150)
+      window.addEventListener('scroll', updateArrowLayout, true)
+      window.addEventListener('resize', updateArrowLayout)
+      const interval = setInterval(updateArrowLayout, 120)
       return () => {
         obs.disconnect()
-        window.removeEventListener('scroll', updateArrowsVisible, true)
-        window.removeEventListener('resize', updateArrowsVisible)
+        window.removeEventListener('scroll', updateArrowLayout, true)
+        window.removeEventListener('resize', updateArrowLayout)
         clearInterval(interval)
       }
-    }, [updateArrowsVisible, fixedArrows])
+    }, [updateArrowLayout, overlayArrows])
 
     useEffect(() => {
       if (scrollDirection === null) return
@@ -159,6 +183,8 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
       }
     }, [scrollDirection, updateScrollState])
 
+    const arrowVisibility = arrowLayout.visible ? 'visible' : 'hidden'
+
     return (
       <div className={`admin-horizontal-scroll-wrap ${className}`} ref={wrapRef}>
         <div
@@ -169,12 +195,16 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
             {children}
           </div>
         </div>
-        {fixedArrows ? (
+        {overlayArrows ? (
           <>
             <button
               type="button"
-              className="admin-scroll-arrow admin-scroll-arrow--left admin-scroll-arrow--fixed"
-              style={{ visibility: arrowsVisible ? 'visible' : 'hidden' }}
+              className="admin-scroll-arrow admin-scroll-arrow--left admin-scroll-arrow--overlay"
+              style={{
+                visibility: arrowVisibility,
+                top: arrowLayout.top,
+                left: arrowLayout.left,
+              }}
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -183,15 +213,19 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
               onMouseEnter={() => setScrollDirection('left')}
               onMouseLeave={() => setScrollDirection(null)}
               disabled={!canScrollLeft}
-              title="Scroll left (or hover to auto-scroll)"
+              title="Scroll left (hover to auto-scroll)"
               aria-label="Scroll left"
             >
               <ChevronLeftIcon />
             </button>
             <button
               type="button"
-              className="admin-scroll-arrow admin-scroll-arrow--right admin-scroll-arrow--fixed"
-              style={{ visibility: arrowsVisible ? 'visible' : 'hidden' }}
+              className="admin-scroll-arrow admin-scroll-arrow--right admin-scroll-arrow--overlay"
+              style={{
+                visibility: arrowVisibility,
+                top: arrowLayout.top,
+                right: arrowLayout.right,
+              }}
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -200,7 +234,7 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
               onMouseEnter={() => setScrollDirection('right')}
               onMouseLeave={() => setScrollDirection(null)}
               disabled={!canScrollRight}
-              title="Scroll right (or hover to auto-scroll)"
+              title="Scroll right (hover to auto-scroll)"
               aria-label="Scroll right"
             >
               <ChevronRightIcon />

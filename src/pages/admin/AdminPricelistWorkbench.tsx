@@ -39,7 +39,6 @@ import PricelistWorkbenchSmartPanel from '@/components/admin/PricelistWorkbenchS
 import PricelistWorkbenchSection from '@/components/admin/PricelistWorkbenchSection'
 import PricelistWorkbenchTable from '@/components/admin/PricelistWorkbenchTable'
 import PricelistWorkbenchTableToolbar from '@/components/admin/PricelistWorkbenchTableToolbar'
-import type { HorizontalScrollHandle, HorizontalScrollState } from '@/components/admin/HorizontalScrollWithArrows'
 import {
   DEFAULT_WORKBENCH_FILTERS,
   filterAndSortWorkbenchRows,
@@ -82,11 +81,6 @@ export default function AdminPricelistWorkbench() {
 
   const [tableFilters, setTableFilters] = useState<WorkbenchTableFilters>(DEFAULT_WORKBENCH_FILTERS)
   const [bulkCategoryId, setBulkCategoryId] = useState('')
-  const tableScrollRef = useRef<HorizontalScrollHandle>(null)
-  const [tableScrollState, setTableScrollState] = useState<HorizontalScrollState>({
-    canScrollLeft: false,
-    canScrollRight: false,
-  })
 
   function patchTableFilters(patch: Partial<WorkbenchTableFilters>) {
     setTableFilters((prev) => ({ ...prev, ...patch }))
@@ -771,22 +765,17 @@ export default function AdminPricelistWorkbench() {
             tip="Resize and show/hide columns via the gear control. Hover the side arrows to auto-scroll. Double-click cells to edit."
             defaultOpen
             badge={filtered.length}
-            headerExtra={
-              <PricelistWorkbenchTableToolbar
-                filters={tableFilters}
-                onChange={patchTableFilters}
-                doorRanges={doorRanges}
-                sections={sections}
-                categories={categories}
-                partTypes={partTypesHook.types}
-                filteredCount={filtered.length}
-                totalCount={rows.length}
-                scrollState={tableScrollState}
-                onScrollLeft={() => tableScrollRef.current?.scrollLeft()}
-                onScrollRight={() => tableScrollRef.current?.scrollRight()}
-              />
-            }
           >
+            <PricelistWorkbenchTableToolbar
+              filters={tableFilters}
+              onChange={patchTableFilters}
+              doorRanges={doorRanges}
+              sections={sections}
+              categories={categories}
+              partTypes={partTypesHook.types}
+              filteredCount={filtered.length}
+              totalCount={rows.length}
+            />
             <PricelistWorkbenchTable
               pageItems={pageItems}
               categories={categories}
@@ -795,9 +784,6 @@ export default function AdminPricelistWorkbench() {
               onToggleSelectAllOnPage={toggleSelectAllOnPage}
               onPatchRow={patchRow}
               onDeleteRow={deleteRow}
-              scrollRef={tableScrollRef}
-              onScrollStateChange={setTableScrollState}
-              hideToolbarScrollArrows
             />
             <ListPager
               totalItems={filtered.length}

@@ -15,7 +15,6 @@ import {
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
 import type { WorkbenchItemKind } from '@/lib/tealburyCatalogueBuild'
 import { catalogueSourceLabel } from '@/lib/catalogueSourceLabel'
-import { suggestWorkbenchColumnWidths } from '@/lib/workbenchAutoColumnWidths'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import { useColumnWidths } from '@/hooks/useColumnWidths'
 import type { AssemblyPartTypeRow, CategoryRow } from '@/types/database'
@@ -63,6 +62,25 @@ const ITEM_KIND_OPTIONS: { value: WorkbenchItemKind; label: string }[] = [
   { value: 'other', label: 'Other' },
 ]
 
+const BASELINE_WIDTHS: Record<string, number> = {
+  catalog_source: 96,
+  item_kind: 88,
+  part_type: 100,
+  door_range: 120,
+  section: 150,
+  trade_code: 90,
+  sku: 150,
+  name: 220,
+  description: 260,
+  category: 160,
+  standalone: 180,
+  cost_price: 88,
+  unit_price: 92,
+  active: 56,
+  is_stock: 56,
+  actions: 92,
+}
+
 export default function PricelistWorkbenchTable({
   pageItems,
   categories,
@@ -76,7 +94,7 @@ export default function PricelistWorkbenchTable({
 }: Props) {
   const { columnDefs, visibleIds, setColumnVisible, setColumnOrder, resetToDefault, isVisible, order } =
     useColumnVisibility('pricelist-workbench', COLUMN_DEFS, PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS)
-  const { widths: columnWidths, setWidth, persistWidths, initialised: widthsInit } = useColumnWidths('pricelist-workbench-v2')
+  const { widths: columnWidths, setWidth, persistWidths, initialised: widthsInit } = useColumnWidths('pricelist-workbench-v3')
   const userResizedRef = useRef(false)
   const [resizingColId, setResizingColId] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null)
@@ -101,15 +119,14 @@ export default function PricelistWorkbenchTable({
     [order, isVisible]
   )
 
-  const visibleColIds = useMemo(() => visibleCols.map((c) => c.id), [visibleCols])
-
   useEffect(() => {
-    if (!widthsInit || userResizedRef.current || pageItems.length === 0) return
-    const suggested = suggestWorkbenchColumnWidths(pageItems, visibleColIds)
-    for (const [id, w] of Object.entries(suggested)) {
-      if (!columnWidths[id]) setWidth(id, w)
-    }
-  }, [widthsInit, pageItems, visibleColIds.join(','), columnWidths, setWidth])
+    if (!widthsInit) return
+    const hasAny = Object.keys(columnWidths).length > 0
+    if (hasAny) return
+    // First run for v3 profile: start compact and predictable.
+    Object.entries(BASELINE_WIDTHS).forEach(([id, w]) => setWidth(id, w))
+    void persistWidths(BASELINE_WIDTHS)
+  }, [widthsInit, columnWidths, setWidth, persistWidths])
 
   useEffect(() => {
     if (!widthsInit) return

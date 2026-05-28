@@ -534,11 +534,11 @@ export default function PricelistWorkbenchTable({
     >
       <div
         className="admin-table-wrap admin-pricelist-table-wrap"
-        style={{ width: `max(100%, ${tableWidthPx}px)`, minWidth: tableWidthPx }}
+        style={{ width: tableWidthPx, minWidth: tableWidthPx }}
       >
         <table
           className="admin-table admin-pricelist-table admin-table--resizable admin-table--sticky-header"
-          style={{ width: `max(100%, ${tableWidthPx}px)`, minWidth: tableWidthPx }}
+          style={{ width: tableWidthPx, minWidth: tableWidthPx }}
         >
         <colgroup>
           <col style={{ width: 40, minWidth: 40 }} />

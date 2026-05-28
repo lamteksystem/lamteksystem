@@ -87,7 +87,10 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
         rect.height > 24
       const visibleTop = Math.max(24, rect.top)
       const visibleBottom = Math.min(vh - 24, rect.bottom)
-      const centerY = visibleTop < visibleBottom ? (visibleTop + visibleBottom) / 2 : vh / 2
+      const centerY =
+        visibleTop < visibleBottom
+          ? visibleTop + (visibleBottom - visibleTop) * 0.62
+          : vh / 2
       setArrowLayout({
         visible,
         top: centerY,

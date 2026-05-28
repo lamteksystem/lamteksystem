@@ -151,5 +151,19 @@ export function workbenchColumnWidth(
   cols: WorkbenchColumnDef[] = PRICELIST_WORKBENCH_COLUMNS
 ): number {
   const def = cols.find((c) => c.id === id)
-  return Math.max(def?.minWidth ?? 60, widths[id] ?? def?.defaultWidth ?? 100)
+  const raw = widths[id] ?? def?.defaultWidth ?? 100
+  // Guard against persisted runaway widths from older sessions.
+  const max =
+    id === 'description'
+      ? 520
+      : id === 'name'
+        ? 360
+        : id === 'section'
+          ? 320
+          : id === 'standalone'
+            ? 320
+            : id === 'sku'
+              ? 300
+              : 260
+  return Math.max(def?.minWidth ?? 60, Math.min(raw, max))
 }

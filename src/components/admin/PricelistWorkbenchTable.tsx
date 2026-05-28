@@ -3,6 +3,7 @@ import { ColumnSettings } from '@/components/admin/ColumnSettings'
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import {
   HorizontalScrollWithArrows,
+  HorizontalScrollToolbarArrows,
   type HorizontalScrollHandle,
   type HorizontalScrollState,
 } from '@/components/admin/HorizontalScrollWithArrows'
@@ -85,8 +86,13 @@ export default function PricelistWorkbenchTable({
   columnWidthsRef.current = columnWidths
   const internalScrollRef = useRef<HorizontalScrollHandle>(null)
   const scrollRef = scrollRefProp ?? internalScrollRef
+  const [scrollState, setScrollState] = useState<HorizontalScrollState>({
+    canScrollLeft: false,
+    canScrollRight: false,
+  })
   const handleScrollStateChange = useCallback(
     (state: HorizontalScrollState) => {
+      setScrollState(state)
       onScrollStateChangeProp?.(state)
     },
     [onScrollStateChangeProp],
@@ -479,6 +485,13 @@ export default function PricelistWorkbenchTable({
           Double-click cells to edit. Scroll horizontally with the bar below or the arrow buttons.
         </span>
       </div>
+      <HorizontalScrollToolbarArrows
+        canScrollLeft={scrollState.canScrollLeft}
+        canScrollRight={scrollState.canScrollRight}
+        onScrollLeft={() => scrollRef.current?.scrollLeft()}
+        onScrollRight={() => scrollRef.current?.scrollRight()}
+        className="admin-pricelist-scroll-arrows"
+      />
     </div>
     <HorizontalScrollWithArrows
       ref={scrollRef}

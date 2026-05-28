@@ -52,6 +52,8 @@ export function filterAndSortWorkbenchRows(
   rows: PricelistWorkbenchRow[],
   f: WorkbenchTableFilters,
 ): PricelistWorkbenchRow[] {
+  const s = (v: unknown) => (typeof v === 'string' ? v : '')
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
   const q = f.search.trim().toLowerCase()
   let list = rows.filter((r) => {
     if (f.source !== 'all' && r.source !== f.source) return false
@@ -65,12 +67,12 @@ export function filterAndSortWorkbenchRows(
     if (!q) return true
     const extraCats = (r.options?.extra_category_names as string[] | undefined)?.join(' ') ?? ''
     return (
-      r.sku.toLowerCase().includes(q) ||
-      r.name.toLowerCase().includes(q) ||
-      r.section.toLowerCase().includes(q) ||
-      r.category_name.toLowerCase().includes(q) ||
-      r.trade_code.toLowerCase().includes(q) ||
-      r.description.toLowerCase().includes(q) ||
+      s(r.sku).toLowerCase().includes(q) ||
+      s(r.name).toLowerCase().includes(q) ||
+      s(r.section).toLowerCase().includes(q) ||
+      s(r.category_name).toLowerCase().includes(q) ||
+      s(r.trade_code).toLowerCase().includes(q) ||
+      s(r.description).toLowerCase().includes(q) ||
       extraCats.toLowerCase().includes(q)
     )
   })
@@ -80,28 +82,28 @@ export function filterAndSortWorkbenchRows(
     let c = 0
     switch (f.sortKey) {
       case 'sku':
-        c = cmpStr(a.sku, b.sku)
+        c = cmpStr(s(a.sku), s(b.sku))
         break
       case 'name':
-        c = cmpStr(a.name, b.name)
+        c = cmpStr(s(a.name), s(b.name))
         break
       case 'section':
-        c = cmpStr(a.section, b.section)
+        c = cmpStr(s(a.section), s(b.section))
         break
       case 'category_name':
-        c = cmpStr(a.category_name, b.category_name)
+        c = cmpStr(s(a.category_name), s(b.category_name))
         break
       case 'unit_price':
-        c = cmpNum(a.unit_price, b.unit_price)
+        c = cmpNum(n(a.unit_price), n(b.unit_price))
         break
       case 'source':
-        c = cmpStr(a.source, b.source)
+        c = cmpStr(s(a.source), s(b.source))
         break
       case 'item_kind':
-        c = cmpStr(a.item_kind, b.item_kind)
+        c = cmpStr(s(a.item_kind), s(b.item_kind))
         break
       case 'part_type':
-        c = cmpStr(a.part_type, b.part_type)
+        c = cmpStr(s(a.part_type), s(b.part_type))
         break
       default:
         c = 0

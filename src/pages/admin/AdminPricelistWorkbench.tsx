@@ -785,6 +785,11 @@ export default function AdminPricelistWorkbench() {
               onPatchRow={patchRow}
               onDeleteRow={deleteRow}
             />
+            {rows.length > 0 && filtered.length === 0 ? (
+              <p className="admin-muted" style={{ marginTop: '0.5rem' }}>
+                No rows match current filters. Reset filters in this section to show all {rows.length} rows.
+              </p>
+            ) : null}
             <ListPager
               totalItems={filtered.length}
               totalPages={totalPages}

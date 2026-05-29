@@ -15,5 +15,8 @@
       "icon": "terminal-powershell"
     }
   },
-  "terminal.integrated.defaultProfile.windows": "Lamtek (gh + Supabase)"
+  "terminal.integrated.defaultProfile.windows": "Lamtek (gh + Supabase)",
+  "cursorRemote.telegram.botToken": "8766376239:AAFsxum449n8b4DN_XQ5XWRf588dFdw0HIE",
+  "cursorRemote.telegram.enabled": true,
+  "cursorRemote.webappPassword": "O5MB-4DKA-VF1B-CTNS-DZUC"
 }

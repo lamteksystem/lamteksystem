@@ -7836,19 +7836,22 @@ button.ordering-wizard-card {
   opacity: 0.5;
   cursor: not-allowed;
 }
-/* Overlay arrows track the scroll region (position set in JS from getBoundingClientRect) */
+/* Overlay arrows sit on the scroll wrap (centered over the table viewport) */
 .admin-scroll-arrow--overlay {
-  position: fixed;
-  z-index: 120;
+  position: absolute;
+  top: 50%;
+  z-index: 12;
   transform: translateY(-50%);
   pointer-events: auto;
 }
-.admin-scroll-arrow--overlay.admin-scroll-arrow--left,
-.admin-scroll-arrow--overlay.admin-scroll-arrow--right {
+.admin-scroll-arrow--overlay.admin-scroll-arrow--left {
+  left: 10px;
   margin: 0;
 }
-.admin-scroll-arrow--left { }
-.admin-scroll-arrow--right { }
+.admin-scroll-arrow--overlay.admin-scroll-arrow--right {
+  right: 10px;
+  margin: 0;
+}
 /* Let the scroll-inner be the only scroll container; table-wrap must not create nested scroll */
 .admin-horizontal-scroll-inner .table-wrap,
 .admin-horizontal-scroll-inner .admin-table-wrap { overflow: visible; }

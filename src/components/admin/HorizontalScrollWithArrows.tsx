@@ -2,16 +2,8 @@ import { forwardRef, useRef, useState, useEffect, useCallback, useImperativeHand
 
 const ARROW_SCROLL_AMOUNT = 280
 const AUTOSCROLL_SPEED_PX_PER_MS = 0.2
-const ARROW_INSET_PX = 10
 
 type ScrollDirection = 'left' | 'right' | null
-
-type OverlayArrowLayout = {
-  visible: boolean
-  top: number
-  left: number
-  right: number
-}
 
 export type HorizontalScrollState = {
   canScrollLeft: boolean
@@ -54,12 +46,7 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
     const [scrollDirection, setScrollDirection] = useState<ScrollDirection>(null)
     const [canScrollLeft, setCanScrollLeft] = useState(false)
     const [canScrollRight, setCanScrollRight] = useState(false)
-    const [arrowLayout, setArrowLayout] = useState<OverlayArrowLayout>({
-      visible: false,
-      top: 0,
-      left: 0,
-      right: 0,
-    })
+    const [overlayVisible, setOverlayVisible] = useState(false)
     const rafRef = useRef<number | null>(null)
     const lastTickRef = useRef<number>(0)
 
@@ -74,7 +61,7 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
       onScrollStateChange?.({ canScrollLeft: left, canScrollRight: right })
     }, [onScrollStateChange])
 
-    const updateArrowLayout = useCallback(() => {
+    const updateOverlayVisibility = useCallback(() => {
       const base = scrollRef.current ?? wrapRef.current
       if (!base) return
       const rect = base.getBoundingClientRect()
@@ -85,17 +72,7 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
         rect.bottom > 24 &&
         rect.width > 48 &&
         rect.height > 24
-      const visibleTop = Math.max(24, rect.top)
-      const visibleBottom = Math.min(vh - 24, rect.bottom)
-      const centerY = visibleTop < visibleBottom
-        ? Math.max(visibleTop + 88, visibleBottom - 90)
-        : vh / 2
-      setArrowLayout({
-        visible,
-        top: centerY,
-        left: Math.max(ARROW_INSET_PX, rect.left + ARROW_INSET_PX),
-        right: Math.max(ARROW_INSET_PX, window.innerWidth - rect.right + ARROW_INSET_PX),
-      })
+      setOverlayVisible(visible)
     }, [overlayArrows])
 
     const scrollLeftFn = useCallback(() => {
@@ -140,19 +117,19 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
 
     useEffect(() => {
       if (!overlayArrows) return
-      updateArrowLayout()
+      updateOverlayVisibility()
       const wrap = wrapRef.current
       if (!wrap) return
-      const obs = new ResizeObserver(updateArrowLayout)
+      const obs = new ResizeObserver(updateOverlayVisibility)
       obs.observe(wrap)
-      window.addEventListener('scroll', updateArrowLayout, true)
-      window.addEventListener('resize', updateArrowLayout)
+      window.addEventListener('scroll', updateOverlayVisibility, true)
+      window.addEventListener('resize', updateOverlayVisibility)
       return () => {
         obs.disconnect()
-        window.removeEventListener('scroll', updateArrowLayout, true)
-        window.removeEventListener('resize', updateArrowLayout)
+        window.removeEventListener('scroll', updateOverlayVisibility, true)
+        window.removeEventListener('resize', updateOverlayVisibility)
       }
-    }, [updateArrowLayout, overlayArrows])
+    }, [updateOverlayVisibility, overlayArrows])
 
     useEffect(() => {
       if (scrollDirection === null) return
@@ -186,7 +163,7 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
       }
     }, [scrollDirection, updateScrollState])
 
-    const arrowVisibility = arrowLayout.visible ? 'visible' : 'hidden'
+    const arrowVisibility = overlayVisible ? 'visible' : 'hidden'
 
     return (
       <div className={`admin-horizontal-scroll-wrap ${className}`} ref={wrapRef}>
@@ -203,11 +180,7 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
             <button
               type="button"
               className="admin-scroll-arrow admin-scroll-arrow--left admin-scroll-arrow--overlay"
-              style={{
-                visibility: arrowVisibility,
-                top: arrowLayout.top,
-                left: arrowLayout.left,
-              }}
+              style={{ visibility: arrowVisibility }}
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -224,11 +197,7 @@ export const HorizontalScrollWithArrows = forwardRef<HorizontalScrollHandle, Hor
             <button
               type="button"
               className="admin-scroll-arrow admin-scroll-arrow--right admin-scroll-arrow--overlay"
-              style={{
-                visibility: arrowVisibility,
-                top: arrowLayout.top,
-                right: arrowLayout.right,
-              }}
+              style={{ visibility: arrowVisibility }}
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()

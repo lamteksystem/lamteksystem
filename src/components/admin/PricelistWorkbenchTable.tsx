@@ -320,9 +320,6 @@ export default function PricelistWorkbenchTable({
           </select>
         )
       case 'part_type':
-        if (row.item_kind === 'complete') {
-          return <span className="admin-muted">—</span>
-        }
         return (
           <select
             className="admin-pricelist-category-select"

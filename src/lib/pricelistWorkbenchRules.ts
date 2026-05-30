@@ -32,6 +32,7 @@ export type WorkbenchActionType =
   | 'delete'
   | 'remove_sku_from_name'
   | 'strip_text_from_field'
+  | 'change_text_case'
   | 'select'
   | 'deselect'
   | 'set_active'
@@ -39,6 +40,19 @@ export type WorkbenchActionType =
   | 'assign_category'
 
 export type StripTextField = 'description' | 'name' | 'sku'
+
+export type TextCaseField = 'name' | 'description' | 'section' | 'door_range' | 'trade_code' | 'sku'
+export type TextCaseMode = 'sentence' | 'title' | 'upper' | 'lower'
+
+export const TEXT_CASE_FIELDS: TextCaseField[] = [
+  'name',
+  'description',
+  'section',
+  'door_range',
+  'trade_code',
+  'sku',
+]
+export const TEXT_CASE_MODES: TextCaseMode[] = ['sentence', 'title', 'upper', 'lower']
 
 export interface WorkbenchCondition {
   field: WorkbenchMatchField
@@ -214,6 +228,79 @@ export function stripTextFromFieldValue(value: string, text: string): string {
   return value.replace(re, '').replace(/\s{2,}/g, ' ').trim()
 }
 
+export function parseTextCaseActionParam(
+  param: string | undefined
+): { field: TextCaseField; mode: TextCaseMode } | null {
+  if (!param?.trim()) return null
+  const idx = param.indexOf(':')
+  if (idx < 1) return null
+  const field = param.slice(0, idx).trim() as TextCaseField
+  const mode = param.slice(idx + 1).trim() as TextCaseMode
+  if (!TEXT_CASE_FIELDS.includes(field)) return null
+  if (!TEXT_CASE_MODES.includes(mode)) return null
+  return { field, mode }
+}
+
+/** Title Case: capitalise the first letter of each word. */
+function toTitleCase(value: string): string {
+  return value.toLowerCase().replace(/\b\p{L}/gu, (m) => m.toUpperCase())
+}
+
+/** Sentence case: lower-case, then capitalise the first letter of each sentence/line. */
+function toSentenceCase(value: string): string {
+  const lower = value.toLowerCase()
+  return lower.replace(/(^\s*\p{L})|([.!?]\s+\p{L})|(\n\s*\p{L})/gu, (m) => m.toUpperCase())
+}
+
+export function applyTextCase(value: string, mode: TextCaseMode): string {
+  switch (mode) {
+    case 'upper':
+      return value.toUpperCase()
+    case 'lower':
+      return value.toLowerCase()
+    case 'title':
+      return toTitleCase(value)
+    case 'sentence':
+      return toSentenceCase(value)
+    default:
+      return value
+  }
+}
+
+export function textCaseFieldLabel(field: TextCaseField): string {
+  switch (field) {
+    case 'name':
+      return 'Name'
+    case 'description':
+      return 'Description'
+    case 'section':
+      return 'Section'
+    case 'door_range':
+      return 'Door / range'
+    case 'trade_code':
+      return 'Trade code'
+    case 'sku':
+      return 'SKU'
+    default:
+      return field
+  }
+}
+
+export function textCaseModeLabel(mode: TextCaseMode): string {
+  switch (mode) {
+    case 'sentence':
+      return 'Sentence case'
+    case 'title':
+      return 'Title Case'
+    case 'upper':
+      return 'UPPER CASE'
+    case 'lower':
+      return 'lower case'
+    default:
+      return mode
+  }
+}
+
 export function findCategoryForRule(
   categories: CategoryRow[],
   param: string | undefined
@@ -289,6 +376,7 @@ export function applyRuleToRows(
   }
 
   const stripParam = rule.action === 'strip_text_from_field' ? parseStripTextActionParam(rule.actionParam) : null
+  const caseParam = rule.action === 'change_text_case' ? parseTextCaseActionParam(rule.actionParam) : null
 
   const next = rows.map((row) => {
     if (!matchedIds.has(row.id)) return row
@@ -315,6 +403,19 @@ export function applyRuleToRows(
         }
         return { ...row, [stripParam.field]: cleaned }
       }
+      case 'change_text_case': {
+        if (!caseParam) {
+          changed--
+          return row
+        }
+        const current = row[caseParam.field] as string
+        const updated = applyTextCase(current, caseParam.mode)
+        if (updated === current) {
+          changed--
+          return row
+        }
+        return { ...row, [caseParam.field]: updated }
+      }
       case 'select':
         return { ...row, selected: true }
       case 'deselect':
@@ -332,6 +433,7 @@ export function applyRuleToRows(
     delete: 'deleted',
     remove_sku_from_name: 'cleaned names on',
     strip_text_from_field: 'updated text on',
+    change_text_case: 'changed text case on',
     select: 'selected',
     deselect: 'deselected',
     set_active: 'activated',
@@ -437,6 +539,20 @@ function buildSimulationSample(
         sku: before.sku,
         name: before.name,
         fieldLabel: fieldLabelForStrip(strip.field),
+        before: truncateSampleText(b || '(empty)'),
+        after: truncateSampleText(a || '(empty)'),
+      }
+    }
+    case 'change_text_case': {
+      const cs = parseTextCaseActionParam(rule.actionParam)
+      if (!cs) return null
+      const b = before[cs.field] as string
+      const a = after[cs.field] as string
+      if (b === a) return null
+      return {
+        sku: before.sku,
+        name: before.name,
+        fieldLabel: textCaseFieldLabel(cs.field),
         before: truncateSampleText(b || '(empty)'),
         after: truncateSampleText(a || '(empty)'),
       }
@@ -635,7 +751,35 @@ function looksLikeStripFromFieldPrompt(lower: string, raw: string): boolean {
   )
 }
 
+function looksLikeCaseCommand(lower: string): boolean {
+  return /\bcase\b/.test(lower) && /\b(sentence|title|upper|lower|caps|capital)\b/.test(lower)
+}
+
+function parseCaseField(lower: string): TextCaseField {
+  if (/\bdescription/.test(lower)) return 'description'
+  if (/\bsection/.test(lower)) return 'section'
+  if (/\b(door|range)\b/.test(lower)) return 'door_range'
+  if (/\btrade\s*code/.test(lower)) return 'trade_code'
+  if (/\bsku/.test(lower)) return 'sku'
+  return 'name'
+}
+
+function parseCaseMode(lower: string): TextCaseMode {
+  if (/\bsentence/.test(lower)) return 'sentence'
+  if (/\btitle/.test(lower)) return 'title'
+  if (/\b(upper|caps|capital)/.test(lower)) return 'upper'
+  if (/\blower/.test(lower)) return 'lower'
+  return 'sentence'
+}
+
 function parseAction(lower: string, raw: string, quoted: string[]): ParsedAction {
+  if (looksLikeCaseCommand(lower)) {
+    return {
+      action: 'change_text_case',
+      actionParam: `${parseCaseField(lower)}:${parseCaseMode(lower)}`,
+    }
+  }
+
   if (looksLikeStripFromFieldPrompt(lower, raw)) {
     const field = parseStripFieldFromPrompt(lower, raw)
     const fromAllDescriptions = /\bfrom\s+(?:all\s+)?(?:product\s+)?descriptions?\b/i.test(raw)
@@ -855,6 +999,7 @@ export function parseSmartCommandPrompt(prompt: string): { rule: WorkbenchRule |
   const matchAll =
     !conditions.length &&
     (action === 'strip_text_from_field' ||
+      action === 'change_text_case' ||
       /\b(each|every|all)\s+(product|row|item|line)s?\b/.test(lower) ||
       /\ball\s+rows\b/.test(lower))
 

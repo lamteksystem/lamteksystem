@@ -10,7 +10,13 @@ import {
   applyRuleToRows,
   describeRule,
   filterRowsByRule,
+  textCaseFieldLabel,
+  textCaseModeLabel,
+  TEXT_CASE_FIELDS,
+  TEXT_CASE_MODES,
   WORKBENCH_RULE_PRESETS,
+  type TextCaseField,
+  type TextCaseMode,
   type WorkbenchActionType,
   type WorkbenchCondition,
   type WorkbenchConditionOp,
@@ -53,6 +59,7 @@ const ACTION_OPTIONS: { value: WorkbenchActionType; label: string }[] = [
   { value: 'assign_category', label: 'Assign category' },
   { value: 'remove_sku_from_name', label: 'Remove SKU from name' },
   { value: 'strip_text_from_field', label: 'Remove text from field' },
+  { value: 'change_text_case', label: 'Change text case' },
   { value: 'select', label: 'Select rows' },
   { value: 'deselect', label: 'Deselect rows' },
   { value: 'set_active', label: 'Set active' },
@@ -96,6 +103,8 @@ export default function PricelistWorkbenchSmartPanel({
   const [builderActionParam, setBuilderActionParam] = useState('')
   const [builderStripField, setBuilderStripField] = useState<'description' | 'name' | 'sku'>('description')
   const [builderStripText, setBuilderStripText] = useState('')
+  const [builderCaseField, setBuilderCaseField] = useState<TextCaseField>('name')
+  const [builderCaseMode, setBuilderCaseMode] = useState<TextCaseMode>('sentence')
   const [builderConditions, setBuilderConditions] = useState<WorkbenchCondition[]>([
     { field: 'source', op: 'equals', value: 'tealbury' },
     newCondition(),
@@ -176,6 +185,8 @@ export default function PricelistWorkbenchSmartPanel({
       builderAction === 'strip_text_from_field' && builderStripText.trim()
         ? `${builderStripField}:${builderStripText.trim()}`
         : undefined
+    const caseParam =
+      builderAction === 'change_text_case' ? `${builderCaseField}:${builderCaseMode}` : undefined
     const rule: WorkbenchRule = {
       id: `saved-${Date.now()}`,
       name: name.slice(0, 120),
@@ -187,10 +198,16 @@ export default function PricelistWorkbenchSmartPanel({
           ? builderActionParam.trim()
           : builderAction === 'strip_text_from_field'
             ? stripParam
-            : undefined,
+            : builderAction === 'change_text_case'
+              ? caseParam
+              : undefined,
     }
-    if (!rule.conditions.length && builderAction !== 'strip_text_from_field') {
-      onNotify('', 'Add at least one condition (or use strip text on all rows with no conditions).')
+    if (
+      !rule.conditions.length &&
+      builderAction !== 'strip_text_from_field' &&
+      builderAction !== 'change_text_case'
+    ) {
+      onNotify('', 'Add at least one condition (or use strip text / change case on all rows with no conditions).')
       return
     }
     if (builderAction === 'strip_text_from_field' && !stripParam) {
@@ -317,6 +334,36 @@ export default function PricelistWorkbenchSmartPanel({
               </label>
             </>
           )}
+          {builderAction === 'change_text_case' && (
+            <>
+              <label>
+                Field
+                <select
+                  value={builderCaseField}
+                  onChange={(e) => setBuilderCaseField(e.target.value as TextCaseField)}
+                >
+                  {TEXT_CASE_FIELDS.map((f) => (
+                    <option key={f} value={f}>
+                      {textCaseFieldLabel(f)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Convert to
+                <select
+                  value={builderCaseMode}
+                  onChange={(e) => setBuilderCaseMode(e.target.value as TextCaseMode)}
+                >
+                  {TEXT_CASE_MODES.map((m) => (
+                    <option key={m} value={m}>
+                      {textCaseModeLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
         </div>
         <div className="admin-pricelist-conditions">
           {builderConditions.map((c, i) => (
@@ -394,7 +441,9 @@ export default function PricelistWorkbenchSmartPanel({
                     ? builderActionParam
                     : builderAction === 'strip_text_from_field' && builderStripText.trim()
                       ? `${builderStripField}:${builderStripText.trim()}`
-                      : undefined,
+                      : builderAction === 'change_text_case'
+                        ? `${builderCaseField}:${builderCaseMode}`
+                        : undefined,
               })
             }
           >

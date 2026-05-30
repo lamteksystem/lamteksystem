@@ -144,7 +144,6 @@ export default function PricelistWorkbenchRowModal({
             <span>Part type</span>
             <select
               value={row.part_type || ''}
-              disabled={row.item_kind === 'complete'}
               onChange={(e) => onPatchRow(row.id, { part_type: e.target.value })}
             >
               <option value="">—</option>

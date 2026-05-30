@@ -3,6 +3,85 @@
     "source.fixAll.eslint": "explicit"
   },
   "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+
+  "//perf": "Stop the OS file watcher from monitoring deps, build output and bulk supplier assets (3.6GB+ of images). This is the single biggest CPU saver.",
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/.firecrawl/**": true,
+    "**/playwright-report/**": true,
+    "**/test-results/**": true,
+    "**/supabase/.temp/**": true,
+    "**/product-images/**": true,
+    "**/product-images-extracted/**": true,
+    "**/demo-videos/**": true,
+    "**/Accessories*/**": true,
+    "**/Emuca*/**": true,
+    "**/Pricelists and Specifications/**": true,
+    "**/Paint grade mouldings technical paint spec/**": true,
+    "**/*.tsbuildinfo": true,
+    "**/*.tif": true
+  },
+
+  "//perf-search": "Keep ripgrep/quick-search fast by skipping deps, build output and bulk assets.",
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.firecrawl": true,
+    "**/playwright-report": true,
+    "**/test-results": true,
+    "**/supabase/.temp": true,
+    "**/product-images": true,
+    "**/product-images-extracted": true,
+    "**/demo-videos": true,
+    "**/Accessories*": true,
+    "**/Emuca*": true,
+    "**/Pricelists and Specifications": true,
+    "**/Paint grade mouldings technical paint spec": true,
+    "**/*.xlsx": true,
+    "**/*.lock": true,
+    "**/package-lock.json": true
+  },
+
+  "//perf-explorer": "Hide bulk binary asset folders from the Explorer tree so the renderer isn't tracking thousands of files.",
+  "files.exclude": {
+    "**/.firecrawl": true,
+    "**/product-images": true,
+    "**/product-images-extracted": true,
+    "**/demo-videos": true,
+    "**/Accessories*": true,
+    "**/Emuca*": true,
+    "**/Pricelists and Specifications": true,
+    "**/Paint grade mouldings technical paint spec": true
+  },
+
+  "//perf-ts": "Bound the TypeScript server memory and skip auto type acquisition so it doesn't balloon CPU/RAM in the background.",
+  "typescript.tsserver.maxTsServerMemory": 3072,
+  "typescript.disableAutomaticTypeAcquisition": true,
+  "typescript.tsc.autoDetect": "off",
+  "javascript.suggest.autoImports": true,
+  "typescript.tsserver.watchOptions": {
+    "watchFile": "useFsEvents",
+    "watchDirectory": "useFsEvents",
+    "fallbackPolling": "dynamicPriority"
+  },
+
+  "//perf-gpu": "Trim GPU-heavy editor rendering (minimap + animations) to ease the discrete GPU / fans.",
+  "editor.minimap.enabled": false,
+  "editor.smoothScrolling": false,
+  "editor.cursorSmoothCaretAnimation": "off",
+  "workbench.list.smoothScrolling": false,
+  "editor.cursorBlinking": "solid",
+  "editor.bracketPairColorization.enabled": false,
+  "editor.guides.bracketPairs": false,
+  "editor.stickyScroll.enabled": false,
+  "editor.largeFileOptimizations": true,
+  "git.autorefresh": false,
+  "git.scanRepositories": [],
+  "telemetry.telemetryLevel": "off",
+
   "terminal.integrated.profiles.windows": {
     "Lamtek (gh + Supabase)": {
       "path": "C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe",
@@ -15,8 +94,5 @@
       "icon": "terminal-powershell"
     }
   },
-  "terminal.integrated.defaultProfile.windows": "Lamtek (gh + Supabase)",
-  "cursorRemote.telegram.botToken": "8766376239:AAFsxum449n8b4DN_XQ5XWRf588dFdw0HIE",
-  "cursorRemote.telegram.enabled": true,
-  "cursorRemote.webappPassword": "O5MB-4DKA-VF1B-CTNS-DZUC"
+  "terminal.integrated.defaultProfile.windows": "Lamtek (gh + Supabase)"
 }

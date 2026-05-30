@@ -1,0 +1,16 @@
+# Files Cursor should NOT index/embed in the background, but may still READ on demand.
+# This keeps code-quality high (the agent can open a dep when needed) while
+# stopping the constant indexing churn that spins the fans.
+
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Build / test artefacts
+playwright-report/
+test-results/
+supabase/.temp/
+
+# Generated / vendored data
+package-lock.json
+.firecrawl/

@@ -1,0 +1,24 @@
+﻿# Fully exclude from Cursor (no indexing AND no AI access).
+# Bulk binary supplier assets (GBs of images/PDFs/spreadsheets) + secrets.
+# Never useful as code context, and a major source of CPU/GPU load.
+
+# Bulk supplier image / spec folders (gitignored, not part of the app)
+Accessories*/
+Emuca*/
+product-images/
+product-images-extracted/
+demo-videos/
+Pricelists and Specifications/
+Paint grade mouldings technical paint spec/
+.firecrawl/
+
+# Large binary asset types anywhere in the tree
+*.tif
+*.tiff
+*.xlsx
+*.docx
+
+# Secrets (defence in depth)
+.env
+.env.*
+.secrets/

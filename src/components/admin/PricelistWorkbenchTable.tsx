@@ -75,8 +75,8 @@ const ITEM_KIND_OPTIONS: { value: WorkbenchItemKind; label: string }[] = [
 
 const BASELINE_WIDTHS: Record<string, number> = {
   catalog_source: 96,
-  item_kind: 80,
-  part_type: 90,
+  item_kind: 177,
+  part_type: 158,
   door_range: 168,
   section: 128,
   trade_code: 152,

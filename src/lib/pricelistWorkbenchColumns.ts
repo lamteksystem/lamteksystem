@@ -37,14 +37,14 @@ export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
     label: 'Kind',
     tip: 'complete = sellable Tealbury unit; component / door / accessory = BOM parts.',
     minWidth: 72,
-    defaultWidth: 88,
+    defaultWidth: 177,
   },
   {
     id: 'part_type',
     label: 'Part type',
     tip: 'BOM part type code (unit, door, hinge, …). Blank for complete units.',
     minWidth: 88,
-    defaultWidth: 100,
+    defaultWidth: 158,
   },
   {
     id: 'door_range',

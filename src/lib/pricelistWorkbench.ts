@@ -45,6 +45,62 @@ export interface PricelistWorkbenchRow {
   item_kind: 'complete' | 'component' | 'door' | 'drawer_front' | 'accessory' | 'other'
   /** assembly_part_types.code — blank for complete units. */
   part_type: string
+  /**
+   * Multi-assign companions. The single `section`/`item_kind`/`part_type` fields above
+   * remain the "primary" value (first element) for backward-compatible logic; these arrays
+   * hold the full set. Kept in sync via {@link setRowSectionsPatch} etc.
+   */
+  sections?: string[]
+  item_kinds?: WorkbenchItemKindValue[]
+  part_types?: string[]
+}
+
+export type WorkbenchItemKindValue = PricelistWorkbenchRow['item_kind']
+
+/** Effective list of sections (array if set, else the single primary, else empty). */
+export function rowSections(row: PricelistWorkbenchRow): string[] {
+  if (Array.isArray(row.sections) && row.sections.length) return dedupeStrings(row.sections)
+  return row.section.trim() ? [row.section.trim()] : []
+}
+
+export function rowItemKinds(row: PricelistWorkbenchRow): WorkbenchItemKindValue[] {
+  if (Array.isArray(row.item_kinds) && row.item_kinds.length) {
+    return [...new Set(row.item_kinds)]
+  }
+  return row.item_kind ? [row.item_kind] : []
+}
+
+export function rowPartTypes(row: PricelistWorkbenchRow): string[] {
+  if (Array.isArray(row.part_types) && row.part_types.length) return dedupeStrings(row.part_types)
+  return row.part_type.trim() ? [row.part_type.trim()] : []
+}
+
+function dedupeStrings(values: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const v of values) {
+    const t = v.trim()
+    if (!t || seen.has(t.toLowerCase())) continue
+    seen.add(t.toLowerCase())
+    out.push(t)
+  }
+  return out
+}
+
+/** Build a patch that keeps the array and its single "primary" field in sync. */
+export function setRowSectionsPatch(values: string[]): Partial<PricelistWorkbenchRow> {
+  const list = dedupeStrings(values)
+  return { sections: list, section: list[0] ?? '' }
+}
+
+export function setRowItemKindsPatch(values: WorkbenchItemKindValue[]): Partial<PricelistWorkbenchRow> {
+  const list = [...new Set(values)].filter(Boolean) as WorkbenchItemKindValue[]
+  return { item_kinds: list, item_kind: list[0] ?? 'other' }
+}
+
+export function setRowPartTypesPatch(values: string[]): Partial<PricelistWorkbenchRow> {
+  const list = dedupeStrings(values)
+  return { part_types: list, part_type: list[0] ?? '' }
 }
 
 export interface PublishWorkbenchResult {
@@ -328,6 +384,19 @@ export async function publishWorkbenchRows(
 
     const catId = row.category_id?.trim() || null
 
+    const sections = rowSections(row)
+    const itemKinds = rowItemKinds(row)
+    const partTypes = rowPartTypes(row)
+    // Surface multi-sections to the ordering screen, which reads `*_sections` from options.
+    const sectionsKey = row.catalog_program === CATALOG_PROGRAM.TEALBURY ? 'tealbury_sections' : 'lamtek_sections'
+    const mergedOptions: Record<string, Json> = {
+      ...row.options,
+      workbench_sections: sections,
+      workbench_item_kinds: itemKinds,
+      workbench_part_types: partTypes,
+    }
+    if (sections.length) mergedOptions[sectionsKey] = sections
+
     const payload = {
       category_id: catId,
       name: displayName.slice(0, 255),
@@ -341,8 +410,8 @@ export async function publishWorkbenchRows(
       image_alt: row.image_alt || null,
       is_stock: row.is_stock !== false,
       catalog_program: row.catalog_program,
-      part_type: row.part_type?.trim() || null,
-      options: row.options as Json,
+      part_type: partTypes[0] ?? (row.part_type?.trim() || null),
+      options: mergedOptions as Json,
     }
 
     const { data: existing } = await supabase.from('products').select('id').eq('sku', sku).maybeSingle()

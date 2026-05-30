@@ -1,7 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import {
+  rowSections,
+  rowItemKinds,
+  rowPartTypes,
+  setRowSectionsPatch,
+  setRowItemKindsPatch,
+  setRowPartTypesPatch,
+  type PricelistWorkbenchRow,
+} from '@/lib/pricelistWorkbench'
 import type { WorkbenchItemKind } from '@/lib/tealburyCatalogueBuild'
+import MultiSelectChips from '@/components/admin/MultiSelectChips'
 import { catalogueSourceLabel } from '@/lib/catalogueSourceLabel'
 import type { AssemblyPartTypeRow, CategoryRow } from '@/types/database'
 
@@ -45,6 +54,18 @@ export default function PricelistWorkbenchRowModal({
   const sellable = row.options.sellable_standalone === true
   const extraCategoryId =
     typeof row.options.extra_category_id === 'string' ? row.options.extra_category_id : ''
+
+  const sectionOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const c of categories) map.set(c.name.toLowerCase(), c.name)
+    for (const s of rowSections(row)) if (!map.has(s.toLowerCase())) map.set(s.toLowerCase(), s)
+    return [...map.values()].sort((a, b) => a.localeCompare(b)).map((s) => ({ value: s, label: s }))
+  }, [categories, row])
+  const partTypeOptions = useMemo(
+    () => partTypes.map((t) => ({ value: t.code, label: t.label })),
+    [partTypes],
+  )
+  const itemKindOptions = ITEM_KIND_OPTIONS.map((o) => ({ value: o.value, label: o.label }))
 
   const modalTree = (
     <div
@@ -116,44 +137,36 @@ export default function PricelistWorkbenchRowModal({
             />
           </label>
 
-          <label className="admin-pricelist-row-modal-field">
-            <span>Section</span>
-            <input
-              type="text"
-              value={row.section}
-              onChange={(e) => onPatchRow(row.id, { section: e.target.value })}
+          <div className="admin-pricelist-row-modal-field">
+            <span>Sections</span>
+            <MultiSelectChips
+              ariaLabel="Sections"
+              values={rowSections(row)}
+              options={sectionOptions}
+              allowCustom
+              onChange={(vals) => onPatchRow(row.id, setRowSectionsPatch(vals))}
             />
-          </label>
+          </div>
 
-          <label className="admin-pricelist-row-modal-field">
-            <span>Kind</span>
-            <select
-              value={row.item_kind || ''}
-              onChange={(e) => onPatchRow(row.id, { item_kind: e.target.value as WorkbenchItemKind })}
-            >
-              <option value="">—</option>
-              {ITEM_KIND_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="admin-pricelist-row-modal-field">
+            <span>Kinds</span>
+            <MultiSelectChips
+              ariaLabel="Item kinds"
+              values={rowItemKinds(row)}
+              options={itemKindOptions}
+              onChange={(vals) => onPatchRow(row.id, setRowItemKindsPatch(vals as WorkbenchItemKind[]))}
+            />
+          </div>
 
-          <label className="admin-pricelist-row-modal-field">
-            <span>Part type</span>
-            <select
-              value={row.part_type || ''}
-              onChange={(e) => onPatchRow(row.id, { part_type: e.target.value })}
-            >
-              <option value="">—</option>
-              {partTypes.map((t) => (
-                <option key={t.code} value={t.code}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="admin-pricelist-row-modal-field">
+            <span>Part types</span>
+            <MultiSelectChips
+              ariaLabel="Part types"
+              values={rowPartTypes(row)}
+              options={partTypeOptions}
+              onChange={(vals) => onPatchRow(row.id, setRowPartTypesPatch(vals))}
+            />
+          </div>
 
           <label className="admin-pricelist-row-modal-field">
             <span>Cost £ (ex VAT)</span>

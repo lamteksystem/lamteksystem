@@ -99,7 +99,9 @@ export function ColumnSettings({
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const mid = rect.top + rect.height / 2
     const position = e.clientY < mid ? 'above' : 'below'
-    setDropIndicator({ targetId: id, position })
+    setDropIndicator((prev) =>
+      prev && prev.targetId === id && prev.position === position ? prev : { targetId: id, position },
+    )
   }
 
   function handleDragLeave() {
@@ -163,7 +165,7 @@ export function ColumnSettings({
                   return (
                   <li key={col.id} className="admin-column-settings-li">
                     {dropIndicator?.targetId === col.id && dropIndicator?.position === 'above' && (
-                      <div className="admin-column-settings-drop-line" aria-hidden title="Drop above" />
+                      <div className="admin-column-settings-drop-line admin-column-settings-drop-line--above" aria-hidden title="Drop above" />
                     )}
                     <div
                       role="listitem"
@@ -224,7 +226,7 @@ export function ColumnSettings({
                       )}
                     </div>
                     {dropIndicator?.targetId === col.id && dropIndicator?.position === 'below' && (
-                      <div className="admin-column-settings-drop-line" aria-hidden title="Drop below" />
+                      <div className="admin-column-settings-drop-line admin-column-settings-drop-line--below" aria-hidden title="Drop below" />
                     )}
                   </li>
                   )

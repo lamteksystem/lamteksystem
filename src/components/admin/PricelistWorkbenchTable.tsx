@@ -12,8 +12,17 @@ import {
   workbenchColumnWidth,
   type WorkbenchColumnId,
 } from '@/lib/pricelistWorkbenchColumns'
-import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import {
+  rowSections,
+  rowItemKinds,
+  rowPartTypes,
+  setRowSectionsPatch,
+  setRowItemKindsPatch,
+  setRowPartTypesPatch,
+  type PricelistWorkbenchRow,
+} from '@/lib/pricelistWorkbench'
 import type { WorkbenchItemKind } from '@/lib/tealburyCatalogueBuild'
+import MultiSelectChips from '@/components/admin/MultiSelectChips'
 import { catalogueSourceLabel } from '@/lib/catalogueSourceLabel'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import { useColumnWidths } from '@/hooks/useColumnWidths'
@@ -47,6 +56,7 @@ const COLUMN_DEFS = PRICELIST_WORKBENCH_COLUMNS.map(({ id, label }) => ({ id, la
 const INTERACTIVE_COLS = new Set<string>([
   'item_kind',
   'part_type',
+  'section',
   'category',
   'standalone',
   'active',
@@ -55,7 +65,6 @@ const INTERACTIVE_COLS = new Set<string>([
 ])
 const DBL_CLICK_FIELDS = new Set<EditableField>([
   'door_range',
-  'section',
   'trade_code',
   'sku',
   'name',
@@ -132,6 +141,23 @@ export default function PricelistWorkbenchTable({
         .filter((c): c is (typeof PRICELIST_WORKBENCH_COLUMNS)[number] => !!c && isVisible(c.id)),
     [order, isVisible]
   )
+
+  const partTypeOptions = useMemo(
+    () => partTypes.map((t) => ({ value: t.code, label: t.label })),
+    [partTypes],
+  )
+  const itemKindOptions = useMemo(
+    () => ITEM_KIND_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+    [],
+  )
+  const sectionOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const c of categories) map.set(c.name.toLowerCase(), c.name)
+    for (const r of pageItems) {
+      for (const s of rowSections(r)) if (!map.has(s.toLowerCase())) map.set(s.toLowerCase(), s)
+    }
+    return [...map.values()].sort((a, b) => a.localeCompare(b)).map((s) => ({ value: s, label: s }))
+  }, [categories, pageItems])
 
   useEffect(() => {
     if (!widthsInit) return
@@ -302,42 +328,36 @@ export default function PricelistWorkbenchTable({
         )
       case 'item_kind':
         return (
-          <select
-            className="admin-pricelist-category-select"
-            value={row.item_kind || ''}
-            onChange={(e) =>
-              onPatchRow(row.id, {
-                item_kind: e.target.value as WorkbenchItemKind,
-              })
+          <MultiSelectChips
+            ariaLabel="Item kinds"
+            values={rowItemKinds(row)}
+            options={itemKindOptions}
+            onChange={(vals) =>
+              onPatchRow(row.id, setRowItemKindsPatch(vals as WorkbenchItemKind[]))
             }
-          >
-            <option value="">—</option>
-            {ITEM_KIND_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          />
         )
       case 'part_type':
         return (
-          <select
-            className="admin-pricelist-category-select"
-            value={row.part_type || ''}
-            onChange={(e) => onPatchRow(row.id, { part_type: e.target.value })}
-          >
-            <option value="">—</option>
-            {partTypes.map((t) => (
-              <option key={t.code} value={t.code}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+          <MultiSelectChips
+            ariaLabel="Part types"
+            values={rowPartTypes(row)}
+            options={partTypeOptions}
+            onChange={(vals) => onPatchRow(row.id, setRowPartTypesPatch(vals))}
+          />
         )
       case 'door_range':
         return renderEditableText(row, 'door_range', 'admin-pricelist-cell--range')
       case 'section':
-        return renderEditableText(row, 'section', 'admin-pricelist-cell--section')
+        return (
+          <MultiSelectChips
+            ariaLabel="Sections"
+            values={rowSections(row)}
+            options={sectionOptions}
+            allowCustom
+            onChange={(vals) => onPatchRow(row.id, setRowSectionsPatch(vals))}
+          />
+        )
       case 'trade_code':
         return renderEditableText(row, 'trade_code', 'admin-pricelist-trade-code')
       case 'sku':

@@ -145,6 +145,10 @@ export const PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS = PRICELIST_WORKBENCH_COLUM
   (c) => c.id !== 'catalog_source',
 ).map((c) => c.id)
 
+// Generous upper bound so columns can be widened substantially; only guards
+// against truly runaway persisted values. Mirrors MAX_WIDTH in useColumnWidths.
+const WORKBENCH_MAX_WIDTH = 800
+
 export function workbenchColumnWidth(
   id: string,
   widths: Record<string, number>,
@@ -152,18 +156,5 @@ export function workbenchColumnWidth(
 ): number {
   const def = cols.find((c) => c.id === id)
   const raw = widths[id] ?? def?.defaultWidth ?? 100
-  // Guard against persisted runaway widths from older sessions.
-  const max =
-    id === 'description'
-      ? 300
-      : id === 'name'
-        ? 240
-        : id === 'section'
-          ? 220
-          : id === 'standalone'
-            ? 220
-            : id === 'sku'
-              ? 200
-              : 180
-  return Math.max(def?.minWidth ?? 60, Math.min(raw, max))
+  return Math.max(def?.minWidth ?? 60, Math.min(raw, WORKBENCH_MAX_WIDTH))
 }

@@ -66,13 +66,13 @@ const BASELINE_WIDTHS: Record<string, number> = {
   catalog_source: 96,
   item_kind: 80,
   part_type: 90,
-  door_range: 108,
+  door_range: 168,
   section: 128,
-  trade_code: 80,
-  sku: 130,
-  name: 180,
-  description: 220,
-  category: 130,
+  trade_code: 152,
+  sku: 200,
+  name: 240,
+  description: 242,
+  category: 180,
   standalone: 150,
   cost_price: 88,
   unit_price: 92,
@@ -94,7 +94,7 @@ export default function PricelistWorkbenchTable({
 }: Props) {
   const { columnDefs, visibleIds, setColumnVisible, setColumnOrder, resetToDefault, isVisible, order } =
     useColumnVisibility('pricelist-workbench', COLUMN_DEFS, PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS)
-  const { widths: columnWidths, setWidth, persistWidths, initialised: widthsInit } = useColumnWidths('pricelist-workbench-v4')
+  const { widths: columnWidths, setWidth, persistWidths, resetWidths, initialised: widthsInit } = useColumnWidths('pricelist-workbench-v4')
   const userResizedRef = useRef(false)
   const [resizingColId, setResizingColId] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null)
@@ -123,36 +123,8 @@ export default function PricelistWorkbenchTable({
     if (!widthsInit) return
     const hasAny = Object.keys(columnWidths).length > 0
     if (hasAny) return
-    // First run for v3 profile: start compact and predictable.
     Object.entries(BASELINE_WIDTHS).forEach(([id, w]) => setWidth(id, w))
     void persistWidths(BASELINE_WIDTHS)
-  }, [widthsInit, columnWidths, setWidth, persistWidths])
-
-  useEffect(() => {
-    if (!widthsInit) return
-    const hardCaps: Record<string, number> = {
-      description: 300,
-      name: 240,
-      section: 220,
-      standalone: 220,
-      sku: 200,
-      category: 180,
-    }
-    let changed = false
-    const next: Record<string, number> = { ...columnWidths }
-    for (const [id, raw] of Object.entries(columnWidths)) {
-      const cap = hardCaps[id] ?? 260
-      if (raw > cap || raw < 40) {
-        changed = true
-        next[id] = Math.max(40, Math.min(raw, cap))
-      }
-    }
-    if (changed) {
-      setTimeout(() => {
-        Object.entries(next).forEach(([id, w]) => setWidth(id, w))
-        void persistWidths(next)
-      }, 0)
-    }
   }, [widthsInit, columnWidths, setWidth, persistWidths])
 
   const tableWidthPx = useMemo(
@@ -517,6 +489,7 @@ export default function PricelistWorkbenchTable({
           order={order}
           setColumnOrder={setColumnOrder}
           resetToDefault={resetToDefault}
+          resetWidths={() => resetWidths(BASELINE_WIDTHS)}
           tooltip="Show, hide, and reorder workbench columns. Drag column edges in the header to resize."
         />
         <span className="admin-muted admin-pricelist-table-hint">

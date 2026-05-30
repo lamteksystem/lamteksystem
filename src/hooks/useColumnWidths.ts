@@ -8,6 +8,11 @@ import { supabase } from '@/lib/supabase'
 const PREF_PREFIX = 'admin_columns_'
 const PREF_SUFFIX = '_widths'
 
+const MIN_WIDTH = 40
+// Generous upper bound so users can widen columns substantially; only guards
+// against truly runaway persisted values.
+const MAX_WIDTH = 800
+
 function sanitizeWidths(input: Record<string, unknown>): Record<string, number> {
   const out: Record<string, number> = {}
   for (const [key, raw] of Object.entries(input)) {
@@ -18,8 +23,7 @@ function sanitizeWidths(input: Record<string, unknown>): Record<string, number> 
           ? Number.parseFloat(raw)
           : Number.NaN
     if (!Number.isFinite(n)) continue
-    // Defensive bounds: ignore runaway values from stale persisted prefs.
-    out[key] = Math.max(40, Math.min(320, n))
+    out[key] = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, n))
   }
   return out
 }
@@ -74,7 +78,7 @@ export function useColumnWidths(scope: string) {
 
   const setWidth = useCallback(
     (columnId: string, widthPx: number) => {
-      const safe = Math.max(40, Math.min(320, widthPx))
+      const safe = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, widthPx))
       setWidthsState((prev) => ({ ...prev, [columnId]: safe }))
     },
     []
@@ -87,5 +91,14 @@ export function useColumnWidths(scope: string) {
     [persist]
   )
 
-  return { widths, setWidth, persistWidths, initialised }
+  const resetWidths = useCallback(
+    (defaults: Record<string, number>) => {
+      const safe = sanitizeWidths(defaults)
+      setWidthsState(safe)
+      void persist(safe)
+    },
+    [persist]
+  )
+
+  return { widths, setWidth, persistWidths, resetWidths, initialised }
 }

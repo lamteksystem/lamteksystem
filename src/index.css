@@ -7648,7 +7648,7 @@ button.ordering-wizard-card {
   cursor: grab; padding: 0.2rem; color: var(--lamtek-gray); flex-shrink: 0;
 }
 .admin-column-settings-drag-handle:active { cursor: grabbing; }
-.admin-column-settings-actions { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--lamtek-border); }
+.admin-column-settings-actions { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--lamtek-border); display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
 /* Inline edit (catalogue table) */
 .admin-table-cell-editable { cursor: text; }

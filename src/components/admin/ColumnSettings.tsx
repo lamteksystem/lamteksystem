@@ -11,6 +11,8 @@ interface ColumnSettingsProps {
   order?: string[]
   setColumnOrder?: (orderedIds: string[]) => void
   resetToDefault?: () => void
+  /** Resets persisted column widths back to their defaults. */
+  resetWidths?: () => void
   /** How each column's visibility is toggled. */
   visibilityControl?: 'checkbox' | 'radio'
   /** Optional note below locked columns (e.g. qty/action always shown). */
@@ -25,6 +27,7 @@ export function ColumnSettings({
   order,
   setColumnOrder,
   resetToDefault,
+  resetWidths,
   visibilityControl = 'checkbox',
   lockedColumnsHint,
 }: ColumnSettingsProps) {
@@ -232,17 +235,31 @@ export function ColumnSettings({
                   {lockedColumnsHint}
                 </p>
               )}
-              {resetToDefault && (
+              {(resetToDefault || resetWidths) && (
                 <div className="admin-column-settings-actions">
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-small"
-                    onClick={() => {
-                      resetToDefault()
-                    }}
-                  >
-                    Reset to default
-                  </button>
+                  {resetToDefault && (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-small"
+                      onClick={() => {
+                        resetToDefault()
+                      }}
+                    >
+                      Reset to default
+                    </button>
+                  )}
+                  {resetWidths && (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-small"
+                      onClick={() => {
+                        resetWidths()
+                      }}
+                      title="Reset column widths back to the default sizes"
+                    >
+                      Reset column widths
+                    </button>
+                  )}
                 </div>
               )}
             </div>,

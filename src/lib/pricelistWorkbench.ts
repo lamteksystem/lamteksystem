@@ -53,9 +53,33 @@ export interface PricelistWorkbenchRow {
   sections?: string[]
   item_kinds?: WorkbenchItemKindValue[]
   part_types?: string[]
+  /** Full set of portal categories this product belongs to; first is the primary. */
+  category_ids?: string[]
 }
 
 export type WorkbenchItemKindValue = PricelistWorkbenchRow['item_kind']
+
+/** Effective list of category IDs (array if set, else the single primary, else empty). */
+export function rowCategoryIds(row: PricelistWorkbenchRow): string[] {
+  if (Array.isArray(row.category_ids) && row.category_ids.length) return dedupeStrings(row.category_ids)
+  return row.category_id ? [row.category_id] : []
+}
+
+/** Patch keeping the category_ids array and the primary category fields in sync. */
+export function setRowCategoriesPatch(
+  ids: string[],
+  categories: CategoryRow[],
+): Partial<PricelistWorkbenchRow> {
+  const list = dedupeStrings(ids)
+  const primary = list[0] ?? null
+  const cat = primary ? categories.find((c) => c.id === primary) : null
+  return {
+    category_ids: list,
+    category_id: primary,
+    category_slug: cat?.slug ?? '',
+    category_name: cat?.name ?? '',
+  }
+}
 
 /** Effective list of sections (array if set, else the single primary, else empty). */
 export function rowSections(row: PricelistWorkbenchRow): string[] {
@@ -382,7 +406,8 @@ export async function publishWorkbenchRows(
       continue
     }
 
-    const catId = row.category_id?.trim() || null
+    const categoryIds = rowCategoryIds(row)
+    const catId = categoryIds[0] ?? (row.category_id?.trim() || null)
 
     const sections = rowSections(row)
     const itemKinds = rowItemKinds(row)
@@ -394,6 +419,9 @@ export async function publishWorkbenchRows(
       workbench_sections: sections,
       workbench_item_kinds: itemKinds,
       workbench_part_types: partTypes,
+      workbench_category_ids: categoryIds,
+      // A product in 2+ categories is, by definition, also sold on its own in the extra ones.
+      sellable_standalone: categoryIds.length > 1,
     }
     if (sections.length) mergedOptions[sectionsKey] = sections
 
@@ -433,14 +461,9 @@ export async function publishWorkbenchRows(
       }
     }
 
-    if (productId && catId) {
-      const extraRaw = row.options.extra_category_id
-      const extraId = typeof extraRaw === 'string' && extraRaw.trim() ? extraRaw.trim() : null
-      const sellable = row.options.sellable_standalone === true
-      if (sellable && extraId && extraId !== catId) {
-        const { error: catErr } = await saveProductCategories(productId, [catId, extraId], catId)
-        if (catErr) result.errors.push(`Categories ${sku}: ${catErr}`)
-      }
+    if (productId && categoryIds.length > 1) {
+      const { error: catErr } = await saveProductCategories(productId, categoryIds, categoryIds[0])
+      if (catErr) result.errors.push(`Categories ${sku}: ${catErr}`)
     }
   }
 

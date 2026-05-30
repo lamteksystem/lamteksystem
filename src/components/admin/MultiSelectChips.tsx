@@ -11,23 +11,24 @@ interface Props {
   onChange: (values: string[]) => void
   /** Allow typing values that are not in `options` (e.g. free-text sections). */
   allowCustom?: boolean
-  /** Placeholder for the add control. */
-  addLabel?: string
+  /** Short noun shown in the add control, e.g. "kind" → "+ Add kind". */
+  noun?: string
   ariaLabel?: string
   className?: string
 }
 
 /**
- * Compact chip-based multi-select. Selected values render as removable chips; an
- * inline native `<select>` (and optional free-text input) adds further values.
- * Used in both the pricelist workbench table cells and the row modal.
+ * Compact chip-based multi-select. Selected values render as removable pills; a
+ * single "+ Add …" dropdown (plus optional free-text entry) appends more.
+ * Shared by the pricelist workbench table cells and the row modal so both look
+ * identical.
  */
 export default function MultiSelectChips({
   values,
   options,
   onChange,
   allowCustom = false,
-  addLabel = '+ Add',
+  noun,
   ariaLabel,
   className,
 }: Props) {
@@ -51,32 +52,33 @@ export default function MultiSelectChips({
     onChange([...values, v])
   }
 
-  const remove = (v: string) => {
-    onChange(values.filter((x) => x !== v))
-  }
+  const remove = (v: string) => onChange(values.filter((x) => x !== v))
+
+  const addLabel = noun ? `+ Add ${noun}` : '+ Add'
 
   return (
-    <div className={`admin-multiselect${className ? ` ${className}` : ''}`} aria-label={ariaLabel}>
-      <div className="admin-multiselect-chips">
-        {values.length === 0 ? <span className="admin-multiselect-empty">—</span> : null}
-        {values.map((v) => (
-          <span key={v} className="admin-multiselect-chip">
-            <span className="admin-multiselect-chip-label">{labelFor(v)}</span>
-            <button
-              type="button"
-              className="admin-multiselect-chip-remove"
-              aria-label={`Remove ${labelFor(v)}`}
-              onClick={() => remove(v)}
-            >
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
-      <div className="admin-multiselect-add">
+    <div className={`admin-mschips${className ? ` ${className}` : ''}`} aria-label={ariaLabel}>
+      {values.length > 0 ? (
+        <div className="admin-mschips-tags">
+          {values.map((v) => (
+            <span key={v} className="admin-mschips-tag">
+              <span className="admin-mschips-tag-label">{labelFor(v)}</span>
+              <button
+                type="button"
+                className="admin-mschips-tag-x"
+                aria-label={`Remove ${labelFor(v)}`}
+                onClick={() => remove(v)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <div className="admin-mschips-add">
         {available.length > 0 ? (
           <select
-            className="admin-multiselect-select"
+            className="admin-mschips-select"
             value=""
             onChange={(e) => {
               if (e.target.value) add(e.target.value)
@@ -93,10 +95,10 @@ export default function MultiSelectChips({
         {allowCustom ? (
           <>
             <input
-              className="admin-multiselect-input"
+              className="admin-mschips-input"
               list={listId}
               value={custom}
-              placeholder="Type + Enter"
+              placeholder={noun ? `New ${noun}…` : 'New…'}
               onChange={(e) => setCustom(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {

@@ -1,4 +1,4 @@
-import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import { rowCategoryIds, type PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
 
 export type WorkbenchSortKey =
   | 'sku'
@@ -63,7 +63,8 @@ export function filterAndSortWorkbenchRows(
     if (f.itemKind && r.item_kind !== f.itemKind) return false
     if (f.partType && r.part_type !== f.partType) return false
     if (f.onlyUnassigned && r.category_id) return false
-    if (f.onlyStandaloneCapable && !r.options?.sellable_standalone) return false
+    // "Standalone capable" now means assigned to 2+ categories (sold on its own elsewhere).
+    if (f.onlyStandaloneCapable && rowCategoryIds(r).length < 2) return false
     if (!q) return true
     const extraCats = (r.options?.extra_category_names as string[] | undefined)?.join(' ') ?? ''
     return (

@@ -16,9 +16,11 @@ import {
   rowSections,
   rowItemKinds,
   rowPartTypes,
+  rowCategoryIds,
   setRowSectionsPatch,
   setRowItemKindsPatch,
   setRowPartTypesPatch,
+  setRowCategoriesPatch,
   type PricelistWorkbenchRow,
 } from '@/lib/pricelistWorkbench'
 import type { WorkbenchItemKind } from '@/lib/tealburyCatalogueBuild'
@@ -58,7 +60,6 @@ const INTERACTIVE_COLS = new Set<string>([
   'part_type',
   'section',
   'category',
-  'standalone',
   'active',
   'is_stock',
   'actions',
@@ -92,8 +93,7 @@ const BASELINE_WIDTHS: Record<string, number> = {
   sku: 200,
   name: 240,
   description: 242,
-  category: 180,
-  standalone: 150,
+  category: 220,
   cost_price: 88,
   unit_price: 92,
   active: 56,
@@ -158,6 +158,10 @@ export default function PricelistWorkbenchTable({
     }
     return [...map.values()].sort((a, b) => a.localeCompare(b)).map((s) => ({ value: s, label: s }))
   }, [categories, pageItems])
+  const categoryOptions = useMemo(
+    () => categories.map((c) => ({ value: c.id, label: c.parent_id ? `— ${c.name}` : c.name })),
+    [categories],
+  )
 
   useEffect(() => {
     if (!widthsInit) return
@@ -330,6 +334,7 @@ export default function PricelistWorkbenchTable({
         return (
           <MultiSelectChips
             ariaLabel="Item kinds"
+            noun="kind"
             values={rowItemKinds(row)}
             options={itemKindOptions}
             onChange={(vals) =>
@@ -341,6 +346,7 @@ export default function PricelistWorkbenchTable({
         return (
           <MultiSelectChips
             ariaLabel="Part types"
+            noun="part type"
             values={rowPartTypes(row)}
             options={partTypeOptions}
             onChange={(vals) => onPatchRow(row.id, setRowPartTypesPatch(vals))}
@@ -352,6 +358,7 @@ export default function PricelistWorkbenchTable({
         return (
           <MultiSelectChips
             ariaLabel="Sections"
+            noun="section"
             values={rowSections(row)}
             options={sectionOptions}
             allowCustom
@@ -368,84 +375,14 @@ export default function PricelistWorkbenchTable({
         return renderEditableText(row, 'description', 'admin-pricelist-cell--desc')
       case 'category':
         return (
-          <select
-            className="admin-pricelist-category-select"
-            value={row.category_id ?? ''}
-            onChange={(e) => {
-              const cat = categories.find((c) => c.id === e.target.value)
-              if (cat) {
-                onPatchRow(row.id, {
-                  category_id: cat.id,
-                  category_slug: cat.slug,
-                  category_name: cat.name,
-                })
-              } else {
-                onPatchRow(row.id, { category_id: null, category_slug: '', category_name: '' })
-              }
-            }}
-          >
-            <option value="">— Assign —</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.parent_id ? `— ${c.name}` : c.name}
-              </option>
-            ))}
-          </select>
+          <MultiSelectChips
+            ariaLabel="Categories"
+            noun="category"
+            values={rowCategoryIds(row)}
+            options={categoryOptions}
+            onChange={(vals) => onPatchRow(row.id, setRowCategoriesPatch(vals, categories))}
+          />
         )
-      case 'standalone': {
-        const sellable = row.options.sellable_standalone === true
-        const extraId =
-          typeof row.options.extra_category_id === 'string' ? row.options.extra_category_id : ''
-        return (
-          <div className="admin-pricelist-standalone-cell">
-            <label className="admin-pricelist-standalone-check">
-              <input
-                type="checkbox"
-                checked={sellable}
-                onChange={(e) => {
-                  const on = e.target.checked
-                  onPatchRow(row.id, {
-                    options: {
-                      ...row.options,
-                      sellable_standalone: on,
-                      ...(on
-                        ? {}
-                        : { extra_category_id: null, extra_category_name: '' }),
-                    },
-                  })
-                }}
-                aria-label="Also sellable standalone"
-              />
-              <span className="admin-muted">Standalone</span>
-            </label>
-            {sellable ? (
-              <select
-                className="admin-pricelist-category-select"
-                value={extraId}
-                onChange={(e) => {
-                  const cat = categories.find((c) => c.id === e.target.value)
-                  onPatchRow(row.id, {
-                    options: {
-                      ...row.options,
-                      sellable_standalone: true,
-                      extra_category_id: cat?.id ?? null,
-                      extra_category_name: cat?.name ?? '',
-                    },
-                  })
-                }}
-                title="Browse category when sold on its own (e.g. Carcasses)"
-              >
-                <option value="">— Browse category —</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.parent_id ? `— ${c.name}` : c.name}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-          </div>
-        )
-      }
       case 'cost_price': {
         const isEditing = editing?.id === row.id && editing.field === 'cost_price'
         if (isEditing) {

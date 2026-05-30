@@ -164,14 +164,14 @@ export default function PricelistWorkbenchTableToolbar({
           />
           Unassigned only
         </label>
-        <label className="admin-pricelist-toolbar-check" title="Lamtek parts also sold on their own (e.g. carcass)">
+        <label className="admin-pricelist-toolbar-check" title="Products assigned to more than one category">
           <input
             type="checkbox"
             checked={filters.onlyStandaloneCapable}
             onChange={(e) => onChange({ onlyStandaloneCapable: e.target.checked })}
           />
-          Standalone SKU
-          <AdminHelpTip text="Rows flagged as sellable on their own (e.g. carcass bought without a complete unit). Uses extra category on publish." />
+          In 2+ categories
+          <AdminHelpTip text="Rows assigned to more than one category — i.e. also sold on their own in the extra categories (e.g. a carcass bought without a complete unit)." />
         </label>
         <button
           type="button"

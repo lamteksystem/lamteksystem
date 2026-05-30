@@ -4,9 +4,11 @@ import {
   rowSections,
   rowItemKinds,
   rowPartTypes,
+  rowCategoryIds,
   setRowSectionsPatch,
   setRowItemKindsPatch,
   setRowPartTypesPatch,
+  setRowCategoriesPatch,
   type PricelistWorkbenchRow,
 } from '@/lib/pricelistWorkbench'
 import type { WorkbenchItemKind } from '@/lib/tealburyCatalogueBuild'
@@ -51,10 +53,6 @@ export default function PricelistWorkbenchRowModal({
     return () => document.removeEventListener('keydown', handleKey, true)
   }, [onClose])
 
-  const sellable = row.options.sellable_standalone === true
-  const extraCategoryId =
-    typeof row.options.extra_category_id === 'string' ? row.options.extra_category_id : ''
-
   const sectionOptions = useMemo(() => {
     const map = new Map<string, string>()
     for (const c of categories) map.set(c.name.toLowerCase(), c.name)
@@ -64,6 +62,10 @@ export default function PricelistWorkbenchRowModal({
   const partTypeOptions = useMemo(
     () => partTypes.map((t) => ({ value: t.code, label: t.label })),
     [partTypes],
+  )
+  const categoryOptions = useMemo(
+    () => categories.map((c) => ({ value: c.id, label: c.parent_id ? `— ${c.name}` : c.name })),
+    [categories],
   )
   const itemKindOptions = ITEM_KIND_OPTIONS.map((o) => ({ value: o.value, label: o.label }))
 
@@ -137,34 +139,37 @@ export default function PricelistWorkbenchRowModal({
             />
           </label>
 
-          <div className="admin-pricelist-row-modal-field">
-            <span>Sections</span>
-            <MultiSelectChips
-              ariaLabel="Sections"
-              values={rowSections(row)}
-              options={sectionOptions}
-              allowCustom
-              onChange={(vals) => onPatchRow(row.id, setRowSectionsPatch(vals))}
-            />
-          </div>
-
-          <div className="admin-pricelist-row-modal-field">
+          <div className="admin-pricelist-row-modal-field admin-pricelist-row-modal-field--wide">
             <span>Kinds</span>
             <MultiSelectChips
               ariaLabel="Item kinds"
+              noun="kind"
               values={rowItemKinds(row)}
               options={itemKindOptions}
               onChange={(vals) => onPatchRow(row.id, setRowItemKindsPatch(vals as WorkbenchItemKind[]))}
             />
           </div>
 
-          <div className="admin-pricelist-row-modal-field">
+          <div className="admin-pricelist-row-modal-field admin-pricelist-row-modal-field--wide">
             <span>Part types</span>
             <MultiSelectChips
               ariaLabel="Part types"
+              noun="part type"
               values={rowPartTypes(row)}
               options={partTypeOptions}
               onChange={(vals) => onPatchRow(row.id, setRowPartTypesPatch(vals))}
+            />
+          </div>
+
+          <div className="admin-pricelist-row-modal-field admin-pricelist-row-modal-field--wide">
+            <span>Sections</span>
+            <MultiSelectChips
+              ariaLabel="Sections"
+              noun="section"
+              values={rowSections(row)}
+              options={sectionOptions}
+              allowCustom
+              onChange={(vals) => onPatchRow(row.id, setRowSectionsPatch(vals))}
             />
           </div>
 
@@ -194,73 +199,18 @@ export default function PricelistWorkbenchRowModal({
             />
           </label>
 
-          <label className="admin-pricelist-row-modal-field admin-pricelist-row-modal-field--wide">
-            <span>Category</span>
-            <select
-              value={row.category_id ?? ''}
-              onChange={(e) => {
-                const cat = categories.find((c) => c.id === e.target.value)
-                if (cat) {
-                  onPatchRow(row.id, {
-                    category_id: cat.id,
-                    category_slug: cat.slug,
-                    category_name: cat.name,
-                  })
-                } else {
-                  onPatchRow(row.id, { category_id: null, category_slug: '', category_name: '' })
-                }
-              }}
-            >
-              <option value="">— Assign —</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.parent_id ? `— ${c.name}` : c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
           <div className="admin-pricelist-row-modal-field admin-pricelist-row-modal-field--wide">
-            <label className="admin-pricelist-row-modal-check">
-              <input
-                type="checkbox"
-                checked={sellable}
-                onChange={(e) => {
-                  const on = e.target.checked
-                  onPatchRow(row.id, {
-                    options: {
-                      ...row.options,
-                      sellable_standalone: on,
-                      ...(on ? {} : { extra_category_id: null, extra_category_name: '' }),
-                    },
-                  })
-                }}
-              />
-              <span>Also sellable standalone</span>
-            </label>
-            {sellable && (
-              <select
-                value={extraCategoryId}
-                onChange={(e) => {
-                  const cat = categories.find((c) => c.id === e.target.value)
-                  onPatchRow(row.id, {
-                    options: {
-                      ...row.options,
-                      sellable_standalone: true,
-                      extra_category_id: cat?.id ?? null,
-                      extra_category_name: cat?.name ?? '',
-                    },
-                  })
-                }}
-              >
-                <option value="">— Browse category —</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.parent_id ? `— ${c.name}` : c.name}
-                  </option>
-                ))}
-              </select>
-            )}
+            <span>Categories</span>
+            <MultiSelectChips
+              ariaLabel="Categories"
+              noun="category"
+              values={rowCategoryIds(row)}
+              options={categoryOptions}
+              onChange={(vals) => onPatchRow(row.id, setRowCategoriesPatch(vals, categories))}
+            />
+            <span className="admin-muted admin-pricelist-row-modal-hint">
+              First category is the primary; add more to also sell this product in those categories.
+            </span>
           </div>
 
           <div className="admin-pricelist-row-modal-field admin-pricelist-row-modal-toggles">

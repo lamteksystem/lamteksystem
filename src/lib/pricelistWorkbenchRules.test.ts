@@ -155,4 +155,30 @@ describe('pricelistWorkbenchRules', () => {
     expect(rule?.conditions.some((c) => c.op === 'unassigned')).toBe(true)
     expect(rule?.conditions.some((c) => c.field === 'source' && c.value === 'tealbury')).toBe(true)
   })
+
+  it('parses a change-case command without inventing a condition from the quoted field name', () => {
+    const { rule, error } = parseSmartCommandPrompt(
+      'check the "Name" field of each item and change all caps lock to Sentence case'
+    )
+    expect(error).toBeUndefined()
+    expect(rule?.action).toBe('change_text_case')
+    expect(rule?.actionParam).toBe('name:sentence')
+    // The quoted "Name" must NOT become a door_range/section filter.
+    expect(rule?.conditions).toHaveLength(0)
+  })
+
+  it('applies sentence case to all rows for a quoted-field change-case command', () => {
+    const rows = [
+      row({ id: 'a', name: 'B15 — 150 BASE UNIT' }),
+      row({ id: 'b', name: 'CORNER WALL CABINET' }),
+    ]
+    const { rule } = parseSmartCommandPrompt(
+      'check the "Name" field of each item and change all caps lock to Sentence case'
+    )
+    expect(rule).not.toBeNull()
+    const { rows: next, result } = applyRuleToRows(rows, rule!)
+    expect(result.matched).toBe(2)
+    expect(result.changed).toBe(2)
+    expect(next[1].name).toBe('Corner wall cabinet')
+  })
 })

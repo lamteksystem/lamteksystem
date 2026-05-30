@@ -896,6 +896,9 @@ function parseFieldConditions(
   const conditions: WorkbenchCondition[] = []
   const stripCommand = action === 'strip_text_from_field' || isStripTextCommand(lower, raw)
   const stripPhrase = parseStripTextActionParam(actionParam)?.text?.toLowerCase()
+  // For these actions a quoted word usually names the *field* to edit (e.g. the "Name"
+  // field), not a filter value — so don't turn stray quotes into conditions.
+  const fieldNamedByQuote = stripCommand || action === 'change_text_case'
 
   if (/\btealbury\b/.test(lower)) {
     pushUniqueCondition(conditions, { field: 'source', op: 'equals', value: 'tealbury' })
@@ -945,7 +948,7 @@ function parseFieldConditions(
     pushUniqueCondition(conditions, { field: 'door_range', op: 'contains', value: noDoors })
   }
 
-  if (!stripCommand) {
+  if (!fieldNamedByQuote) {
     for (const q of quoted) {
       if (/no doors/i.test(q)) continue
       if (stripPhrase && q.toLowerCase() === stripPhrase) continue

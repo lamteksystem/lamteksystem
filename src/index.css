@@ -5688,6 +5688,77 @@ button.ordering-wizard-card {
   padding-right: 0.25rem;
 }
 
+/* Pricelist workbench row editor modal */
+.admin-modal.card.admin-modal--pricelist-row {
+  max-width: min(720px, 100%);
+  max-height: min(90vh, 860px);
+  margin-bottom: 0;
+  padding: 1.75rem 2rem 1.5rem;
+  padding-right: 2.75rem;
+  overflow-y: auto;
+  background: var(--lamtek-surface, #fff);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+}
+.admin-pricelist-row-modal-sub {
+  margin: 0.25rem 0 1rem;
+  font-size: 0.85rem;
+}
+.admin-pricelist-row-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+.admin-pricelist-row-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.admin-pricelist-row-modal-field > span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--lamtek-text-muted, #555);
+}
+.admin-pricelist-row-modal-field--wide {
+  grid-column: 1 / -1;
+}
+.admin-pricelist-row-modal-field input[type='text'],
+.admin-pricelist-row-modal-field input[type='number'],
+.admin-pricelist-row-modal-field textarea,
+.admin-pricelist-row-modal-field select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.admin-pricelist-row-modal-field textarea {
+  resize: vertical;
+}
+.admin-pricelist-row-modal-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+.admin-pricelist-row-modal-toggles {
+  flex-direction: row;
+  gap: 1.25rem;
+  align-items: center;
+}
+.admin-pricelist-row-modal-actions {
+  margin-top: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.admin-pricelist-row--clickable {
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .admin-pricelist-row-modal-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Categories modal (portaled to body — not under .admin-app) */
 .admin-modal-backdrop--stacked {
   z-index: 10100;

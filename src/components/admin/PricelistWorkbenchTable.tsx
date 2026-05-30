@@ -17,6 +17,7 @@ import type { WorkbenchItemKind } from '@/lib/tealburyCatalogueBuild'
 import { catalogueSourceLabel } from '@/lib/catalogueSourceLabel'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import { useColumnWidths } from '@/hooks/useColumnWidths'
+import PricelistWorkbenchRowModal from '@/components/admin/PricelistWorkbenchRowModal'
 import type { AssemblyPartTypeRow, CategoryRow } from '@/types/database'
 
 type EditableField =
@@ -42,6 +43,16 @@ type Props = {
 }
 
 const COLUMN_DEFS = PRICELIST_WORKBENCH_COLUMNS.map(({ id, label }) => ({ id, label }))
+// Columns whose own controls handle the click — single-click here must NOT open the row modal.
+const INTERACTIVE_COLS = new Set<string>([
+  'item_kind',
+  'part_type',
+  'category',
+  'standalone',
+  'active',
+  'is_stock',
+  'actions',
+])
 const DBL_CLICK_FIELDS = new Set<EditableField>([
   'door_range',
   'section',
@@ -98,6 +109,9 @@ export default function PricelistWorkbenchTable({
   const userResizedRef = useRef(false)
   const [resizingColId, setResizingColId] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null)
+  const [modalRowId, setModalRowId] = useState<string | null>(null)
+  // Delay opening the row modal so a double-click (inline edit) on the same row can cancel it.
+  const openModalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resizeStartRef = useRef({ x: 0, width: 0 })
   const columnWidthsRef = useRef(columnWidths)
   columnWidthsRef.current = columnWidths
@@ -158,9 +172,39 @@ export default function PricelistWorkbenchTable({
     }
   }, [resizingColId, setWidth, persistWidths])
 
-  const startEdit = useCallback((id: string, field: EditableField) => {
-    setEditing({ id, field })
+  const cancelPendingModal = useCallback(() => {
+    if (openModalTimerRef.current) {
+      clearTimeout(openModalTimerRef.current)
+      openModalTimerRef.current = null
+    }
   }, [])
+
+  const scheduleOpenModal = useCallback(
+    (rowId: string) => {
+      if (editing || resizingColId) return
+      cancelPendingModal()
+      openModalTimerRef.current = setTimeout(() => {
+        openModalTimerRef.current = null
+        setModalRowId(rowId)
+      }, 420)
+    },
+    [editing, resizingColId, cancelPendingModal],
+  )
+
+  useEffect(() => () => cancelPendingModal(), [cancelPendingModal])
+
+  const startEdit = useCallback(
+    (id: string, field: EditableField) => {
+      cancelPendingModal()
+      setEditing({ id, field })
+    },
+    [cancelPendingModal],
+  )
+
+  const modalRow = useMemo(
+    () => (modalRowId ? pageItems.find((r) => r.id === modalRowId) ?? null : null),
+    [modalRowId, pageItems],
+  )
 
   const commitEdit = useCallback(
     (row: PricelistWorkbenchRow, field: EditableField, value: string) => {
@@ -542,8 +586,13 @@ export default function PricelistWorkbenchTable({
             </tr>
           ) : (
             pageItems.map((r) => (
-              <tr key={r.id} className={!r.category_id ? 'admin-pricelist-row--unassigned' : undefined}>
-                <td>
+              <tr
+                key={r.id}
+                className={`admin-pricelist-row--clickable${!r.category_id ? ' admin-pricelist-row--unassigned' : ''}`}
+                onClick={() => scheduleOpenModal(r.id)}
+                title="Click to open product · double-click a cell to edit inline"
+              >
+                <td onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={r.selected}
@@ -553,6 +602,9 @@ export default function PricelistWorkbenchTable({
                 {visibleCols.map((col) => (
                   <td
                     key={col.id}
+                    onClick={
+                      INTERACTIVE_COLS.has(col.id) ? (e) => e.stopPropagation() : undefined
+                    }
                     className={
                       col.id === 'actions'
                         ? 'admin-pricelist-td-actions'
@@ -571,6 +623,16 @@ export default function PricelistWorkbenchTable({
         </table>
       </div>
     </HorizontalScrollWithArrows>
+    {modalRow ? (
+      <PricelistWorkbenchRowModal
+        row={modalRow}
+        categories={categories}
+        partTypes={partTypes}
+        onPatchRow={onPatchRow}
+        onDeleteRow={onDeleteRow}
+        onClose={() => setModalRowId(null)}
+      />
+    ) : null}
     </>
   )
 }

@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import MultiSelectChips from '@/components/admin/MultiSelectChips'
-import { rowSections, type PricelistWorkbenchRow, type WorkbenchItemKindValue } from '@/lib/pricelistWorkbench'
+import { catalogueSourceLabel } from '@/lib/catalogueSourceLabel'
+import {
+  rowSections,
+  rowItemKinds,
+  rowPartTypes,
+  rowCategoryIds,
+  type PricelistWorkbenchRow,
+  type WorkbenchItemKindValue,
+} from '@/lib/pricelistWorkbench'
 import {
   bulkSpecHasChanges,
   emptyBulkEditSpec,
@@ -102,6 +110,37 @@ export default function PricelistWorkbenchBulkEditModal({
     return [...map.values()].sort((a, b) => a.localeCompare(b)).map((s) => ({ value: s, label: s }))
   }, [categories, rows])
   const itemKindOptions = ITEM_KIND_OPTIONS.map((o) => ({ value: o.value, label: o.label }))
+
+  const categoryNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of categories) m.set(c.id, c.name)
+    return m
+  }, [categories])
+  const partTypeLabelByCode = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const t of partTypes) m.set(t.code, t.label)
+    return m
+  }, [partTypes])
+  const itemKindLabel = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const o of ITEM_KIND_OPTIONS) m.set(o.value, o.label)
+    return m
+  }, [])
+
+  const gbp = useMemo(
+    () => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }),
+    [],
+  )
+
+  const rowMeta = (r: PricelistWorkbenchRow) => {
+    const cats = rowCategoryIds(r).map((id) => categoryNameById.get(id) || id)
+    const secs = rowSections(r)
+    const kinds = rowItemKinds(r).map((k) => itemKindLabel.get(k) || k)
+    const parts = rowPartTypes(r)
+      .filter(Boolean)
+      .map((p) => partTypeLabelByCode.get(p) || p)
+    return { cats, secs, kinds, parts }
+  }
 
   const allSelected = selectedIds.size === rows.length && rows.length > 0
   const hasChanges = bulkSpecHasChanges(spec)
@@ -237,19 +276,60 @@ export default function PricelistWorkbenchBulkEditModal({
               </label>
             </div>
             <ul className="admin-bulk-list-items">
-              {rows.map((r) => (
-                <li key={r.id} className="admin-bulk-list-item">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(r.id)}
-                      onChange={() => toggleRow(r.id)}
-                    />
-                    <span className="admin-bulk-list-sku">{r.sku || '(no SKU)'}</span>
-                    <span className="admin-bulk-list-name">{r.name || '(no name)'}</span>
-                  </label>
-                </li>
-              ))}
+              {rows.map((r) => {
+                const meta = rowMeta(r)
+                return (
+                  <li key={r.id} className="admin-bulk-list-item">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(r.id)}
+                        onChange={() => toggleRow(r.id)}
+                      />
+                      <span className="admin-bulk-list-content">
+                        <span className="admin-bulk-list-line1">
+                          <span className="admin-bulk-list-sku">{r.sku || '(no SKU)'}</span>
+                          <span className="admin-bulk-list-name">{r.name || '(no name)'}</span>
+                          {!r.active && <span className="admin-bulk-list-flag admin-bulk-list-flag--off">Inactive</span>}
+                          {r.is_stock && <span className="admin-bulk-list-flag">Stock</span>}
+                        </span>
+                        <span className="admin-bulk-list-meta">
+                          <span className="admin-bulk-list-source">{catalogueSourceLabel(r.source)}</span>
+                          <span className="admin-bulk-list-price">
+                            {gbp.format(r.unit_price || 0)}
+                            {typeof r.cost_price === 'number' && r.cost_price > 0
+                              ? ` · cost ${gbp.format(r.cost_price)}`
+                              : ''}
+                          </span>
+                          {meta.cats.map((c) => (
+                            <span key={`c-${c}`} className="admin-bulk-list-tag admin-bulk-list-tag--cat">
+                              {c}
+                            </span>
+                          ))}
+                          {meta.secs.map((s) => (
+                            <span key={`s-${s}`} className="admin-bulk-list-tag admin-bulk-list-tag--sec">
+                              {s}
+                            </span>
+                          ))}
+                          {meta.kinds.map((k) => (
+                            <span key={`k-${k}`} className="admin-bulk-list-tag admin-bulk-list-tag--kind">
+                              {k}
+                            </span>
+                          ))}
+                          {meta.parts.map((p) => (
+                            <span key={`p-${p}`} className="admin-bulk-list-tag admin-bulk-list-tag--part">
+                              {p}
+                            </span>
+                          ))}
+                          {r.door_range ? (
+                            <span className="admin-bulk-list-tag admin-bulk-list-tag--range">{r.door_range}</span>
+                          ) : null}
+                        </span>
+                      </span>
+                    </label>
+                  </li>
+                )
+              })}
             </ul>
           </div>
 

@@ -7752,7 +7752,7 @@ button.ordering-wizard-card {
 }
 .admin-mschips-select:hover { border-color: var(--lamtek-gold); color: var(--lamtek-text, #1c1c1c); }
 .admin-mschips-input {
-  font-size: 0.78rem; padding: 0.15rem 0.35rem; width: 10ch; min-width: 0;
+  font-size: 0.78rem; padding: 0.15rem 0.35rem; width: 100%; max-width: 16rem; min-width: 8rem;
   border: 1px solid var(--lamtek-border); border-radius: 6px; background: var(--lamtek-white, #fff);
 }
 .admin-pricelist-row-modal-hint { font-size: 0.75rem; margin-top: 0.15rem; }

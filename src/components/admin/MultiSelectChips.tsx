@@ -76,7 +76,35 @@ export default function MultiSelectChips({
         </div>
       ) : null}
       <div className="admin-mschips-add">
-        {available.length > 0 ? (
+        {allowCustom ? (
+          <>
+            <input
+              className="admin-mschips-input"
+              list={listId}
+              value={custom}
+              placeholder={`${addLabel}…`}
+              onChange={(e) => setCustom(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  add(custom)
+                  setCustom('')
+                }
+              }}
+              onBlur={() => {
+                if (custom.trim()) {
+                  add(custom)
+                  setCustom('')
+                }
+              }}
+            />
+            <datalist id={listId}>
+              {available.map((o) => (
+                <option key={o.value} value={o.value} />
+              ))}
+            </datalist>
+          </>
+        ) : available.length > 0 ? (
           <select
             className="admin-mschips-select"
             value=""
@@ -91,29 +119,6 @@ export default function MultiSelectChips({
               </option>
             ))}
           </select>
-        ) : null}
-        {allowCustom ? (
-          <>
-            <input
-              className="admin-mschips-input"
-              list={listId}
-              value={custom}
-              placeholder={noun ? `New ${noun}…` : 'New…'}
-              onChange={(e) => setCustom(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  add(custom)
-                  setCustom('')
-                }
-              }}
-            />
-            <datalist id={listId}>
-              {available.map((o) => (
-                <option key={o.value} value={o.value} />
-              ))}
-            </datalist>
-          </>
         ) : null}
       </div>
     </div>

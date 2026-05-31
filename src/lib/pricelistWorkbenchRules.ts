@@ -1028,6 +1028,69 @@ export function parseSmartCommandPrompt(prompt: string): { rule: WorkbenchRule |
   }
 }
 
+/**
+ * Parse a plain-English *selection* (criteria only — no action). Used by the bulk
+ * editor to gather the products to open. Falls back to keyword heuristics like
+ * "products with the word panel in the name".
+ */
+export function parseSmartSelectionPrompt(prompt: string): {
+  conditions: WorkbenchCondition[]
+  matchMode: 'all' | 'any'
+  error?: string
+} {
+  const raw = prompt.trim()
+  if (!raw) return { conditions: [], matchMode: 'all', error: 'Enter what to select first.' }
+
+  const lower = normalizePrompt(raw)
+  const quoted = extractQuotedPhrases(raw)
+  const matchMode = parseMatchMode(lower)
+  const conditions = parseFieldConditions(lower, raw, quoted, 'select')
+
+  const fieldWord = '(name|description|sku|section|door|range|category)'
+  const toField = (w: string): WorkbenchMatchField => {
+    const x = w.toLowerCase()
+    if (x === 'door' || x === 'range') return 'door_range'
+    if (x === 'category') return 'category_name'
+    return x as WorkbenchMatchField
+  }
+
+  if (!conditions.length) {
+    // "with the word panel in the name", "the words 'x y' in description"
+    const m = raw.match(
+      new RegExp(`\\bwords?\\s+"?([A-Za-z0-9][\\w&/ -]{0,60}?)"?\\s+(?:in|on|of)\\s+(?:the\\s+)?${fieldWord}`, 'i'),
+    )
+    if (m) pushUniqueCondition(conditions, { field: toField(m[2]), op: 'contains', value: m[1].trim() })
+  }
+
+  if (!conditions.length) {
+    // "name contains panel", "description includes foo"
+    const m = raw.match(
+      new RegExp(`\\b${fieldWord}\\s+(?:that\\s+)?(?:contains?|with|has|having|includes?|including)\\s+"?([A-Za-z0-9][\\w&/ -]{0,60}?)"?\\s*$`, 'i'),
+    )
+    if (m) pushUniqueCondition(conditions, { field: toField(m[1]), op: 'contains', value: m[2].trim() })
+  }
+
+  if (!conditions.length) {
+    // "<keyword> in the name"
+    const m = raw.match(
+      new RegExp(`"?([A-Za-z0-9][\\w&/ -]{0,60}?)"?\\s+(?:in|on)\\s+(?:the\\s+)?${fieldWord}\\b`, 'i'),
+    )
+    if (m && !/\b(all|each|every|products?|items?|rows?)\b/i.test(m[1])) {
+      pushUniqueCondition(conditions, { field: toField(m[2]), op: 'contains', value: m[1].trim() })
+    }
+  }
+
+  if (!conditions.length) {
+    return {
+      conditions,
+      matchMode,
+      error:
+        'Could not detect criteria. Try: name contains "panel", or "products with the word panel in the name".',
+    }
+  }
+  return { conditions, matchMode }
+}
+
 export function sourceLabel(source: PricelistSource): string {
   return source === 'tealbury' ? 'Tealbury' : 'Lamtek trade'
 }

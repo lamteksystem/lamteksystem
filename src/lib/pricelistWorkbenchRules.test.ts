@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyRuleToRows,
+  filterRowsByRule,
   parseSmartCommandPrompt,
+  parseSmartSelectionPrompt,
   removeSkuFromName,
   simulateRuleOnRows,
   WORKBENCH_RULE_PRESETS,
@@ -165,6 +167,26 @@ describe('pricelistWorkbenchRules', () => {
     expect(rule?.actionParam).toBe('name:sentence')
     // The quoted "Name" must NOT become a door_range/section filter.
     expect(rule?.conditions).toHaveLength(0)
+  })
+
+  it('parses a selection criteria from "word X in the name"', () => {
+    const { conditions, error } = parseSmartSelectionPrompt(
+      'find all products with the word panel in the name',
+    )
+    expect(error).toBeUndefined()
+    expect(conditions).toHaveLength(1)
+    expect(conditions[0]).toMatchObject({ field: 'name', op: 'contains', value: 'panel' })
+  })
+
+  it('selection criteria matches the expected rows', () => {
+    const rows = [
+      row({ id: 'a', name: 'End Panel 720' }),
+      row({ id: 'b', name: 'Base Unit 600' }),
+      row({ id: 'c', name: 'Tall PANEL infill' }),
+    ]
+    const { conditions, matchMode } = parseSmartSelectionPrompt('name contains panel')
+    const matched = filterRowsByRule(rows, { conditions, matchMode })
+    expect(matched.map((r) => r.id).sort()).toEqual(['a', 'c'])
   })
 
   it('applies sentence case to all rows for a quoted-field change-case command', () => {

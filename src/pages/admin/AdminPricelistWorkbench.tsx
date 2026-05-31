@@ -931,6 +931,7 @@ export default function AdminPricelistWorkbench() {
                   rows={rows}
                   filtered={filtered}
                   categories={categories}
+                  partTypes={partTypesHook.types}
                   onRowsChange={setRows}
                   onNotify={notifySmart}
                 />

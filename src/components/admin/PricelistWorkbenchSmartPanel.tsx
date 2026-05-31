@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import PricelistWorkbenchQuickCommand, {
   type SmartApplyScope,
 } from '@/components/admin/PricelistWorkbenchQuickCommand'
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
+import PricelistWorkbenchBulkEditModal from '@/components/admin/PricelistWorkbenchBulkEditModal'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import { applyBulkEdit, type BulkEditSpec } from '@/lib/pricelistWorkbenchBulkEdit'
 import { getUserPreference, setUserPreference } from '@/lib/userPreferences'
-import type { CategoryRow } from '@/types/database'
+import type { AssemblyPartTypeRow, CategoryRow } from '@/types/database'
 import {
   applyRuleToRows,
   describeRule,
   filterRowsByRule,
+  parseSmartSelectionPrompt,
   textCaseFieldLabel,
   textCaseModeLabel,
   TEXT_CASE_FIELDS,
@@ -70,6 +73,7 @@ type Props = {
   rows: PricelistWorkbenchRow[]
   filtered: PricelistWorkbenchRow[]
   categories: CategoryRow[]
+  partTypes: AssemblyPartTypeRow[]
   onRowsChange: (rows: PricelistWorkbenchRow[]) => void
   onNotify: (message: string, error?: string | null) => void
 }
@@ -92,10 +96,14 @@ export default function PricelistWorkbenchSmartPanel({
   rows,
   filtered,
   categories,
+  partTypes,
   onRowsChange,
   onNotify,
 }: Props) {
   const [scope, setScope] = useState<SmartApplyScope>('filtered')
+  const [bulkRows, setBulkRows] = useState<PricelistWorkbenchRow[] | null>(null)
+  const [bulkLabel, setBulkLabel] = useState('')
+  const [bulkCriteria, setBulkCriteria] = useState('')
   const [savedRules, setSavedRules] = useState<WorkbenchRule[]>([])
   const [builderName, setBuilderName] = useState('')
   const [builderMode, setBuilderMode] = useState<'all' | 'any'>('all')
@@ -128,6 +136,62 @@ export default function PricelistWorkbenchSmartPanel({
     if (scope === 'filtered') return new Set(filtered.map((r) => r.id))
     const sel = rows.filter((r) => r.selected)
     return new Set(sel.map((r) => r.id))
+  }
+
+  function poolForScope(): PricelistWorkbenchRow[] {
+    if (scope === 'all') return rows
+    if (scope === 'filtered') return filtered
+    return rows.filter((r) => r.selected)
+  }
+
+  const scopeLabel =
+    scope === 'all' ? `all rows (${rows.length})` : scope === 'filtered' ? `current filter (${filtered.length})` : `selected (${rows.filter((r) => r.selected).length})`
+
+  const bulkCriteriaMatchCount = useMemo(() => {
+    if (!bulkCriteria.trim()) return null
+    const { conditions, matchMode, error } = parseSmartSelectionPrompt(bulkCriteria)
+    if (error) return -1
+    return filterRowsByRule(poolForScope(), { conditions, matchMode }).length
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkCriteria, rows, filtered, scope])
+
+  function openBulkFromScope() {
+    const pool = poolForScope()
+    if (!pool.length) {
+      onNotify('', scope === 'selected' ? 'No rows selected.' : 'No rows in scope.')
+      return
+    }
+    setBulkLabel(scopeLabel)
+    setBulkRows(pool)
+  }
+
+  function openBulkFromCriteria() {
+    const { conditions, matchMode, error } = parseSmartSelectionPrompt(bulkCriteria)
+    if (error) {
+      onNotify('', error)
+      return
+    }
+    const matched = filterRowsByRule(poolForScope(), { conditions, matchMode })
+    if (!matched.length) {
+      onNotify('', 'No products matched that criteria in the current scope.')
+      return
+    }
+    setBulkLabel(
+      describeRule({ id: '', name: '', conditions, matchMode, action: 'select' }).replace(/^select:\s*/, ''),
+    )
+    setBulkRows(matched)
+  }
+
+  function handleBulkApply(spec: BulkEditSpec, ids: string[]) {
+    const { rows: next, changed } = applyBulkEdit(rows, new Set(ids), spec, categories)
+    onRowsChange(next)
+    onNotify(`Bulk updated ${changed} product(s).`)
+  }
+
+  function handleBulkDelete(ids: string[]) {
+    const idset = new Set(ids)
+    onRowsChange(rows.filter((r) => !idset.has(r.id)))
+    onNotify(`Removed ${ids.length} row(s) from the workbench draft.`)
   }
 
   function runRule(rule: WorkbenchRule, confirmDelete = true) {
@@ -252,6 +316,43 @@ export default function PricelistWorkbenchSmartPanel({
           onRunRule={runRule}
           onNotify={onNotify}
         />
+
+        <div className="admin-pricelist-smart-card admin-pricelist-bulk-card">
+          <h3>
+            Bulk editor
+            <AdminHelpTip text="Pick products by criteria (or use the current filter / selection), open them in a pop-up, and change many fields at once — category, sections, kinds, part types, prices, find &amp; replace, text case and more." />
+          </h3>
+          <p className="admin-muted">
+            Select products, then edit them all at once — no line-by-line editing.
+          </p>
+          <textarea
+            className="admin-pricelist-prompt"
+            rows={3}
+            value={bulkCriteria}
+            onChange={(e) => setBulkCriteria(e.target.value)}
+            placeholder='e.g. products with the word "panel" in the name'
+          />
+          {bulkCriteriaMatchCount !== null && (
+            <p className="admin-muted admin-pricelist-bulk-count">
+              {bulkCriteriaMatchCount < 0
+                ? 'Could not read that criteria yet — try e.g. name contains "panel".'
+                : `${bulkCriteriaMatchCount} product(s) match in ${scopeLabel}.`}
+            </p>
+          )}
+          <div className="admin-pricelist-smart-actions">
+            <button
+              type="button"
+              className="btn btn-small"
+              onClick={openBulkFromCriteria}
+              disabled={!bulkCriteria.trim()}
+            >
+              Find &amp; bulk edit
+            </button>
+            <button type="button" className="btn btn-small btn-outline" onClick={openBulkFromScope}>
+              Bulk edit {scopeLabel}
+            </button>
+          </div>
+        </div>
 
         <div className="admin-pricelist-smart-card">
           <h3>Presets</h3>
@@ -480,6 +581,18 @@ export default function PricelistWorkbenchSmartPanel({
       )}
 
       {lastPreview && <p className="admin-muted">Last run: {lastPreview}</p>}
+
+      {bulkRows && (
+        <PricelistWorkbenchBulkEditModal
+          rows={bulkRows}
+          criteriaLabel={bulkLabel}
+          categories={categories}
+          partTypes={partTypes}
+          onApply={handleBulkApply}
+          onDelete={handleBulkDelete}
+          onClose={() => setBulkRows(null)}
+        />
+      )}
     </div>
   )
 }

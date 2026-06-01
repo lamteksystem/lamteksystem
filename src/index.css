@@ -7800,6 +7800,36 @@ button.ordering-wizard-card {
 .admin-bulk-actions { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.75rem; }
 .admin-bulk-actions-end { display: flex; gap: 0.5rem; }
 
+/* Power tools bar above the workbench table */
+.admin-pricelist-tools-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+  margin-bottom: 0.75rem; padding-bottom: 0.6rem;
+  border-bottom: 1px dashed var(--lamtek-border);
+}
+.admin-pricelist-tools-bar-label {
+  font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--lamtek-gray); margin-right: 0.15rem;
+}
+
+/* Workbench tools modal (AI command, bulk editor, rules, bulk actions) */
+.admin-modal.card.admin-modal--workbench-tools {
+  max-width: 1080px; width: 96vw; max-height: 92vh; display: flex; flex-direction: column;
+}
+.admin-workbench-tools-tabs {
+  display: flex; gap: 0.25rem; flex-wrap: wrap;
+  border-bottom: 1px solid var(--lamtek-border); margin: 0.25rem 0 0.85rem;
+}
+.admin-workbench-tools-tab {
+  appearance: none; background: transparent; border: 0; cursor: pointer;
+  font: inherit; font-size: 0.88rem; font-weight: 600; color: var(--lamtek-gray);
+  padding: 0.5rem 0.85rem; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.admin-workbench-tools-tab:hover { color: var(--lamtek-ink, #1f2937); }
+.admin-workbench-tools-tab.is-active {
+  color: var(--lamtek-ink, #1f2937); border-bottom-color: var(--lamtek-gold);
+}
+.admin-workbench-tools-body { overflow-y: auto; min-height: 0; flex: 1; padding-right: 0.25rem; }
+
 /* Inline edit (catalogue table) */
 .admin-table-cell-editable { cursor: text; }
 .admin-table-cell-editable:hover { background: var(--lamtek-bg); }

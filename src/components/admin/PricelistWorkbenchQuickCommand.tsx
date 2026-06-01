@@ -235,7 +235,12 @@ export default function PricelistWorkbenchQuickCommand({
         rows={4}
         value={prompt}
         onChange={(e) => onPromptChange(e.target.value)}
-        placeholder='e.g. Remove the word "Section:" from the description of each product'
+        placeholder={
+          'Write it however you like, e.g.\n' +
+          '• Change the text in the name and description that is in capitals to Sentence case\n' +
+          '• Remove the word "Section:" from the description of each product\n' +
+          '• Assign category "Base units" to all unassigned Tealbury rows'
+        }
       />
 
       <div className="admin-pricelist-smart-actions">

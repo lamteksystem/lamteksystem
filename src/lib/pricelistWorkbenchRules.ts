@@ -228,17 +228,36 @@ export function stripTextFromFieldValue(value: string, text: string): string {
   return value.replace(re, '').replace(/\s{2,}/g, ' ').trim()
 }
 
+/**
+ * Action param format for change_text_case:
+ *   `field[+field…]:mode[:onlycaps]`
+ * e.g. `name:sentence`, `name+description:sentence:onlycaps`.
+ * The optional `onlycaps` flag means: only convert values that are currently
+ * SHOUTING (all upper-case), leaving correctly-cased text untouched.
+ */
 export function parseTextCaseActionParam(
   param: string | undefined
-): { field: TextCaseField; mode: TextCaseMode } | null {
+): { fields: TextCaseField[]; mode: TextCaseMode; onlyUpper: boolean } | null {
   if (!param?.trim()) return null
   const idx = param.indexOf(':')
   if (idx < 1) return null
-  const field = param.slice(0, idx).trim() as TextCaseField
-  const mode = param.slice(idx + 1).trim() as TextCaseMode
-  if (!TEXT_CASE_FIELDS.includes(field)) return null
+  const fieldsPart = param.slice(0, idx).trim()
+  const rest = param.slice(idx + 1).trim()
+  const [modeRaw, flag] = rest.split(':').map((s) => s.trim())
+  const fields = fieldsPart
+    .split('+')
+    .map((f) => f.trim())
+    .filter(Boolean) as TextCaseField[]
+  const mode = modeRaw as TextCaseMode
+  if (!fields.length || !fields.every((f) => TEXT_CASE_FIELDS.includes(f))) return null
   if (!TEXT_CASE_MODES.includes(mode)) return null
-  return { field, mode }
+  return { fields: [...new Set(fields)], mode, onlyUpper: flag === 'onlycaps' }
+}
+
+/** True when text is "shouting" — has letters and is entirely upper-case. */
+export function isShoutyText(value: string): boolean {
+  if (!/\p{Lu}/u.test(value)) return false
+  return value === value.toUpperCase() && value !== value.toLowerCase()
 }
 
 /** Title Case: capitalise the first letter of each word. */
@@ -408,13 +427,22 @@ export function applyRuleToRows(
           changed--
           return row
         }
-        const current = row[caseParam.field] as string
-        const updated = applyTextCase(current, caseParam.mode)
-        if (updated === current) {
+        let mutated = row
+        let anyChange = false
+        for (const field of caseParam.fields) {
+          const current = mutated[field] as string
+          if (caseParam.onlyUpper && !isShoutyText(current)) continue
+          const updated = applyTextCase(current, caseParam.mode)
+          if (updated !== current) {
+            mutated = { ...mutated, [field]: updated }
+            anyChange = true
+          }
+        }
+        if (!anyChange) {
           changed--
           return row
         }
-        return { ...row, [caseParam.field]: updated }
+        return mutated
       }
       case 'select':
         return { ...row, selected: true }
@@ -546,16 +574,19 @@ function buildSimulationSample(
     case 'change_text_case': {
       const cs = parseTextCaseActionParam(rule.actionParam)
       if (!cs) return null
-      const b = before[cs.field] as string
-      const a = after[cs.field] as string
-      if (b === a) return null
-      return {
-        sku: before.sku,
-        name: before.name,
-        fieldLabel: textCaseFieldLabel(cs.field),
-        before: truncateSampleText(b || '(empty)'),
-        after: truncateSampleText(a || '(empty)'),
+      for (const field of cs.fields) {
+        const b = before[field] as string
+        const a = after[field] as string
+        if (b === a) continue
+        return {
+          sku: before.sku,
+          name: before.name,
+          fieldLabel: textCaseFieldLabel(field),
+          before: truncateSampleText(b || '(empty)'),
+          after: truncateSampleText(a || '(empty)'),
+        }
       }
+      return null
     }
     case 'select':
       if (before.selected === after.selected) return null
@@ -752,31 +783,53 @@ function looksLikeStripFromFieldPrompt(lower: string, raw: string): boolean {
 }
 
 function looksLikeCaseCommand(lower: string): boolean {
-  return /\bcase\b/.test(lower) && /\b(sentence|title|upper|lower|caps|capital)\b/.test(lower)
+  const caseWord =
+    /\bcase\b/.test(lower) ||
+    /\b(uppercase|lowercase)\b/.test(lower) ||
+    /\bcapitali[sz]e/.test(lower) ||
+    /\ball\s*caps\b/.test(lower)
+  if (!caseWord) return false
+  return /\b(sentence|title|upper|lower|caps|capital)/.test(lower)
 }
 
-function parseCaseField(lower: string): TextCaseField {
-  if (/\bdescription/.test(lower)) return 'description'
-  if (/\bsection/.test(lower)) return 'section'
-  if (/\b(door|range)\b/.test(lower)) return 'door_range'
-  if (/\btrade\s*code/.test(lower)) return 'trade_code'
-  if (/\bsku/.test(lower)) return 'sku'
-  return 'name'
+/** Every field the user mentions (so "name and description" updates both). */
+function parseCaseFields(lower: string): TextCaseField[] {
+  const fields: TextCaseField[] = []
+  if (/\bname/.test(lower)) fields.push('name')
+  if (/\bdescription/.test(lower)) fields.push('description')
+  if (/\bsection/.test(lower)) fields.push('section')
+  if (/\b(door|range)\b/.test(lower)) fields.push('door_range')
+  if (/\btrade\s*code/.test(lower)) fields.push('trade_code')
+  if (/\bsku/.test(lower)) fields.push('sku')
+  return fields.length ? [...new Set(fields)] : ['name']
 }
 
 function parseCaseMode(lower: string): TextCaseMode {
   if (/\bsentence/.test(lower)) return 'sentence'
   if (/\btitle/.test(lower)) return 'title'
-  if (/\b(upper|caps|capital)/.test(lower)) return 'upper'
+  if (/\b(upper|all\s*caps|capitali[sz]e)/.test(lower)) return 'upper'
   if (/\blower/.test(lower)) return 'lower'
   return 'sentence'
 }
 
+/**
+ * True when the user is targeting only the SHOUTING (all-caps) values — e.g.
+ * "the text that is in capitals" / "fix the all-caps names". When converting
+ * to sentence/title/lower we then leave already-tidy text untouched.
+ */
+function caseOnlyUpperSource(lower: string, mode: TextCaseMode): boolean {
+  if (mode === 'upper') return false
+  return /\b(all\s*caps|caps\s*lock|in\s*caps|capitals?|capitali[sz]ed|uppercase|shouting)\b/.test(lower)
+}
+
 function parseAction(lower: string, raw: string, quoted: string[]): ParsedAction {
   if (looksLikeCaseCommand(lower)) {
+    const mode = parseCaseMode(lower)
+    const fields = parseCaseFields(lower)
+    const onlyUpper = caseOnlyUpperSource(lower, mode)
     return {
       action: 'change_text_case',
-      actionParam: `${parseCaseField(lower)}:${parseCaseMode(lower)}`,
+      actionParam: `${fields.join('+')}:${mode}${onlyUpper ? ':onlycaps' : ''}`,
     }
   }
 

@@ -35,7 +35,10 @@ import PricelistSourceImportProgress, {
 import AdminNoticeModal from '@/components/admin/AdminNoticeModal'
 import { useListPagination } from '@/lib/listPagination'
 import { deleteRowsByIds } from '@/lib/pricelistWorkbenchRules'
-import PricelistWorkbenchSmartPanel from '@/components/admin/PricelistWorkbenchSmartPanel'
+import PricelistWorkbenchToolsModal, {
+  type WorkbenchToolsTab,
+} from '@/components/admin/PricelistWorkbenchToolsModal'
+import type { BulkActionScope } from '@/components/admin/PricelistWorkbenchBulkActionsPanel'
 import PricelistWorkbenchSection from '@/components/admin/PricelistWorkbenchSection'
 import PricelistWorkbenchTable from '@/components/admin/PricelistWorkbenchTable'
 import PricelistWorkbenchTableToolbar from '@/components/admin/PricelistWorkbenchTableToolbar'
@@ -81,7 +84,7 @@ export default function AdminPricelistWorkbench() {
   }
 
   const [tableFilters, setTableFilters] = useState<WorkbenchTableFilters>(DEFAULT_WORKBENCH_FILTERS)
-  const [bulkCategoryId, setBulkCategoryId] = useState('')
+  const [toolsTab, setToolsTab] = useState<WorkbenchToolsTab | null>(null)
   const tableScrollRef = useRef<HorizontalScrollHandle>(null)
   const [tableScrollState, setTableScrollState] = useState<HorizontalScrollState>({
     canScrollLeft: false,
@@ -427,8 +430,8 @@ export default function AdminPricelistWorkbench() {
     setRows((prev) => prev.map((r) => (ids.has(r.id) ? { ...r, selected: checked } : r)))
   }
 
-  function onBulkCategoryApply(scope: 'selected' | 'filtered') {
-    const cat = categories.find((c) => c.id === bulkCategoryId)
+  function assignCategoryToScope(categoryId: string, scope: BulkActionScope) {
+    const cat = categories.find((c) => c.id === categoryId)
     if (!cat) {
       setError('Choose a category for bulk assign.')
       return
@@ -442,6 +445,10 @@ export default function AdminPricelistWorkbench() {
     }
     setRows((prev) => applyCategoryToRows(prev, ids, cat))
     showSuccess('Category assigned', `Assigned “${cat.name}” to ${ids.size} row(s).`)
+  }
+
+  function clearSelection() {
+    setRows((p) => p.map((r) => ({ ...r, selected: false })))
   }
 
   function runAutoMap(scope: 'all' | 'unassigned') {
@@ -772,6 +779,24 @@ export default function AdminPricelistWorkbench() {
             defaultOpen
             badge={filtered.length}
           >
+            <div className="admin-pricelist-tools-bar">
+              <span className="admin-pricelist-tools-bar-label">Power tools</span>
+              <button
+                type="button"
+                className="btn btn-small"
+                onClick={() => setToolsTab('smart')}
+              >
+                ✨ AI command &amp; rules
+              </button>
+              <button
+                type="button"
+                className="btn btn-small btn-outline"
+                onClick={() => setToolsTab('bulk')}
+              >
+                Bulk actions
+              </button>
+              <AdminHelpTip text="Open the AI natural-language command, bulk editor, presets and rule builder, or quick bulk actions (select / assign category / delete / auto-map) in a pop-up. They act on the current filter, selection, or all rows — without cluttering the table." />
+            </div>
             <PricelistWorkbenchTableToolbar
               filters={tableFilters}
               onChange={patchTableFilters}
@@ -816,132 +841,8 @@ export default function AdminPricelistWorkbench() {
           </PricelistWorkbenchSection>
 
           <PricelistWorkbenchSection
-            id="workbench-tools"
-            title="3. Bulk actions & smart commands"
-            summary="Assign categories, delete rows, or run plain-English commands on the filtered list"
-            tip="Use the search and filters in section 2. Bulk actions apply to filtered rows or ticked selection."
-            defaultOpen={false}
-          >
-            <div className="admin-pricelist-tools-layout">
-              <p className="admin-muted admin-pricelist-filter-summary">
-                Table shows {rangeStart}–{rangeEnd} of {filtered.length} filtered
-                {selectedCount > 0 ? ` · ${selectedCount} selected` : ''}
-              </p>
-              <div className="admin-pricelist-panel admin-pricelist-panel--bulk">
-                <h3>
-                  Selection &amp; bulk actions
-                  <AdminHelpTip text="Select rows with checkboxes, then apply category, delete, or smart commands to filtered or selected rows only." />
-                </h3>
-                <div className="admin-pricelist-action-group">
-                  <span className="admin-pricelist-action-label">Selection</span>
-                  <div className="admin-pricelist-action-row">
-                    <button type="button" className="btn btn-small btn-outline" onClick={() => toggleSelectAllFiltered(true)}>
-                      Select filtered ({filtered.length})
-                    </button>
-                    <button type="button" className="btn btn-small btn-ghost" onClick={() => setRows((p) => p.map((r) => ({ ...r, selected: false })))}>
-                      Clear selection
-                    </button>
-                  </div>
-                </div>
-                <div className="admin-pricelist-action-group">
-                  <span className="admin-pricelist-action-label">Delete from workbench</span>
-                  <div className="admin-pricelist-action-row">
-                    <button
-                      type="button"
-                      className="btn btn-small btn-danger-outline"
-                      disabled={filtered.length === 0}
-                      onClick={() => deleteBulk('filtered')}
-                    >
-                      Delete filtered ({filtered.length})
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-small btn-danger-outline"
-                      disabled={filteredSelectedCount === 0}
-                      onClick={() => deleteBulk('selected')}
-                    >
-                      Delete selected ({filteredSelectedCount})
-                    </button>
-                  </div>
-                </div>
-                <div className="admin-pricelist-action-group">
-                  <span className="admin-pricelist-action-label">
-                    Assign category
-                    <AdminHelpTip text="Pick a portal category, then apply to all filtered rows or only ticked rows. Does not publish until you use Export/Publish." />
-                  </span>
-                  <div className="admin-pricelist-action-row admin-pricelist-action-row--category">
-                    <select
-                      value={bulkCategoryId}
-                      onChange={(e) => setBulkCategoryId(e.target.value)}
-                      aria-label="Assign category"
-                    >
-                      <option value="">Choose category to assign…</option>
-                      {categoryOptions.parents.map((p) => (
-                        <optgroup key={p.id} label={p.name}>
-                          <option value={p.id}>{p.name}</option>
-                          {(categoryOptions.childrenByParent.get(p.id) ?? []).map((c) => (
-                            <option key={c.id} value={c.id}>
-                              — {c.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="btn btn-small"
-                      disabled={!bulkCategoryId}
-                      onClick={() => onBulkCategoryApply('filtered')}
-                    >
-                      Apply to filtered
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-small btn-outline"
-                      disabled={!bulkCategoryId || filteredSelectedCount === 0}
-                      onClick={() => onBulkCategoryApply('selected')}
-                    >
-                      Apply to selected
-                    </button>
-                  </div>
-                  <div className="admin-pricelist-action-row">
-                    <button
-                      type="button"
-                      className="btn btn-small btn-outline"
-                      title="Match section headings to existing category names"
-                      onClick={() => runAutoMap('unassigned')}
-                    >
-                      Auto-map unassigned
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-small btn-outline"
-                      title="Re-run auto-map on every row"
-                      onClick={() => runAutoMap('all')}
-                    >
-                      Auto-map all
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="admin-pricelist-panel admin-pricelist-panel--smart">
-                <h3>Smart commands</h3>
-                <PricelistWorkbenchSmartPanel
-                  rows={rows}
-                  filtered={filtered}
-                  categories={categories}
-                  partTypes={partTypesHook.types}
-                  onRowsChange={setRows}
-                  onNotify={notifySmart}
-                />
-              </div>
-            </div>
-          </PricelistWorkbenchSection>
-
-          <PricelistWorkbenchSection
             id="workbench-export"
-            title="4. Export or publish"
+            title="3. Export or publish"
             summary="Download template.xlsx or upsert live catalogue by SKU"
             tip="Export is safe preview. Publish writes to Supabase — Tealbury and Lamtek program tags are preserved per row."
             defaultOpen={false}
@@ -977,6 +878,27 @@ export default function AdminPricelistWorkbench() {
             </div>
           </PricelistWorkbenchSection>
         </>
+      )}
+
+      {toolsTab && (
+        <PricelistWorkbenchToolsModal
+          initialTab={toolsTab}
+          onClose={() => setToolsTab(null)}
+          rows={rows}
+          filtered={filtered}
+          categories={categories}
+          partTypes={partTypesHook.types}
+          onRowsChange={setRows}
+          onNotify={notifySmart}
+          filteredSelectedCount={filteredSelectedCount}
+          categoryOptions={categoryOptions}
+          onSelectFiltered={() => toggleSelectAllFiltered(true)}
+          onClearSelection={clearSelection}
+          onDeleteFiltered={() => deleteBulk('filtered')}
+          onDeleteSelected={() => deleteBulk('selected')}
+          onAssignCategory={assignCategoryToScope}
+          onAutoMap={runAutoMap}
+        />
       )}
 
       <AdminNoticeModal

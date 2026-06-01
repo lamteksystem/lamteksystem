@@ -164,9 +164,37 @@ describe('pricelistWorkbenchRules', () => {
     )
     expect(error).toBeUndefined()
     expect(rule?.action).toBe('change_text_case')
-    expect(rule?.actionParam).toBe('name:sentence')
+    // "all caps lock" → only convert the shouting values.
+    expect(rule?.actionParam).toBe('name:sentence:onlycaps')
     // The quoted "Name" must NOT become a door_range/section filter.
     expect(rule?.conditions).toHaveLength(0)
+  })
+
+  it('parses a multi-field change-case command targeting capitals', () => {
+    const { rule, error } = parseSmartCommandPrompt(
+      'change the text in the name and description that is in capitals to Sentence case'
+    )
+    expect(error).toBeUndefined()
+    expect(rule?.action).toBe('change_text_case')
+    expect(rule?.actionParam).toBe('name+description:sentence:onlycaps')
+    expect(rule?.conditions).toHaveLength(0)
+  })
+
+  it('only-caps change-case leaves correctly-cased text untouched', () => {
+    const rows = [
+      row({ id: 'a', name: 'CORNER WALL CABINET', description: 'WITH SOFT CLOSE' }),
+      row({ id: 'b', name: 'Belmont Painted Door', description: 'Already tidy text.' }),
+    ]
+    const { rule } = parseSmartCommandPrompt(
+      'change the text in the name and description that is in capitals to Sentence case'
+    )
+    const { rows: next, result } = applyRuleToRows(rows, rule!)
+    expect(next[0].name).toBe('Corner wall cabinet')
+    expect(next[0].description).toBe('With soft close')
+    // Mixed-case row is left exactly as-is.
+    expect(next[1].name).toBe('Belmont Painted Door')
+    expect(next[1].description).toBe('Already tidy text.')
+    expect(result.changed).toBe(1)
   })
 
   it('parses a selection criteria from "word X in the name"', () => {

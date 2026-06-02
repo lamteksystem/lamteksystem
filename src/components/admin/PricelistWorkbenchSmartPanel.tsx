@@ -31,6 +31,7 @@ import {
 } from '@/lib/pricelistWorkbenchRules'
 
 const RULES_PREF_KEY = 'pricelist_workbench_rules_v1'
+const AI_MODE_PREF_KEY = 'pricelist_ai_mode_v1'
 
 export type { SmartApplyScope } from '@/components/admin/PricelistWorkbenchQuickCommand'
 
@@ -104,6 +105,7 @@ export default function PricelistWorkbenchSmartPanel({
   onNotify,
 }: Props) {
   const [scope, setScope] = useState<SmartApplyScope>('filtered')
+  const [aiEnabled, setAiEnabled] = useState(true)
   const [bulkRows, setBulkRows] = useState<PricelistWorkbenchRow[] | null>(null)
   const [bulkLabel, setBulkLabel] = useState('')
   const [bulkCriteria, setBulkCriteria] = useState('')
@@ -155,7 +157,14 @@ export default function PricelistWorkbenchSmartPanel({
     void (async () => {
       const raw = await getUserPreference(RULES_PREF_KEY)
       setSavedRules(parseSavedRules(raw))
+      const aiRaw = await getUserPreference(AI_MODE_PREF_KEY)
+      if (aiRaw === 'off') setAiEnabled(false)
     })()
+  }, [])
+
+  const toggleAi = useCallback((next: boolean) => {
+    setAiEnabled(next)
+    void setUserPreference(AI_MODE_PREF_KEY, next ? 'on' : 'off')
   }, [])
 
   const persistRules = useCallback(async (rules: WorkbenchRule[]) => {
@@ -337,6 +346,11 @@ export default function PricelistWorkbenchSmartPanel({
           <input type="radio" name="smart-scope" checked={scope === 'all'} onChange={() => setScope('all')} />
           All rows ({rows.length})
         </label>
+        <label className="admin-pricelist-ai-toggle" title="When on, your command is understood by Google Gemini AI. If the AI is unavailable, it falls back to the built-in parser automatically.">
+          <input type="checkbox" checked={aiEnabled} onChange={(e) => toggleAi(e.target.checked)} />
+          ✨ AI understanding
+          <AdminHelpTip text="On: the AI command box sends your wording to Google Gemini (free tier) to interpret it, so you can phrase commands however you like. Off (or if no AI key / offline): uses the built-in keyword parser. Either way you always see a preview before anything changes." />
+        </label>
       </div>
 
       <div className="admin-pricelist-smart-grid">
@@ -345,6 +359,7 @@ export default function PricelistWorkbenchSmartPanel({
           filtered={filtered}
           categories={categories}
           scope={scope}
+          aiEnabled={aiEnabled}
           onRunRule={runRule}
           onNotify={onNotify}
           onEditInBuilder={editRuleInBuilder}

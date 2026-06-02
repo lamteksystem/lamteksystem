@@ -21,6 +21,7 @@ import {
   type RuleSimulationResult,
   type WorkbenchRule,
 } from '@/lib/pricelistWorkbenchRules'
+import { buildAiContext, parseCommandWithAi } from '@/lib/pricelistWorkbenchAi'
 import type { CategoryRow } from '@/types/database'
 export type SmartApplyScope = 'all' | 'filtered' | 'selected'
 
@@ -29,6 +30,8 @@ type Props = {
   filtered: PricelistWorkbenchRow[]
   categories: CategoryRow[]
   scope: SmartApplyScope
+  /** When true, interpret commands with the AI model first (falls back to offline). */
+  aiEnabled: boolean
   onRunRule: (rule: WorkbenchRule, confirmDelete?: boolean) => void
   onNotify: (message: string, error?: string | null) => void
   /** Hand the best-guess rule to the dropdown builder so the user can fix it in place. */
@@ -42,6 +45,7 @@ export default function PricelistWorkbenchQuickCommand({
   filtered,
   categories,
   scope,
+  aiEnabled,
   onRunRule,
   onNotify,
   onEditInBuilder,
@@ -58,6 +62,9 @@ export default function PricelistWorkbenchQuickCommand({
   const [highlightedFix, setHighlightedFix] = useState<PromptAssistSuggestion | null>(null)
   /** Best-guess rule shown when the strict parser couldn't fully understand the prompt. */
   const [fallbackRule, setFallbackRule] = useState<WorkbenchRule | null>(null)
+  const [aiThinking, setAiThinking] = useState(false)
+  /** Whether the last interpretation came from the AI model (vs offline parser). */
+  const [interpretedViaAi, setInterpretedViaAi] = useState(false)
 
   useEffect(() => {
     void (async () => {
@@ -74,6 +81,7 @@ export default function PricelistWorkbenchQuickCommand({
     setAssist(null)
     setHighlightedFix(null)
     setFallbackRule(null)
+    setInterpretedViaAi(false)
   }, [])
 
   function offerBuilderFallback() {
@@ -120,19 +128,35 @@ export default function PricelistWorkbenchQuickCommand({
     return new Set(sel.map((r) => r.id))
   }
 
-  function parsePromptOrNotify(): WorkbenchRule | null {
-    const { rule, error } = parseSmartCommandPrompt(prompt)
-    if (!rule || error) {
-      if (!offerBuilderFallback()) onNotify('', error ?? 'Could not parse command.')
-      return null
+  /**
+   * Resolve the prompt to a rule. With AI on, ask the model first; if it's
+   * unavailable, offline, or returns nothing usable, fall back to the offline
+   * parser. Returns null when even the offline parser can't understand it.
+   */
+  async function resolveRule(): Promise<{ rule: WorkbenchRule | null; error?: string; viaAi: boolean }> {
+    if (aiEnabled) {
+      setAiThinking(true)
+      try {
+        const ctx = buildAiContext(rows, categories.map((c) => c.name))
+        const ai = await parseCommandWithAi(prompt, ctx)
+        if (ai.rule) return { rule: ai.rule, viaAi: true }
+      } finally {
+        setAiThinking(false)
+      }
     }
-    return rule
+    const { rule, error } = parseSmartCommandPrompt(prompt)
+    return { rule, error, viaAi: false }
   }
 
-  function runSimulation() {
-    const rule = parsePromptOrNotify()
-    if (!rule) return
+  async function runSimulation() {
+    if (!prompt.trim()) return
+    const { rule, error, viaAi } = await resolveRule()
+    if (!rule) {
+      if (!offerBuilderFallback()) onNotify('', error ?? 'Could not parse command.')
+      return
+    }
     setFallbackRule(null)
+    setInterpretedViaAi(viaAi)
     const targetIds = resolveTargetIds()
     const poolSize =
       scope === 'all' ? rows.length : scope === 'filtered' ? filtered.length : rows.filter((r) => r.selected).length
@@ -144,9 +168,13 @@ export default function PricelistWorkbenchQuickCommand({
     applySimulationResult(rule, sim)
   }
 
-  function runWithoutTest() {
-    const rule = parsePromptOrNotify()
-    if (!rule) return
+  async function runWithoutTest() {
+    if (!prompt.trim()) return
+    const { rule, error } = await resolveRule()
+    if (!rule) {
+      if (!offerBuilderFallback()) onNotify('', error ?? 'Could not parse command.')
+      return
+    }
     resetFlow()
     onRunRule(rule)
   }
@@ -261,12 +289,23 @@ export default function PricelistWorkbenchQuickCommand({
       />
 
       <div className="admin-pricelist-smart-actions">
-        <button type="button" className="btn btn-small" onClick={runSimulation} disabled={!prompt.trim()}>
-          Test simulation
+        <button
+          type="button"
+          className="btn btn-small"
+          onClick={() => void runSimulation()}
+          disabled={!prompt.trim() || aiThinking}
+        >
+          {aiThinking ? 'Thinking…' : 'Test simulation'}
         </button>
-        <button type="button" className="btn btn-small btn-outline" onClick={runWithoutTest} disabled={!prompt.trim()}>
+        <button
+          type="button"
+          className="btn btn-small btn-outline"
+          onClick={() => void runWithoutTest()}
+          disabled={!prompt.trim() || aiThinking}
+        >
           Run without testing
         </button>
+        {aiEnabled && <span className="admin-pricelist-ai-badge">✨ AI on</span>}
       </div>
 
       {fallbackRule && onEditInBuilder && (
@@ -299,6 +338,7 @@ export default function PricelistWorkbenchQuickCommand({
           <h4>Simulation preview</h4>
           <p className="admin-muted admin-pricelist-simulation-parse">
             <strong>Interpreted as:</strong> {simulation.interpretedAs}
+            {interpretedViaAi ? <span className="admin-pricelist-ai-badge"> ✨ via AI</span> : null}
           </p>
           <ul className="admin-pricelist-simulation-stats">
             <li>

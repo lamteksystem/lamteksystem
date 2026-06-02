@@ -12,6 +12,7 @@ interface LineRow {
   quantity: number
   unit_price: number
   combination_label?: string | null
+  composed_code?: string | null
 }
 
 const QUOTE_STATUSES: OrderRow['status'][] = ['draft', 'quotation', 'placed']
@@ -47,7 +48,7 @@ export default function QuotePrint() {
       setOrder(orderData as OrderRow)
       const { data: linesData } = await supabase
         .from('order_lines')
-        .select('id, product_snapshot, quantity, unit_price, combination_label')
+        .select('id, product_snapshot, quantity, unit_price, combination_label, composed_code')
         .eq('order_id', orderId)
       setLines((linesData as LineRow[]) ?? [])
       const { data: profile } = await supabase

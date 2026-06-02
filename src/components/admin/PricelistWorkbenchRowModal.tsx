@@ -140,9 +140,9 @@ export default function PricelistWorkbenchRowModal({
           </label>
 
           <div className="admin-pricelist-row-modal-field admin-pricelist-row-modal-field--wide">
-            <span>Kinds</span>
+            <span>Sold as</span>
             <MultiSelectChips
-              ariaLabel="Item kinds"
+              ariaLabel="Sold as"
               noun="kind"
               values={rowItemKinds(row)}
               options={itemKindOptions}
@@ -151,9 +151,9 @@ export default function PricelistWorkbenchRowModal({
           </div>
 
           <div className="admin-pricelist-row-modal-field admin-pricelist-row-modal-field--wide">
-            <span>Part types</span>
+            <span>Component role</span>
             <MultiSelectChips
-              ariaLabel="Part types"
+              ariaLabel="Component role"
               noun="part type"
               values={rowPartTypes(row)}
               options={partTypeOptions}
@@ -162,9 +162,9 @@ export default function PricelistWorkbenchRowModal({
           </div>
 
           <div className="admin-pricelist-row-modal-field admin-pricelist-row-modal-field--wide">
-            <span>Sections</span>
+            <span>Import section (legacy)</span>
             <MultiSelectChips
-              ariaLabel="Sections"
+              ariaLabel="Import section"
               noun="section"
               values={rowSections(row)}
               options={sectionOptions}

@@ -8624,6 +8624,7 @@ button.ordering-wizard-card {
 .admin-order-line-combination { display: inline-flex; align-items: center; gap: 0.35rem; margin-top: 0.25rem; font-size: 0.85rem; }
 .admin-order-line-combination input { max-width: 10rem; }
 .admin-order-line-combination-badge { margin-left: 0.35rem; }
+.admin-order-line-code-badge { margin-right: 0.4rem; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.78rem; letter-spacing: 0.02em; background: #f1f3f5; color: #343a40; }
 
 /* Warehouse pick scan */
 .admin-pick-scan-page .admin-page-header { margin-bottom: 1rem; }

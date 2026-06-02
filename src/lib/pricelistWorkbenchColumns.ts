@@ -33,15 +33,15 @@ export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
   },
   {
     id: 'item_kind',
-    label: 'Kind',
-    tip: 'complete = sellable Tealbury unit; component / door / accessory = BOM parts.',
+    label: 'Sold as',
+    tip: 'How the product is sold: Complete (a sellable finished unit) · Component (a BOM building block) · Accessory. This drives whether adding it explodes into parts.',
     minWidth: 72,
     defaultWidth: 177,
   },
   {
     id: 'part_type',
-    label: 'Part type',
-    tip: 'BOM part type code (unit, door, hinge, …). Blank for complete units.',
+    label: 'Component role',
+    tip: 'For components only — the role it plays inside a unit (unit/carcass, door, hinge, leg, fittings…). Blank for complete units.',
     minWidth: 88,
     defaultWidth: 158,
   },
@@ -54,8 +54,8 @@ export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
   },
   {
     id: 'section',
-    label: 'Section',
-    tip: 'Spreadsheet section heading (e.g. HIGHLINE BASE UNITS). Double-click to edit.',
+    label: 'Import section (legacy)',
+    tip: 'Original pricelist heading (e.g. HIGHLINE BASE UNITS), kept for reference only. Browsing/filtering now uses Categories — assign a Category instead of relying on Section. Hidden by default.',
     minWidth: 110,
     defaultWidth: 140,
   },
@@ -131,9 +131,14 @@ export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
   },
 ]
 
-/** Columns visible on first use (Catalogue column hidden until enabled in column settings). */
+/**
+ * Columns visible on first use. The Catalogue column and the legacy Import
+ * section column are hidden until enabled in column settings (Section is
+ * superseded by Categories).
+ */
+const DEFAULT_HIDDEN_IDS: WorkbenchColumnId[] = ['catalog_source', 'section']
 export const PRICELIST_WORKBENCH_DEFAULT_VISIBLE_IDS = PRICELIST_WORKBENCH_COLUMNS.filter(
-  (c) => c.id !== 'catalog_source',
+  (c) => !DEFAULT_HIDDEN_IDS.includes(c.id as WorkbenchColumnId),
 ).map((c) => c.id)
 
 // Generous upper bound so columns can be widened substantially; only guards

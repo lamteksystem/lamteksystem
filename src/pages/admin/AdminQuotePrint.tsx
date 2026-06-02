@@ -16,6 +16,7 @@ interface LineRow {
   quantity: number
   unit_price: number
   combination_label?: string | null
+  composed_code?: string | null
   cost_price?: number | null
 }
 
@@ -57,7 +58,7 @@ export default function AdminQuotePrint() {
       setOrder(orderData as OrderRow)
       const { data: linesData } = await supabase
         .from('order_lines')
-        .select('id, product_snapshot, quantity, unit_price, combination_label, product:products(cost_price)')
+        .select('id, product_snapshot, quantity, unit_price, combination_label, composed_code, product:products(cost_price)')
         .eq('order_id', orderId)
       const mapped = (
         (linesData ?? []) as Array<
@@ -160,6 +161,7 @@ export default function AdminQuotePrint() {
             <thead>
               <tr>
                 <th>Combination</th>
+                <th>Code</th>
                 <th>Description</th>
                 <th>Qty</th>
                 <th>Sell unit</th>
@@ -176,6 +178,7 @@ export default function AdminQuotePrint() {
                 return (
                   <tr key={l.id}>
                     <td>{l.combination_label ?? '—'}</td>
+                    <td>{l.composed_code || (l.product_snapshot as { sku?: string })?.sku || '—'}</td>
                     <td>{(l.product_snapshot as { name?: string })?.name ?? 'Product'}</td>
                     <td>{qty}</td>
                     <td>£{sellUnit.toFixed(2)}</td>

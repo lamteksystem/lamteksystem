@@ -9,6 +9,7 @@ interface LineItem {
   quantity: number
   unit_price: number
   combination_label?: string | null
+  composed_code?: string | null
 }
 
 export type InvoicePrintVariant = 'invoice' | 'quote' | 'quote_no_pricing'
@@ -122,7 +123,7 @@ export default function InvoicePrintView({
                 const snap = l.product_snapshot as { name?: string; sku?: string }
                 return (
                   <tr key={l.id}>
-                    {showSku && <td>{snap?.sku ?? '—'}</td>}
+                    {showSku && <td>{l.composed_code || snap?.sku || '—'}</td>}
                     <td>{snap?.name ?? 'Product'}</td>
                     <td>{l.quantity}</td>
                     {showPricing && <td>£{Number(l.unit_price).toFixed(2)}</td>}

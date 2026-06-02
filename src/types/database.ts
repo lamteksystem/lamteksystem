@@ -388,6 +388,8 @@ export interface OrderLineRow {
   options: Json
   /** Quote grouping e.g. Kitchen main, Island */
   combination_label?: string | null
+  /** Composed configuration code for the unit, e.g. 1000-HL-BASE-WHI-DAW-WHI. */
+  composed_code?: string | null
   created_at?: string
 }
 

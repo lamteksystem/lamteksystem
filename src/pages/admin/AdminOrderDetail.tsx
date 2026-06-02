@@ -61,6 +61,7 @@ interface LineRow {
   quantity: number
   unit_price: number
   combination_label?: string | null
+  composed_code?: string | null
 }
 
 type LinkedOrderPreview = Pick<OrderRow, 'id' | 'reference' | 'status' | 'created_at' | 'parent_order_id' | 'link_reason'>
@@ -229,7 +230,7 @@ export default function AdminOrderDetail() {
     if (!orderId) return
     const [orderRes, linesRes, eventsRes, locationsRes, shipmentsRes, notificationRulesRes, pickListsRes] = await Promise.all([
       supabase.from('orders').select('*').eq('id', orderId).single(),
-      supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price, combination_label').eq('order_id', orderId),
+      supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price, combination_label, composed_code').eq('order_id', orderId),
       supabase.from('order_events').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
       supabase.from('locations').select('*').eq('active', true).order('sort_order').order('name'),
       supabase.from('shipments').select('*').eq('order_id', orderId).order('shipped_at', { ascending: false }),
@@ -990,7 +991,7 @@ export default function AdminOrderDetail() {
       .eq('id', lineId)
     const { data } = await supabase
       .from('order_lines')
-      .select('id, product_snapshot, quantity, unit_price, combination_label')
+      .select('id, product_snapshot, quantity, unit_price, combination_label, composed_code')
       .eq('order_id', orderId)
     setLines((data as LineRow[]) ?? [])
     setSaving(false)
@@ -1009,7 +1010,7 @@ export default function AdminOrderDetail() {
     }).catch(() => {})
     const { data } = await supabase
       .from('order_lines')
-      .select('id, product_snapshot, quantity, unit_price, combination_label')
+      .select('id, product_snapshot, quantity, unit_price, combination_label, composed_code')
       .eq('order_id', orderId)
     setLines((data as LineRow[]) ?? [])
     const { data: o } = await supabase.from('orders').select('*').eq('id', orderId).single()
@@ -1055,7 +1056,7 @@ export default function AdminOrderDetail() {
   async function reloadOrderLinesFromDb() {
     if (!orderId) return
     const [{ data: lineData }, { data: orderData }] = await Promise.all([
-      supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price, combination_label').eq('order_id', orderId),
+      supabase.from('order_lines').select('id, product_snapshot, quantity, unit_price, combination_label, composed_code').eq('order_id', orderId),
       supabase.from('orders').select('*').eq('id', orderId).single(),
     ])
     setLines((lineData as LineRow[]) ?? [])
@@ -2571,6 +2572,11 @@ export default function AdminOrderDetail() {
               )}
               {!canEdit && l.combination_label && (
                 <span className="admin-badge admin-order-line-combination-badge">{l.combination_label}</span>
+              )}
+              {l.composed_code && (
+                <span className="admin-badge admin-order-line-code-badge" title="Configuration code">
+                  {l.composed_code}
+                </span>
               )}
               <span className="line-name">{(l.product_snapshot as { name?: string })?.name ?? 'Product'}</span>
               <span className="line-price">

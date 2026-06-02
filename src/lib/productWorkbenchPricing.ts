@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { resolveCostPrice, resolveCustomerPrice, type CustomerSegmentIds } from '@/lib/pricing'
 import { normalizeAccountDiscountPercent } from '@/lib/pricing'
+import { effectiveBaseUnitPrice } from '@/lib/finishPricing'
 import type { ProductRow } from '@/types/database'
 
 export interface ProductPriceBreakdown {
@@ -38,9 +39,11 @@ export async function resolveProductPriceBreakdown(params: {
   product: ProductRow
   customerUserId?: string | null
   orderTotalExVat?: number
+  /** Chosen door/range finish — prices finish-aware products at that finish. */
+  doorFinish?: string | null
 }): Promise<ProductPriceBreakdown> {
-  const { product, customerUserId, orderTotalExVat = 0 } = params
-  const cataloguePrice = Number(product.unit_price)
+  const { product, customerUserId, orderTotalExVat = 0, doorFinish = null } = params
+  const cataloguePrice = effectiveBaseUnitPrice(product, doorFinish)
 
   let sellPrice = cataloguePrice
   if (customerUserId) {

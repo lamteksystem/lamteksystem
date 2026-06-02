@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { recalcOrderTotals } from '@/lib/orders'
 import { resolveCustomerPrice, normalizeAccountDiscountPercent, type CustomerSegmentIds } from '@/lib/pricing'
+import { effectiveBaseUnitPrice } from '@/lib/finishPricing'
 import type { OrderLineRow, ProductRow } from '@/types/database'
 
 async function getCustomerPricingContext(customerUserId: string): Promise<{
@@ -29,7 +30,7 @@ async function getCustomerPricingContext(customerUserId: string): Promise<{
 async function getProductsMap(productIds: string[]): Promise<Map<string, ProductRow>> {
   const { data } = await supabase
     .from('products')
-    .select('id, unit_price, category_id')
+    .select('id, unit_price, category_id, options')
     .in('id', productIds)
 
   const map = new Map<string, ProductRow>()
@@ -51,9 +52,10 @@ export async function repriceDraftOrderLinesForCustomer(params: {
 
   const [{ segment, accountDiscountPercent }, orderRes, linesRes] = await Promise.all([
     getCustomerPricingContext(customerUserId),
-    supabase.from('orders').select('total_ex_vat').eq('id', orderId).maybeSingle(),
+    supabase.from('orders').select('total_ex_vat, door_finish').eq('id', orderId).maybeSingle(),
     supabase.from('order_lines').select('id, product_id, quantity').eq('order_id', orderId),
   ])
+  const doorFinish = (orderRes.data?.door_finish as string | null) ?? null
 
   const lines = (linesRes.data ?? []) as Array<Pick<OrderLineRow, 'id' | 'product_id' | 'quantity'>>
   if (lines.length === 0) return
@@ -72,7 +74,7 @@ export async function repriceDraftOrderLinesForCustomer(params: {
       const resolved = await resolveCustomerPrice({
         productId,
         categoryId: p.category_id ?? '',
-        baseUnitPrice: Number(p.unit_price),
+        baseUnitPrice: effectiveBaseUnitPrice(p, doorFinish),
         segment,
         orderTotalExVat: currentOrderTotalExVat,
         collectionIds,

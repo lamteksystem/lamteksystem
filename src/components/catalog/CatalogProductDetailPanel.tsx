@@ -17,6 +17,8 @@ interface CatalogProductDetailPanelProps {
   product: ProductRow
   categories: CategoryRow[]
   customerUserId?: string | null
+  /** Chosen door/range finish so the shown price matches what will be charged. */
+  doorFinish?: string | null
   isFavourite: boolean
   onToggleFavourite: () => void
   onClose: () => void
@@ -31,6 +33,7 @@ export default function CatalogProductDetailPanel({
   product,
   categories,
   customerUserId,
+  doorFinish = null,
   isFavourite,
   onToggleFavourite,
   onClose,
@@ -51,7 +54,7 @@ export default function CatalogProductDetailPanel({
   useEffect(() => {
     let cancelled = false
     setPricingLoading(true)
-    resolveProductPriceBreakdown({ product, customerUserId })
+    resolveProductPriceBreakdown({ product, customerUserId, doorFinish })
       .then((p) => {
         if (!cancelled) setPricing(p)
       })
@@ -61,7 +64,7 @@ export default function CatalogProductDetailPanel({
     return () => {
       cancelled = true
     }
-  }, [product, customerUserId])
+  }, [product, customerUserId, doorFinish])
 
   const sellExVat = pricing?.sellPrice ?? Number(product.unit_price)
   const sellIncVat = sellExVat * VAT_RATE

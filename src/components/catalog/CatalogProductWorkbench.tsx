@@ -476,7 +476,11 @@ export default function CatalogProductWorkbench({
     void (async () => {
       const entries = await Promise.all(
         slice.map(async (p) => {
-          const b = await resolveProductPriceBreakdown({ product: p, customerUserId })
+          const b = await resolveProductPriceBreakdown({
+            product: p,
+            customerUserId,
+            doorFinish: tealburySetup?.door_finish ?? null,
+          })
           return [p.id, b.sellPrice] as const
         }),
       )
@@ -490,7 +494,7 @@ export default function CatalogProductWorkbench({
     return () => {
       cancelled = true
     }
-  }, [filtered, customerUserId])
+  }, [filtered, customerUserId, tealburySetup?.door_finish])
 
   const toggleFavourite = useCallback(
     (productId: string) => {
@@ -1356,6 +1360,7 @@ export default function CatalogProductWorkbench({
                   product={selectedProduct}
                   categories={effectiveCategories}
                   customerUserId={customerUserId}
+                  doorFinish={tealburySetup?.door_finish ?? null}
                   isFavourite={favouriteSet.has(selectedProduct.id)}
                   onToggleFavourite={() => toggleFavourite(selectedProduct.id)}
                   onClose={() => setSelectedProductId(null)}

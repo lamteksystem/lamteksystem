@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { repriceDraftOrderLinesForCustomer } from '@/lib/orderPricing'
 import { recalcOrderTotals } from '@/lib/orders'
+import { effectiveBaseUnitPrice } from '@/lib/finishPricing'
 import type { AssemblyWithLines, ProductRow } from '@/types/database'
 
 export function productSnapshotFromRow(product: ProductRow) {
@@ -12,6 +13,12 @@ export function productSnapshotFromRow(product: ProductRow) {
   }
 }
 
+/** The order's chosen door/range finish (drives finish-aware base pricing). */
+async function getOrderDoorFinish(orderId: string): Promise<string | null> {
+  const { data } = await supabase.from('orders').select('door_finish').eq('id', orderId).maybeSingle()
+  return ((data?.door_finish as string | null) ?? null) || null
+}
+
 export async function insertProductOrderLines(params: {
   orderId: string
   lines: { product: ProductRow; quantity: number }[]
@@ -21,12 +28,13 @@ export async function insertProductOrderLines(params: {
   const { orderId, lines, customerUserId, repriceCustomer = true } = params
   if (lines.length === 0) return
 
+  const doorFinish = await getOrderDoorFinish(orderId)
   const rows = lines.map(({ product, quantity }) => ({
     order_id: orderId,
     product_id: product.id,
     product_snapshot: productSnapshotFromRow(product),
     quantity,
-    unit_price: product.unit_price,
+    unit_price: effectiveBaseUnitPrice(product, doorFinish),
     options: product.options ?? {},
   }))
 
@@ -49,15 +57,18 @@ export async function insertAssemblyOrderLines(params: {
 }): Promise<void> {
   const { orderId, assembly, quantity, customerUserId, repriceCustomer = true } = params
   const assemblyLines = assembly.assembly_lines ?? []
+  const doorFinish = await getOrderDoorFinish(orderId)
   const inserts = assemblyLines.flatMap((line) => {
     const product = line.product as ProductRow | undefined
     if (!product) return []
+    // Door/range-finished components (e.g. the doors) price from the chosen
+    // finish; carcass, legs and fittings have no finish matrix so keep unit_price.
     return {
       order_id: orderId,
       product_id: product.id,
       product_snapshot: productSnapshotFromRow(product),
       quantity: line.quantity * quantity,
-      unit_price: product.unit_price,
+      unit_price: effectiveBaseUnitPrice(product, doorFinish),
       options: product.options ?? {},
     }
   })

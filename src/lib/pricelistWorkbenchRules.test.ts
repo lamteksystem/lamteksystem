@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyRuleToRows,
   filterRowsByRule,
+  parseSmartCommandLoose,
   parseSmartCommandPrompt,
   parseSmartSelectionPrompt,
   removeSkuFromName,
@@ -215,6 +216,27 @@ describe('pricelistWorkbenchRules', () => {
     const { conditions, matchMode } = parseSmartSelectionPrompt('name contains panel')
     const matched = filterRowsByRule(rows, { conditions, matchMode })
     expect(matched.map((r) => r.id).sort()).toEqual(['a', 'c'])
+  })
+
+  it('loose parser returns a confident rule for clear commands', () => {
+    const { rule, confident } = parseSmartCommandLoose('delete all Tealbury No Doors rows')
+    expect(confident).toBe(true)
+    expect(rule.action).toBe('delete')
+  })
+
+  it('loose parser never dead-ends: falls back to a select rule with detected filters', () => {
+    const { rule, confident } = parseSmartCommandLoose('the panels in section kitchen units please')
+    expect(confident).toBe(false)
+    // Always usable: an action is present so it can load into the builder.
+    expect(rule.action).toBeTruthy()
+    expect(rule.conditions.length).toBeGreaterThan(0)
+  })
+
+  it('understands extra verbs (disable / get rid of)', () => {
+    const disable = parseSmartCommandPrompt('disable all Lamtek rows')
+    expect(disable.rule?.action).toBe('set_inactive')
+    const purge = parseSmartCommandPrompt('get rid of every Tealbury No Doors row')
+    expect(purge.rule?.action).toBe('delete')
   })
 
   it('applies sentence case to all rows for a quoted-field change-case command', () => {

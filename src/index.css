@@ -7830,6 +7830,15 @@ button.ordering-wizard-card {
 }
 .admin-workbench-tools-body { overflow-y: auto; min-height: 0; flex: 1; padding-right: 0.25rem; }
 
+/* "Couldn't fully read that" best-guess fallback in the AI command card */
+.admin-pricelist-fallback {
+  margin-top: 0.75rem; padding: 0.75rem 0.85rem;
+  border: 1px solid var(--lamtek-gold); border-radius: 8px;
+  background: rgba(212, 175, 55, 0.08);
+}
+.admin-pricelist-fallback h4 { margin: 0 0 0.35rem; font-size: 0.92rem; }
+.admin-pricelist-fallback p { margin: 0 0 0.6rem; font-size: 0.84rem; }
+
 /* Inline edit (catalogue table) */
 .admin-table-cell-editable { cursor: text; }
 .admin-table-cell-editable:hover { background: var(--lamtek-bg); }

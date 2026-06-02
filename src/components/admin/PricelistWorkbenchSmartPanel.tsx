@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import PricelistWorkbenchQuickCommand, {
   type SmartApplyScope,
 } from '@/components/admin/PricelistWorkbenchQuickCommand'
@@ -13,11 +13,14 @@ import {
   describeRule,
   filterRowsByRule,
   parseSmartSelectionPrompt,
+  parseStripTextActionParam,
+  parseTextCaseActionParam,
   textCaseFieldLabel,
   textCaseModeLabel,
   TEXT_CASE_FIELDS,
   TEXT_CASE_MODES,
   WORKBENCH_RULE_PRESETS,
+  type StripTextField,
   type TextCaseField,
   type TextCaseMode,
   type WorkbenchActionType,
@@ -117,7 +120,36 @@ export default function PricelistWorkbenchSmartPanel({
     { field: 'source', op: 'equals', value: 'tealbury' },
     newCondition(),
   ])
+  const [builderOpen, setBuilderOpen] = useState(false)
   const [lastPreview, setLastPreview] = useState<string | null>(null)
+  const builderRef = useRef<HTMLDetailsElement>(null)
+
+  const editRuleInBuilder = useCallback((rule: WorkbenchRule) => {
+    setBuilderAction(rule.action)
+    setBuilderMode(rule.matchMode)
+    setBuilderConditions(rule.conditions.length ? rule.conditions : [newCondition()])
+    setBuilderName('')
+    setBuilderActionParam(rule.action === 'assign_category' ? rule.actionParam ?? '' : '')
+    if (rule.action === 'strip_text_from_field') {
+      const p = parseStripTextActionParam(rule.actionParam)
+      if (p) {
+        setBuilderStripField(p.field as StripTextField)
+        setBuilderStripText(p.text)
+      }
+    }
+    if (rule.action === 'change_text_case') {
+      const c = parseTextCaseActionParam(rule.actionParam)
+      if (c) {
+        setBuilderCaseField(c.fields[0] ?? 'name')
+        setBuilderCaseMode(c.mode)
+      }
+    }
+    setBuilderOpen(true)
+    onNotify('Loaded your command into the builder below — adjust the dropdowns and Run.')
+    requestAnimationFrame(() =>
+      builderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    )
+  }, [onNotify])
 
   useEffect(() => {
     void (async () => {
@@ -315,6 +347,7 @@ export default function PricelistWorkbenchSmartPanel({
           scope={scope}
           onRunRule={runRule}
           onNotify={onNotify}
+          onEditInBuilder={editRuleInBuilder}
         />
 
         <div className="admin-pricelist-smart-card admin-pricelist-bulk-card">
@@ -372,7 +405,12 @@ export default function PricelistWorkbenchSmartPanel({
         </div>
       </div>
 
-      <details className="admin-pricelist-smart-card admin-pricelist-rule-builder">
+      <details
+        ref={builderRef}
+        className="admin-pricelist-smart-card admin-pricelist-rule-builder"
+        open={builderOpen}
+        onToggle={(e) => setBuilderOpen((e.target as HTMLDetailsElement).open)}
+      >
         <summary>Rule builder (save &amp; re-run)</summary>
         <div className="admin-pricelist-builder-form">
           <label>

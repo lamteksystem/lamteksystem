@@ -15,6 +15,7 @@ import {
 } from '@/lib/pricelistWorkbenchPromptAssist'
 import {
   describeRule,
+  parseSmartCommandLoose,
   parseSmartCommandPrompt,
   simulateRuleOnRows,
   type RuleSimulationResult,
@@ -30,6 +31,8 @@ type Props = {
   scope: SmartApplyScope
   onRunRule: (rule: WorkbenchRule, confirmDelete?: boolean) => void
   onNotify: (message: string, error?: string | null) => void
+  /** Hand the best-guess rule to the dropdown builder so the user can fix it in place. */
+  onEditInBuilder?: (rule: WorkbenchRule) => void
 }
 
 type FlowPhase = 'idle' | 'simulated' | 'approved' | 'refining'
@@ -41,6 +44,7 @@ export default function PricelistWorkbenchQuickCommand({
   scope,
   onRunRule,
   onNotify,
+  onEditInBuilder,
 }: Props) {
   const [prompt, setPrompt] = useState('')
   const [phase, setPhase] = useState<FlowPhase>('idle')
@@ -52,6 +56,8 @@ export default function PricelistWorkbenchQuickCommand({
   const [refineAddition, setRefineAddition] = useState('')
   const [assist, setAssist] = useState<PromptAssistResult | null>(null)
   const [highlightedFix, setHighlightedFix] = useState<PromptAssistSuggestion | null>(null)
+  /** Best-guess rule shown when the strict parser couldn't fully understand the prompt. */
+  const [fallbackRule, setFallbackRule] = useState<WorkbenchRule | null>(null)
 
   useEffect(() => {
     void (async () => {
@@ -67,7 +73,17 @@ export default function PricelistWorkbenchQuickCommand({
     setRefineAddition('')
     setAssist(null)
     setHighlightedFix(null)
+    setFallbackRule(null)
   }, [])
+
+  function offerBuilderFallback() {
+    if (!onEditInBuilder) return false
+    const loose = parseSmartCommandLoose(prompt)
+    setFallbackRule(loose.rule)
+    setPhase('idle')
+    setSimulation(null)
+    return true
+  }
 
   function applySimulationResult(
     rule: WorkbenchRule,
@@ -107,7 +123,7 @@ export default function PricelistWorkbenchQuickCommand({
   function parsePromptOrNotify(): WorkbenchRule | null {
     const { rule, error } = parseSmartCommandPrompt(prompt)
     if (!rule || error) {
-      onNotify('', error ?? 'Could not parse command.')
+      if (!offerBuilderFallback()) onNotify('', error ?? 'Could not parse command.')
       return null
     }
     return rule
@@ -116,6 +132,7 @@ export default function PricelistWorkbenchQuickCommand({
   function runSimulation() {
     const rule = parsePromptOrNotify()
     if (!rule) return
+    setFallbackRule(null)
     const targetIds = resolveTargetIds()
     const poolSize =
       scope === 'all' ? rows.length : scope === 'filtered' ? filtered.length : rows.filter((r) => r.selected).length
@@ -251,6 +268,31 @@ export default function PricelistWorkbenchQuickCommand({
           Run without testing
         </button>
       </div>
+
+      {fallbackRule && onEditInBuilder && (
+        <div className="admin-pricelist-fallback" role="region" aria-label="Command needs adjusting">
+          <h4>I couldn&rsquo;t fully read that — here&rsquo;s my best guess</h4>
+          <p className="admin-muted">
+            Interpreted as: <strong>{describeRule(fallbackRule)}</strong>. Load it into the dropdown
+            builder below to fix the action or filters, then run — no need to come back to chat.
+          </p>
+          <div className="admin-pricelist-smart-actions">
+            <button
+              type="button"
+              className="btn btn-small"
+              onClick={() => {
+                onEditInBuilder(fallbackRule)
+                setFallbackRule(null)
+              }}
+            >
+              Adjust with dropdowns →
+            </button>
+            <button type="button" className="btn btn-small btn-ghost" onClick={() => setFallbackRule(null)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {simulation && phase !== 'idle' && (
         <div className="admin-pricelist-simulation" role="region" aria-label="Command simulation preview">
@@ -396,6 +438,15 @@ export default function PricelistWorkbenchQuickCommand({
             <div className="admin-pricelist-simulation-outcome">
               <p>No rows would change. Adjust filters or wording, then test again.</p>
               <div className="admin-pricelist-smart-actions">
+                {onEditInBuilder && pendingRule && (
+                  <button
+                    type="button"
+                    className="btn btn-small"
+                    onClick={() => onEditInBuilder(pendingRule)}
+                  >
+                    Adjust with dropdowns →
+                  </button>
+                )}
                 <button type="button" className="btn btn-small btn-outline" onClick={() => setPhase('refining')}>
                   Refine command
                 </button>

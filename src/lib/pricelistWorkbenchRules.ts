@@ -895,10 +895,14 @@ function parseAction(lower: string, raw: string, quoted: string[]): ParsedAction
     }
   }
 
-  if (/\b(deactivate|mark\s+inactive|set\s+inactive)\b/.test(lower)) {
+  if (/\b(deactivate|disable|mark\s+inactive|set\s+inactive|turn\s+off|switch\s+off)\b/.test(lower)) {
     return { action: 'set_inactive' }
   }
-  if (/\b(activate|mark\s+active|set\s+active)\b/.test(lower) && !/\binactiv/.test(lower)) {
+  if (
+    /\b(activate|enable|mark\s+active|set\s+active|turn\s+on|switch\s+on)\b/.test(lower) &&
+    !/\binactiv/.test(lower) &&
+    !/\bdisable/.test(lower)
+  ) {
     return { action: 'set_active' }
   }
   if (/\b(select|tick|check)\b/.test(lower) && !/\b(de)?select/.test(lower)) {
@@ -907,7 +911,7 @@ function parseAction(lower: string, raw: string, quoted: string[]): ParsedAction
   if (/\b(deselect|untick|uncheck|clear\s+selection)\b/.test(lower)) {
     return { action: 'deselect' }
   }
-  if (/\b(delete|drop|remove\s+from\s+(?:the\s+)?(?:workbench|list|draft))\b/.test(lower)) {
+  if (/\b(delete|drop|get\s+rid\s+of|purge|remove\s+from\s+(?:the\s+)?(?:workbench|list|draft))\b/.test(lower)) {
     return { action: 'delete' }
   }
   if (/\b(remove|drop)\b/.test(lower) && /\b(row|product|item|line)s?\b/.test(lower)) {
@@ -1078,6 +1082,54 @@ export function parseSmartCommandPrompt(prompt: string): { rule: WorkbenchRule |
       action,
       actionParam,
     },
+  }
+}
+
+/**
+ * Best-effort parse that NEVER fails: if the strict parser can't fully understand
+ * the prompt, we still detect whatever action/filters we can and fall back to a
+ * "select" action so the command can be loaded into the dropdown builder and
+ * fixed in place — instead of dead-ending the user. `confident` is true only when
+ * the strict parser succeeded.
+ */
+export function parseSmartCommandLoose(prompt: string): {
+  rule: WorkbenchRule
+  confident: boolean
+  note?: string
+} {
+  const strict = parseSmartCommandPrompt(prompt)
+  if (strict.rule) return { rule: strict.rule, confident: true }
+
+  const raw = prompt.trim()
+  const lower = normalizePrompt(raw)
+  const quoted = extractQuotedPhrases(raw)
+  const matchMode = parseMatchMode(lower)
+
+  const actionParsed = parseAction(lower, raw, quoted)
+  let action: WorkbenchActionType = 'select'
+  let actionParam: string | undefined
+  if (actionParsed && !('error' in actionParsed)) {
+    action = actionParsed.action
+    actionParam = actionParsed.actionParam
+  }
+
+  let conditions = parseFieldConditions(lower, raw, quoted, action, actionParam)
+  if (!conditions.length) {
+    const sel = parseSmartSelectionPrompt(raw)
+    if (!sel.error) conditions = sel.conditions
+  }
+
+  return {
+    rule: {
+      id: `cmd-${Date.now()}`,
+      name: raw.length > 72 ? `${raw.slice(0, 69)}…` : raw,
+      conditions,
+      matchMode,
+      action,
+      actionParam,
+    },
+    confident: false,
+    note: strict.error,
   }
 }
 

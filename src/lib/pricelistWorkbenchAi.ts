@@ -48,6 +48,7 @@ const ACTIONS: WorkbenchActionType[] = [
   'set_active',
   'set_inactive',
   'assign_category',
+  'assign_taxonomy',
 ]
 
 function uniqueStrings(values: (string | null | undefined)[], limit = 80): string[] {

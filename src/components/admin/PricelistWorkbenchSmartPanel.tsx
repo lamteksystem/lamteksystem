@@ -64,6 +64,7 @@ const OP_OPTIONS: { value: WorkbenchConditionOp; label: string }[] = [
 const ACTION_OPTIONS: { value: WorkbenchActionType; label: string }[] = [
   { value: 'delete', label: 'Delete from workbench' },
   { value: 'assign_category', label: 'Assign category' },
+  { value: 'assign_taxonomy', label: 'Assign category + section + kind' },
   { value: 'remove_sku_from_name', label: 'Remove SKU from name' },
   { value: 'strip_text_from_field', label: 'Remove text from field' },
   { value: 'change_text_case', label: 'Change text case' },
@@ -131,7 +132,9 @@ export default function PricelistWorkbenchSmartPanel({
     setBuilderMode(rule.matchMode)
     setBuilderConditions(rule.conditions.length ? rule.conditions : [newCondition()])
     setBuilderName('')
-    setBuilderActionParam(rule.action === 'assign_category' ? rule.actionParam ?? '' : '')
+    setBuilderActionParam(
+      rule.action === 'assign_category' || rule.action === 'assign_taxonomy' ? rule.actionParam ?? '' : ''
+    )
     if (rule.action === 'strip_text_from_field') {
       const p = parseStripTextActionParam(rule.actionParam)
       if (p) {
@@ -256,6 +259,10 @@ export default function PricelistWorkbenchSmartPanel({
       onNotify('', 'Assign category needs a category name (use the rule builder or quote it in the command).')
       return
     }
+    if (rule.action === 'assign_taxonomy' && !rule.actionParam?.includes('=')) {
+      onNotify('', 'Assign taxonomy needs at least one field=value (e.g. category=Panels;section=Panels).')
+      return
+    }
     if (rule.action === 'strip_text_from_field' && !rule.actionParam?.includes(':')) {
       onNotify('', 'Remove text needs a field and phrase (e.g. description:Section:).')
       return
@@ -299,7 +306,7 @@ export default function PricelistWorkbenchSmartPanel({
       matchMode: builderMode,
       action: builderAction,
       actionParam:
-        builderAction === 'assign_category'
+        builderAction === 'assign_category' || builderAction === 'assign_taxonomy'
           ? builderActionParam.trim()
           : builderAction === 'strip_text_from_field'
             ? stripParam
@@ -463,6 +470,20 @@ export default function PricelistWorkbenchSmartPanel({
                   <option key={c.id} value={c.name} />
                 ))}
               </datalist>
+            </label>
+          )}
+          {builderAction === 'assign_taxonomy' && (
+            <label>
+              Assignments
+              <input
+                value={builderActionParam}
+                onChange={(e) => setBuilderActionParam(e.target.value)}
+                placeholder="e.g. category=Panels;section=Panels"
+              />
+              <span className="admin-muted" style={{ fontSize: '0.78rem' }}>
+                Fields: category, section, kind, part_type. Separate with “;”. Kind must be one of
+                complete/component/door/drawer_front/accessory/other.
+              </span>
             </label>
           )}
           {builderAction === 'strip_text_from_field' && (

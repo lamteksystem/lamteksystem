@@ -49,6 +49,7 @@ const ACTION_ENUM = [
   'set_active',
   'set_inactive',
   'assign_category',
+  'assign_taxonomy',
 ]
 
 const RESPONSE_SCHEMA = {
@@ -83,7 +84,8 @@ If the instruction targets every row (e.g. "all products", "each item"), return 
 
 ACTIONS (action enum) and how to fill actionParam:
 - delete: remove rows from the draft. actionParam "".
-- assign_category: actionParam = the category NAME exactly as in this list if possible: [${categories.join(' | ')}].
+- assign_category: assign ONE category. actionParam = the category NAME exactly as in this list if possible: [${categories.join(' | ')}].
+- assign_taxonomy: assign SEVERAL of category / section / kind / part type at once (use this whenever the user sets more than one of these, e.g. "categorise to Panels, section Panels, kind component"). actionParam = semicolon-separated "field=value" pairs using fields: category, section, kind, part_type. Multiple values for one field use "|". Match category to the list above when possible. IMPORTANT: "kind" is a FIXED type, only one of: complete, component, door, drawer_front, accessory, other. A grouping word like "Panels", "Doors range", "Trims" is NOT a kind — put those under section or category, and only set kind when the user clearly means one of the fixed types. Example actionParam: category=Panels;section=Panels
 - remove_sku_from_name: tidies the SKU/code out of the name. actionParam "".
 - strip_text_from_field: remove a literal phrase. actionParam = "field:phrase" where field is description|name|sku. Example: description:Section:
 - change_text_case: actionParam = "FIELDS:MODE[:onlycaps]". FIELDS = one or more of name,description,section,door_range,trade_code,sku joined with "+". MODE = sentence|title|upper|lower. Append ":onlycaps" when the user only wants to fix text that is currently in CAPITALS / ALL CAPS (so already-tidy text is left alone). Example: name+description:sentence:onlycaps

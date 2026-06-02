@@ -1,7 +1,18 @@
 /**
  * Smart rules & natural-language commands for the pricelist workbench draft list.
  */
-import type { PricelistWorkbenchRow, PricelistSource } from '@/lib/pricelistWorkbench'
+import type { PricelistWorkbenchRow, PricelistSource, WorkbenchItemKindValue } from '@/lib/pricelistWorkbench'
+import {
+  parseItemKindValue,
+  rowCategoryIds,
+  rowItemKinds,
+  rowPartTypes,
+  rowSections,
+  setRowCategoriesPatch,
+  setRowItemKindsPatch,
+  setRowPartTypesPatch,
+  setRowSectionsPatch,
+} from '@/lib/pricelistWorkbench'
 import type { CategoryRow } from '@/types/database'
 
 export type WorkbenchMatchField =
@@ -38,8 +49,53 @@ export type WorkbenchActionType =
   | 'set_active'
   | 'set_inactive'
   | 'assign_category'
+  | 'assign_taxonomy'
 
 export type StripTextField = 'description' | 'name' | 'sku'
+
+/** Parsed `field=value;field=value` taxonomy assignment (category/section/kind/part_type). */
+export interface TaxonomyAssignment {
+  categories: string[]
+  sections: string[]
+  kinds: WorkbenchItemKindValue[]
+  partTypes: string[]
+  /** Kind words that aren't valid item_kind values (e.g. "panels"). */
+  invalidKinds: string[]
+}
+
+/**
+ * Parse the assign_taxonomy actionParam, e.g. "category=Panels;section=Panels;kind=component".
+ * Multiple values for the same field can be separated with "|".
+ */
+export function parseTaxonomyActionParam(param: string | undefined): TaxonomyAssignment | null {
+  if (!param || !param.trim()) return null
+  const out: TaxonomyAssignment = { categories: [], sections: [], kinds: [], partTypes: [], invalidKinds: [] }
+  for (const part of param.split(';')) {
+    const eq = part.indexOf('=')
+    if (eq < 0) continue
+    const field = part.slice(0, eq).trim().toLowerCase()
+    const values = part
+      .slice(eq + 1)
+      .split('|')
+      .map((v) => v.trim())
+      .filter(Boolean)
+    if (!values.length) continue
+    if (field === 'category' || field === 'categories') out.categories.push(...values)
+    else if (field === 'section' || field === 'sections') out.sections.push(...values)
+    else if (field === 'part_type' || field === 'parttype' || field === 'part type' || field === 'part_types') {
+      out.partTypes.push(...values)
+    } else if (field === 'kind' || field === 'kinds' || field === 'item_kind') {
+      for (const v of values) {
+        const k = parseItemKindValue(v)
+        if (k) out.kinds.push(k)
+        else out.invalidKinds.push(v)
+      }
+    }
+  }
+  const hasAny =
+    out.categories.length || out.sections.length || out.kinds.length || out.partTypes.length || out.invalidKinds.length
+  return hasAny ? out : null
+}
 
 export type TextCaseField = 'name' | 'description' | 'section' | 'door_range' | 'trade_code' | 'sku'
 export type TextCaseMode = 'sentence' | 'title' | 'upper' | 'lower'
@@ -394,6 +450,74 @@ export function applyRuleToRows(
     }
   }
 
+  if (rule.action === 'assign_taxonomy') {
+    const tax = parseTaxonomyActionParam(rule.actionParam)
+    if (!tax) {
+      return { rows, result: { matched: matched.length, changed: 0, message: 'No taxonomy values to assign.' } }
+    }
+    const cats = categories ?? []
+    const resolvedCatIds: string[] = []
+    const missingCats: string[] = []
+    for (const name of tax.categories) {
+      const cat = findCategoryForRule(cats, name)
+      if (cat) resolvedCatIds.push(cat.id)
+      else missingCats.push(name)
+    }
+    const next = rows.map((row) => {
+      if (!matchedIds.has(row.id)) return row
+      let mutated = row
+      let rowChanged = false
+
+      if (resolvedCatIds.length) {
+        const current = rowCategoryIds(mutated)
+        const merged = [...current]
+        for (const id of resolvedCatIds) if (!merged.includes(id)) merged.push(id)
+        if (merged.length !== current.length || !Array.isArray(mutated.category_ids)) {
+          mutated = { ...mutated, ...setRowCategoriesPatch(merged, cats) }
+          if (merged.length !== current.length) rowChanged = true
+        }
+      }
+      if (tax.sections.length) {
+        const current = rowSections(mutated)
+        const merged = [...current]
+        for (const s of tax.sections) if (!merged.some((c) => c.toLowerCase() === s.toLowerCase())) merged.push(s)
+        if (merged.length !== current.length) {
+          mutated = { ...mutated, ...setRowSectionsPatch(merged) }
+          rowChanged = true
+        }
+      }
+      if (tax.kinds.length) {
+        const current = rowItemKinds(mutated)
+        const merged = [...current]
+        for (const k of tax.kinds) if (!merged.includes(k)) merged.push(k)
+        if (merged.length !== current.length) {
+          mutated = { ...mutated, ...setRowItemKindsPatch(merged) }
+          rowChanged = true
+        }
+      }
+      if (tax.partTypes.length) {
+        const current = rowPartTypes(mutated)
+        const merged = [...current]
+        for (const p of tax.partTypes) if (!merged.some((c) => c.toLowerCase() === p.toLowerCase())) merged.push(p)
+        if (merged.length !== current.length) {
+          mutated = { ...mutated, ...setRowPartTypesPatch(merged) }
+          rowChanged = true
+        }
+      }
+      if (rowChanged) changed++
+      return mutated
+    })
+    const parts: string[] = []
+    if (tax.categories.length) parts.push(`category ${tax.categories.join(', ')}`)
+    if (tax.sections.length) parts.push(`section ${tax.sections.join(', ')}`)
+    if (tax.kinds.length) parts.push(`kind ${tax.kinds.join(', ')}`)
+    if (tax.partTypes.length) parts.push(`part type ${tax.partTypes.join(', ')}`)
+    let message = `Assigned ${parts.join(' + ') || 'taxonomy'} to ${changed} of ${matched.length} matched row(s).`
+    if (missingCats.length) message += ` Category not found: ${missingCats.join(', ')}.`
+    if (tax.invalidKinds.length) message += ` Not a valid Kind: ${tax.invalidKinds.join(', ')} (Kind is a fixed type).`
+    return { rows: next, result: { matched: matched.length, changed, message } }
+  }
+
   const stripParam = rule.action === 'strip_text_from_field' ? parseStripTextActionParam(rule.actionParam) : null
   const caseParam = rule.action === 'change_text_case' ? parseTextCaseActionParam(rule.actionParam) : null
 
@@ -467,6 +591,7 @@ export function applyRuleToRows(
     set_active: 'activated',
     set_inactive: 'deactivated',
     assign_category: 'assigned category on',
+    assign_taxonomy: 'assigned taxonomy on',
   }
 
   return {
@@ -546,6 +671,53 @@ function buildSimulationSample(
         before: truncateSampleText(beforeCat),
         after: truncateSampleText(afterCat),
       }
+    }
+    case 'assign_taxonomy': {
+      const beforeCats = rowCategoryIds(before).length
+      const afterCats = rowCategoryIds(after).length
+      if (afterCats !== beforeCats) {
+        return {
+          sku: before.sku,
+          name: before.name,
+          fieldLabel: 'Categories',
+          before: truncateSampleText(before.category_name || `${beforeCats} assigned`),
+          after: truncateSampleText(`${afterCats} assigned`),
+        }
+      }
+      const beforeSec = rowSections(before).join(', ')
+      const afterSec = rowSections(after).join(', ')
+      if (afterSec !== beforeSec) {
+        return {
+          sku: before.sku,
+          name: before.name,
+          fieldLabel: 'Section',
+          before: truncateSampleText(beforeSec || '(none)'),
+          after: truncateSampleText(afterSec || '(none)'),
+        }
+      }
+      const beforeKind = rowItemKinds(before).join(', ')
+      const afterKind = rowItemKinds(after).join(', ')
+      if (afterKind !== beforeKind) {
+        return {
+          sku: before.sku,
+          name: before.name,
+          fieldLabel: 'Kind',
+          before: truncateSampleText(beforeKind || '(none)'),
+          after: truncateSampleText(afterKind || '(none)'),
+        }
+      }
+      const beforePt = rowPartTypes(before).join(', ')
+      const afterPt = rowPartTypes(after).join(', ')
+      if (afterPt !== beforePt) {
+        return {
+          sku: before.sku,
+          name: before.name,
+          fieldLabel: 'Part type',
+          before: truncateSampleText(beforePt || '(none)'),
+          after: truncateSampleText(afterPt || '(none)'),
+        }
+      }
+      return null
     }
     case 'remove_sku_from_name': {
       if (before.name === after.name) return null
@@ -661,6 +833,22 @@ export function simulateRuleOnRows(
       warnings.push(
         `No category matched “${rule.actionParam ?? ''}”. Create or rename the category before running.`
       )
+    }
+  }
+
+  if (rule.action === 'assign_taxonomy' && matched.length) {
+    const tax = parseTaxonomyActionParam(rule.actionParam)
+    if (tax) {
+      for (const name of tax.categories) {
+        if (!findCategoryForRule(categories, name)) {
+          warnings.push(`No category matched “${name}”. Create it in Categories first, or it will be skipped.`)
+        }
+      }
+      if (tax.invalidKinds.length) {
+        warnings.push(
+          `“${tax.invalidKinds.join(', ')}” isn’t a valid Kind. Kind is a fixed type (complete, component, door, drawer_front, accessory, other) — use Section/Category for groupings like “Panels”.`
+        )
+      }
     }
   }
 
@@ -855,6 +1043,20 @@ function parseAction(lower: string, raw: string, quoted: string[]): ParsedAction
         actionParam: `${resolvedField ?? (fromAllDescriptions ? 'description' : field)}:${text}`,
       }
     }
+  }
+
+  // Combined taxonomy assignment, e.g. "Section: Panels / Categories: Panels / Kind: component".
+  const taxParts: string[] = []
+  const secLabel = raw.match(/\bsections?\s*[:=]\s*([^\r\n;]+)/i)
+  const catLabel = raw.match(/\bcategor(?:y|ies)\s*[:=]\s*([^\r\n;]+)/i)
+  const kindLabel = raw.match(/\bkinds?\s*[:=]\s*([^\r\n;]+)/i)
+  const ptLabel = raw.match(/\bpart\s*types?\s*[:=]\s*([^\r\n;]+)/i)
+  if (secLabel) taxParts.push(`section=${secLabel[1].trim()}`)
+  if (catLabel) taxParts.push(`category=${catLabel[1].trim()}`)
+  if (kindLabel) taxParts.push(`kind=${kindLabel[1].trim()}`)
+  if (ptLabel) taxParts.push(`part_type=${ptLabel[1].trim()}`)
+  if (taxParts.length >= 2) {
+    return { action: 'assign_taxonomy', actionParam: taxParts.join(';') }
   }
 
   const assignMatch =

@@ -5,11 +5,15 @@ import {
   parseSmartCommandLoose,
   parseSmartCommandPrompt,
   parseSmartSelectionPrompt,
+  parseTaxonomyActionParam,
   removeSkuFromName,
   simulateRuleOnRows,
   WORKBENCH_RULE_PRESETS,
+  type WorkbenchRule,
 } from '@/lib/pricelistWorkbenchRules'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import { rowCategoryIds, rowSections } from '@/lib/pricelistWorkbench'
+import type { CategoryRow } from '@/types/database'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
 
 function row(partial: Partial<PricelistWorkbenchRow>): PricelistWorkbenchRow {
@@ -51,6 +55,51 @@ describe('pricelistWorkbenchRules', () => {
     expect(next).toHaveLength(1)
     expect(next[0].id).toBe('b')
     expect(result.changed).toBe(1)
+  })
+
+  it('parses combined taxonomy actionParam and drops invalid kinds', () => {
+    const tax = parseTaxonomyActionParam('category=Panels;section=Panels;kind=Panels')
+    expect(tax?.categories).toEqual(['Panels'])
+    expect(tax?.sections).toEqual(['Panels'])
+    expect(tax?.kinds).toEqual([])
+    expect(tax?.invalidKinds).toEqual(['Panels'])
+  })
+
+  it('assigns category + section together via assign_taxonomy', () => {
+    const cats: CategoryRow[] = [
+      { id: 'cat-panels', name: 'Panels', slug: 'panels' } as CategoryRow,
+    ]
+    const rows = [
+      row({ id: 'a', name: 'OAK END PANEL 720', description: '', section: '' }),
+      row({ id: 'b', name: 'BASE UNIT', description: 'standard base', section: '' }),
+    ]
+    const rule: WorkbenchRule = {
+      id: 't',
+      name: 'panels',
+      matchMode: 'any',
+      conditions: [
+        { field: 'name', op: 'contains', value: 'end panel' },
+        { field: 'description', op: 'contains', value: 'end panel' },
+      ],
+      action: 'assign_taxonomy',
+      actionParam: 'category=Panels;section=Panels',
+    }
+    const { rows: next, result } = applyRuleToRows(rows, rule, undefined, cats)
+    expect(result.changed).toBe(1)
+    const a = next.find((r) => r.id === 'a')!
+    expect(rowCategoryIds(a)).toContain('cat-panels')
+    expect(rowSections(a)).toContain('Panels')
+    const b = next.find((r) => r.id === 'b')!
+    expect(rowSections(b)).not.toContain('Panels')
+  })
+
+  it('parses a multi-line categorise command into assign_taxonomy (offline)', () => {
+    const { rule } = parseSmartCommandPrompt(
+      'name or description contains "end panel"\nSection: Panels\nCategories: Panels\nKind: Panels'
+    )
+    expect(rule?.action).toBe('assign_taxonomy')
+    expect(rule?.actionParam).toContain('section=Panels')
+    expect(rule?.actionParam).toContain('category=Panels')
   })
 
   it('removes sku prefix from name', () => {

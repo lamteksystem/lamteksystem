@@ -59,6 +59,50 @@ export interface PricelistWorkbenchRow {
 
 export type WorkbenchItemKindValue = PricelistWorkbenchRow['item_kind']
 
+export const WORKBENCH_ITEM_KINDS: WorkbenchItemKindValue[] = [
+  'complete',
+  'component',
+  'door',
+  'drawer_front',
+  'accessory',
+  'other',
+]
+
+/**
+ * Map a free-text "kind" word to the fixed item_kind enum. Returns null when the
+ * word isn't a recognised kind (e.g. "panels" — that's a section/category, not a kind).
+ */
+export function parseItemKindValue(value: string): WorkbenchItemKindValue | null {
+  const v = value.trim().toLowerCase().replace(/[\s-]+/g, '_')
+  if (!v) return null
+  const direct = WORKBENCH_ITEM_KINDS.find((k) => k === v)
+  if (direct) return direct
+  const synonyms: Record<string, WorkbenchItemKindValue> = {
+    complete: 'complete',
+    completes: 'complete',
+    unit: 'complete',
+    units: 'complete',
+    finished: 'complete',
+    sellable: 'complete',
+    component: 'component',
+    components: 'component',
+    part: 'component',
+    parts: 'component',
+    door: 'door',
+    doors: 'door',
+    drawer: 'drawer_front',
+    drawer_front: 'drawer_front',
+    drawer_fronts: 'drawer_front',
+    drawerfront: 'drawer_front',
+    accessory: 'accessory',
+    accessories: 'accessory',
+    trim: 'accessory',
+    other: 'other',
+    misc: 'other',
+  }
+  return synonyms[v] ?? null
+}
+
 /** Effective list of category IDs (array if set, else the single primary, else empty). */
 export function rowCategoryIds(row: PricelistWorkbenchRow): string[] {
   if (Array.isArray(row.category_ids) && row.category_ids.length) return dedupeStrings(row.category_ids)

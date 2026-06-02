@@ -12,7 +12,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const MODEL = 'gemini-2.0-flash'
+// gemini-2.5-flash is on the project's free tier (2.0-flash returns limit:0 here).
+const MODEL = 'gemini-2.5-flash'
 
 const FIELD_ENUM = [
   'source',
@@ -164,6 +165,8 @@ serve(async (req) => {
       temperature: 0,
       responseMimeType: 'application/json',
       responseSchema: RESPONSE_SCHEMA,
+      // Disable "thinking" on 2.5-flash for faster, cheaper structured output.
+      thinkingConfig: { thinkingBudget: 0 },
     },
   }
 

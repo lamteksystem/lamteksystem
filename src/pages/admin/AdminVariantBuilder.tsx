@@ -5,7 +5,18 @@ import { formatUnknownError } from '@/lib/formatError'
 import { usePermission } from '@/hooks/usePermission'
 import { useAssemblyPartTypes } from '@/hooks/useAssemblyPartTypes'
 import PartTypeSelectWithAdd from '@/components/admin/PartTypeSelectWithAdd'
-import type { CategoryRow, ProductRow } from '@/types/database'
+import { loadWorkbenchDraft, saveWorkbenchDraft } from '@/lib/pricelistWorkbenchDraft'
+import { type PricelistSource, type PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
+import { enrichWorkbenchRowMetadata } from '@/lib/tealburyCatalogueBuild'
+import {
+  applyVariantTemplate,
+  buildFinishPriceMatrix,
+  cheapestFinishPrice,
+  finishCode,
+  rangeCode,
+  type FinishOption,
+} from '@/lib/variantGenerator'
+import type { CategoryRow } from '@/types/database'
 
 /**
  * Variant Matrix Builder: type each base SKU once, tick the finishes/ranges/sizes,
@@ -25,6 +36,8 @@ interface AxisValue {
   active: boolean
 }
 
+type PricingMode = 'matrix' | 'per_sku'
+
 interface PreviewRow {
   sku: string
   name: string
@@ -32,7 +45,10 @@ interface PreviewRow {
   unit_price: number
   cost_price: number | null
   axisLabel: string
+  /** True when this SKU already exists in the workbench draft. */
   exists: boolean
+  /** Finish price matrix for matrix mode (one row, many colours). */
+  finishMatrix?: Record<string, number>
 }
 
 const DEFAULT_FINISHES: AxisValue[] = [
@@ -57,33 +73,19 @@ function defaultCode(value: string): string {
   return clean.slice(0, 3)
 }
 
-function applyTemplate(
-  template: string,
-  ctx: {
-    size?: AxisValue | null
-    range?: AxisValue | null
-    finish?: AxisValue | null
-  }
-): string {
-  return template
-    .replace(/\{SIZE\}/g, ctx.size?.value ?? '')
-    .replace(/\{SIZE_CODE\}/g, ctx.size?.code ?? '')
-    .replace(/\{RANGE\}/g, ctx.range?.value ?? '')
-    .replace(/\{RANGE_CODE\}/g, ctx.range?.code ?? '')
-    .replace(/\{FINISH\}/g, ctx.finish?.value ?? '')
-    .replace(/\{FINISH_CODE\}/g, ctx.finish?.code ?? '')
-}
-
 export default function AdminVariantBuilder() {
   const { allowed: canEdit, loading: permLoading } = usePermission('admin.catalogue', 'edit')
   const partTypesHook = useAssemblyPartTypes(true)
 
-  const [products, setProducts] = useState<ProductRow[]>([])
+  const [draftRows, setDraftRows] = useState<PricelistWorkbenchRow[]>([])
   const [categories, setCategories] = useState<CategoryRow[]>([])
   const [dataLoading, setDataLoading] = useState(true)
 
-  const [skuPattern, setSkuPattern] = useState('1000-HL-B-{FINISH_CODE}')
-  const [namePattern, setNamePattern] = useState('1000 HL Base Carcass ({FINISH})')
+  const [source, setSource] = useState<PricelistSource>('lamtek')
+  const [pricingMode, setPricingMode] = useState<PricingMode>('matrix')
+
+  const [skuPattern, setSkuPattern] = useState('B{SIZE}')
+  const [namePattern, setNamePattern] = useState('{SIZE} Base unit')
   const [descriptionPattern, setDescriptionPattern] = useState('')
   const [partType, setPartType] = useState('carcass')
   const [unitPrice, setUnitPrice] = useState('55')
@@ -106,11 +108,11 @@ export default function AdminVariantBuilder() {
 
   const reload = useCallback(async () => {
     setDataLoading(true)
-    const [prodRes, catRes] = await Promise.all([
-      supabase.from('products').select('id, sku, category_id').order('sku'),
+    const [{ rows }, catRes] = await Promise.all([
+      loadWorkbenchDraft(),
       supabase.from('categories').select('*').order('sort_order').order('name'),
     ])
-    setProducts((prodRes.data ?? []) as ProductRow[])
+    setDraftRows(rows)
     setCategories((catRes.data ?? []) as CategoryRow[])
     setDataLoading(false)
   }, [])
@@ -143,29 +145,76 @@ export default function AdminVariantBuilder() {
     [categories]
   )
   const existingSkus = useMemo(
-    () => new Set(products.map((p) => (p.sku ?? '').trim().toLowerCase())),
-    [products]
+    () => new Set(draftRows.map((r) => (r.sku ?? '').trim().toLowerCase())),
+    [draftRows],
   )
 
   const previewRows: PreviewRow[] = useMemo(() => {
-    const finishValues = useFinishAxis ? finishes.filter((f) => f.active) : [null]
+    const activeFinishes = useFinishAxis ? finishes.filter((f) => f.active) : []
     const sizeValues = useSizeAxis ? sizes.filter((s) => s.active) : [null]
     const rangeValues = useRangeAxis ? rangeAxis.filter((r) => r.active) : [null]
     const basePrice = Number(unitPrice) || 0
     const baseCost = costPrice === '' ? null : Number(costPrice)
 
     const rows: PreviewRow[] = []
-    for (const finish of finishValues) {
+
+    if (pricingMode === 'matrix') {
+      // One draft row per size/range combo; all colours live in a finish price matrix.
+      const sizeLoop = sizeValues.length > 0 ? sizeValues : [null]
+      const rangeLoop = rangeValues.length > 0 ? rangeValues : [null]
+      for (const size of sizeLoop) {
+        for (const range of rangeLoop) {
+          const ctx = {
+            size: size?.value ?? null,
+            sizeCode: size?.code ?? null,
+            range: range?.value ?? null,
+            rangeCode: range?.code ?? (range?.value ? rangeCode(range.value) : null),
+          }
+          const sku = applyVariantTemplate(skuPattern, ctx)
+          const name = applyVariantTemplate(namePattern, ctx)
+          const description = applyVariantTemplate(descriptionPattern, ctx)
+          const finishOpts: FinishOption[] =
+            activeFinishes.length > 0
+              ? activeFinishes.map((f) => {
+                  const raw = priceOverrides[`finish:${f.value}`]
+                  const explicit =
+                    raw != null && raw !== '' && Number.isFinite(Number(raw)) ? Number(raw) : undefined
+                  return { label: f.value, price: explicit }
+                })
+              : [{ label: 'Default', price: basePrice }]
+          const matrix = buildFinishPriceMatrix(finishOpts, basePrice)
+          const parts = [size?.value && `${size.value}mm`, range?.value].filter(Boolean)
+          rows.push({
+            sku,
+            name,
+            description,
+            unit_price: cheapestFinishPrice(matrix) ?? basePrice,
+            cost_price: baseCost,
+            axisLabel: parts.join(' / ') || '(base)',
+            exists: !!sku && existingSkus.has(sku.toLowerCase()),
+            finishMatrix: matrix,
+          })
+        }
+      }
+      return rows
+    }
+
+    // per_sku: one concrete SKU per combination (e.g. separate hinge brands).
+    const finishLoop = useFinishAxis ? activeFinishes : [null]
+    for (const finish of finishLoop) {
       for (const size of sizeValues) {
         for (const range of rangeValues) {
           const ctx = {
-            finish: finish ?? undefined,
-            size: size ?? undefined,
-            range: range ?? undefined,
+            finish: finish?.value ?? null,
+            finishCode: finish?.code ?? (finish?.value ? finishCode(finish.value) : null),
+            size: size?.value ?? null,
+            sizeCode: size?.code ?? null,
+            range: range?.value ?? null,
+            rangeCode: range?.code ?? (range?.value ? rangeCode(range.value) : null),
           }
-          const sku = applyTemplate(skuPattern, ctx).trim()
-          const name = applyTemplate(namePattern, ctx).trim()
-          const description = applyTemplate(descriptionPattern, ctx).trim()
+          const sku = applyVariantTemplate(skuPattern, ctx)
+          const name = applyVariantTemplate(namePattern, ctx)
+          const description = applyVariantTemplate(descriptionPattern, ctx)
           const parts = [finish?.value, size?.value && `${size.value}mm`, range?.value].filter(Boolean)
           const axisLabel = parts.join(' / ') || '(base)'
           const overrideRaw = priceOverrides[sku]
@@ -187,6 +236,7 @@ export default function AdminVariantBuilder() {
     }
     return rows
   }, [
+    pricingMode,
     useFinishAxis,
     useSizeAxis,
     useRangeAxis,
@@ -207,73 +257,80 @@ export default function AdminVariantBuilder() {
   const skipCount = useMemo(() => validRows.filter((r) => r.exists).length, [validRows])
   const blankRows = previewRows.length - validRows.length
 
-  async function handleCreate() {
+  function buildWorkbenchRowFromPreview(row: PreviewRow): PricelistWorkbenchRow {
+    const finishKey =
+      source === 'tealbury' ? 'tealbury_finish_prices_gbp' : 'lamtek_finish_prices_gbp'
+    const primaryCat = categories.find((c) => c.id === primaryCategoryId)
+    const rangePart = row.axisLabel.split(' / ').find((part) => rangeCategoriesByName.has(part.toLowerCase()))
+    const doorRange = rangePart ?? ''
+    const sizePart = row.axisLabel.match(/(\d+)mm/)?.[1]
+    const widthMm = sizePart ? Number(sizePart) : null
+
+    const options: Record<string, unknown> = {}
+    if (row.finishMatrix) options[finishKey] = row.finishMatrix
+    if (widthMm) options.lamtek_dims_mm = { w: widthMm, h: 720, d: 560 }
+
+    const draft: PricelistWorkbenchRow = {
+      id: crypto.randomUUID(),
+      source,
+      catalog_program: source === 'tealbury' ? 'tealbury' : 'lamtek',
+      sku: row.sku,
+      name: row.name,
+      description: row.description,
+      unit_price: row.unit_price,
+      cost_price: row.cost_price,
+      active: true,
+      is_stock: source !== 'tealbury',
+      image_url: '',
+      image_alt: '',
+      category_id: primaryCategoryId || null,
+      category_slug: primaryCat?.slug ?? '',
+      category_name: primaryCat?.name ?? '',
+      section: '',
+      door_range: doorRange,
+      trade_code: row.sku.replace(/\s*·\s*.+$/, '').trim(),
+      selected: false,
+      options: options as PricelistWorkbenchRow['options'],
+      item_kind: source === 'tealbury' ? 'complete' : 'component',
+      part_type: partType || '',
+    }
+    return enrichWorkbenchRowMetadata(draft)
+  }
+
+  async function handleAddToDraft() {
     if (!canEdit) return
     setCreating(true)
     setResultMessage(null)
     setResultError(null)
     try {
-      const toCreate = validRows.filter((r) => !r.exists)
-      if (toCreate.length === 0) {
-        setResultMessage('Nothing to create — all rows already exist.')
+      const toAdd = validRows.filter((r) => !r.exists)
+      if (toAdd.length === 0) {
+        setResultMessage('Nothing to add — every preview SKU is already in the workbench draft.')
         return
       }
-      const payload = toCreate.map((r) => ({
-        sku: r.sku,
-        name: r.name,
-        description: r.description || null,
-        part_type: partType || null,
-        category_id: primaryCategoryId || null,
-        unit_price: r.unit_price,
-        cost_price: r.cost_price,
-        stock_quantity: 0,
-        is_stock: true,
-        active: true,
-      }))
-      const { data, error } = await supabase
-        .from('products')
-        .upsert(payload, { onConflict: 'sku' })
-        .select('id, sku, name')
-      if (error) throw error
-
-      // For each created row, attach range category if axis is active.
-      const rangeAxisActive = useRangeAxis ? rangeAxis.filter((r) => r.active) : []
-      const skuToRow = new Map<string, PreviewRow>()
-      for (const r of toCreate) skuToRow.set(r.sku, r)
-
-      if (rangeAxisActive.length > 0 && primaryCategoryId) {
-        for (const created of data ?? []) {
-          const row = skuToRow.get(created.sku ?? '')
-          if (!row) continue
-          const rangeName = row.axisLabel.split(' / ').find((part) => {
-            const lower = part.toLowerCase()
-            return [...rangeCategoriesByName.keys()].some((rn) => rn === lower)
-          })
-          if (!rangeName) continue
-          const rangeCat = rangeCategoriesByName.get(rangeName.toLowerCase())
-          if (!rangeCat) continue
-          const categoryIds = [primaryCategoryId, rangeCat.id]
-          await supabase.rpc('save_product_categories', {
-            p_product_id: created.id,
-            p_category_ids: categoryIds,
-            p_primary_category_id: primaryCategoryId,
-          })
-        }
-      } else if (primaryCategoryId) {
-        for (const created of data ?? []) {
-          await supabase.rpc('save_product_categories', {
-            p_product_id: created.id,
-            p_category_ids: [primaryCategoryId],
-            p_primary_category_id: primaryCategoryId,
-          })
+      const updated = [...draftRows]
+      let added = 0
+      let replaced = 0
+      for (const pr of toAdd) {
+        const wb = buildWorkbenchRowFromPreview(pr)
+        const idx = updated.findIndex((r) => (r.sku ?? '').trim().toLowerCase() === pr.sku.toLowerCase())
+        if (idx >= 0) {
+          updated[idx] = { ...wb, id: updated[idx].id }
+          replaced++
+        } else {
+          updated.push(wb)
+          added++
         }
       }
-
-      setResultMessage(`Created ${data?.length ?? 0} component(s).`)
+      await saveWorkbenchDraft(updated)
+      setResultMessage(
+        `Added ${added} row(s) to the workbench draft${replaced ? ` (${replaced} updated)` : ''}. ` +
+          `Draft now has ${updated.length} rows — nothing is live in the catalogue until you publish.`,
+      )
       await reload()
     } catch (e) {
-      const msg = formatUnknownError(e, 'Could not create variants.')
-      console.error('[variant-builder] create failed:', msg)
+      const msg = formatUnknownError(e, 'Could not add variants to the workbench draft.')
+      console.error('[variant-builder] draft save failed:', msg)
       setResultError(msg)
     } finally {
       setCreating(false)
@@ -303,19 +360,50 @@ export default function AdminVariantBuilder() {
       <div className="admin-page-header">
         <h1>Variant matrix builder</h1>
         <p className="page-intro">
-          Type each base SKU once, tick the colours / ranges / sizes you want, and we&rsquo;ll
-          create one concrete component for every combination.
+          Generate component or complete-unit rows into the <strong>pricelist workbench draft</strong>{' '}
+          (not the live catalogue). Use <strong>Finish matrix</strong> mode so one SKU carries every
+          colour price — the customer picks the finish at order time. Publish from the workbench when
+          everything is ready.
+        </p>
+        <p className="admin-muted">
+          Draft: {draftRows.length} row{draftRows.length === 1 ? '' : 's'} · Live catalogue: empty until
+          you publish.{' '}
+          <Link to="/admin/catalogue-tools/pricelist-workbench">Open workbench</Link>
         </p>
       </div>
 
       <section className="admin-modal-card admin-wipe-section">
         <h2>1. Base template</h2>
         <p className="admin-muted" style={{ marginTop: 0 }}>
-          Use <code>&#123;FINISH&#125;</code>, <code>&#123;FINISH_CODE&#125;</code>,{' '}
-          <code>&#123;SIZE&#125;</code>, <code>&#123;RANGE&#125;</code>, or{' '}
-          <code>&#123;RANGE_CODE&#125;</code> as placeholders.
+          Placeholders: <code>&#123;SIZE&#125;</code> <code>&#123;RANGE&#125;</code>{' '}
+          <code>&#123;FINISH&#125;</code> (per-SKU mode only). In <strong>matrix</strong> mode, colours
+          are not separate SKUs — they become entries in{' '}
+          <code>lamtek_finish_prices_gbp</code> / <code>tealbury_finish_prices_gbp</code>.
         </p>
         <div className="admin-form-grid">
+          <label>
+            <span className="admin-muted">Draft source</span>
+            <select
+              className="admin-input"
+              value={source}
+              onChange={(e) => setSource(e.target.value as PricelistSource)}
+            >
+              <option value="lamtek">Lamtek components (carcass, hinges…)</option>
+              <option value="uform">UFORM doors / drawer fronts</option>
+              <option value="tealbury">Tealbury complete units</option>
+            </select>
+          </label>
+          <label>
+            <span className="admin-muted">Pricing mode</span>
+            <select
+              className="admin-input"
+              value={pricingMode}
+              onChange={(e) => setPricingMode(e.target.value as PricingMode)}
+            >
+              <option value="matrix">Finish matrix (one SKU, many colours)</option>
+              <option value="per_sku">Separate SKU per combination</option>
+            </select>
+          </label>
           <label>
             <span className="admin-muted">SKU pattern</span>
             <input
@@ -401,6 +489,31 @@ export default function AdminVariantBuilder() {
           placeholder="Add finish (e.g. Smoke)"
           codeHint="3-letter code, e.g. WHI"
         />
+        {pricingMode === 'matrix' && useFinishAxis && (
+          <div className="admin-finish-price-grid">
+            <p className="admin-muted">Optional price per finish (GBP). Leave blank to use base price.</p>
+            {finishes
+              .filter((f) => f.active)
+              .map((f) => (
+                <label key={f.value} className="admin-finish-price-row">
+                  <span>{f.value}</span>
+                  <input
+                    className="admin-input"
+                    type="number"
+                    step="0.01"
+                    placeholder={unitPrice || '0'}
+                    value={priceOverrides[`finish:${f.value}`] ?? ''}
+                    onChange={(e) =>
+                      setPriceOverrides((prev) => ({
+                        ...prev,
+                        [`finish:${f.value}`]: e.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+          </div>
+        )}
         <AxisEditor
           label="Size (mm)"
           enabled={useSizeAxis}
@@ -423,8 +536,8 @@ export default function AdminVariantBuilder() {
 
       <section className="admin-modal-card admin-wipe-section">
         <h2>
-          3. Preview ({validRows.length} SKU{validRows.length === 1 ? '' : 's'} — {newRowCount} new,{' '}
-          {skipCount} already exist
+          3. Preview ({validRows.length} SKU{validRows.length === 1 ? '' : 's'} — {newRowCount} to add,{' '}
+          {skipCount} already in draft
           {blankRows > 0 ? `, ${blankRows} skipped (blank sku/name)` : ''})
         </h2>
         {previewRows.length === 0 && (
@@ -438,6 +551,7 @@ export default function AdminVariantBuilder() {
                   <th>Variant</th>
                   <th>SKU</th>
                   <th>Name</th>
+                  {pricingMode === 'matrix' && <th>Finish prices</th>}
                   <th>Price override</th>
                   <th>Status</th>
                 </tr>
@@ -450,25 +564,38 @@ export default function AdminVariantBuilder() {
                       <code>{r.sku || '(blank)'}</code>
                     </td>
                     <td>{r.name || '(blank)'}</td>
+                    {pricingMode === 'matrix' && (
+                      <td className="admin-muted" style={{ fontSize: '0.85rem', maxWidth: '14rem' }}>
+                        {r.finishMatrix
+                          ? Object.entries(r.finishMatrix)
+                              .map(([k, v]) => `${k}: £${v.toFixed(2)}`)
+                              .join(' · ')
+                          : '—'}
+                      </td>
+                    )}
                     <td>
-                      <input
-                        className="admin-input"
-                        type="number"
-                        step="0.01"
-                        placeholder={String(unitPrice || 0)}
-                        value={priceOverrides[r.sku] ?? ''}
-                        onChange={(e) =>
-                          setPriceOverrides((prev) => ({ ...prev, [r.sku]: e.target.value }))
-                        }
-                        style={{ width: '6rem' }}
-                      />
+                      {pricingMode === 'matrix' ? (
+                        <span className="admin-muted">per finish below</span>
+                      ) : (
+                        <input
+                          className="admin-input"
+                          type="number"
+                          step="0.01"
+                          placeholder={String(unitPrice || 0)}
+                          value={priceOverrides[r.sku] ?? ''}
+                          onChange={(e) =>
+                            setPriceOverrides((prev) => ({ ...prev, [r.sku]: e.target.value }))
+                          }
+                          style={{ width: '6rem' }}
+                        />
+                      )}
                     </td>
                     <td>
                       {!r.sku || !r.name
                         ? 'blank'
                         : r.exists
-                        ? 'exists (skip)'
-                        : 'will create'}
+                          ? 'in draft (skip)'
+                          : 'will add to draft'}
                     </td>
                   </tr>
                 ))}
@@ -484,10 +611,10 @@ export default function AdminVariantBuilder() {
           <button
             type="button"
             className="btn"
-            onClick={() => void handleCreate()}
+            onClick={() => void handleAddToDraft()}
             disabled={creating || newRowCount === 0 || dataLoading}
           >
-            {creating ? 'Creating…' : `Create ${newRowCount} component(s)`}
+            {creating ? 'Saving draft…' : `Add ${newRowCount} row(s) to workbench draft`}
           </button>
           <Link to="/admin/catalogue-tools" className="btn btn-ghost">
             Back to tools

@@ -12,6 +12,7 @@ import {
   resolveProductPriceBreakdown,
   type ProductPriceBreakdown,
 } from '@/lib/productWorkbenchPricing'
+import { getFinishPriceMap, resolveFinishBasePrice } from '@/lib/finishPricing'
 import ProductAssemblyBreakdown from '@/components/ProductAssemblyBreakdown'
 
 interface CatalogProductDetailPanelProps {
@@ -54,6 +55,8 @@ export default function CatalogProductDetailPanel({
   const availability = getProductAvailabilityMeta(product)
   const specs = getSpecificationBullets(product)
   const properties = getPropertiesRows(product)
+  const finishMap = getFinishPriceMap(product)
+  const finishOptions = finishMap ? Object.keys(finishMap) : []
 
   useEffect(() => {
     let cancelled = false
@@ -119,6 +122,19 @@ export default function CatalogProductDetailPanel({
           </p>
           <h4 className="tb-detail-title">{product.name}</h4>
           <p className="tb-detail-code">{displayProductCode(product)}</p>
+          {finishOptions.length > 0 && (
+            <p className="tb-detail-finishes">
+              <span className="tb-muted">Finishes:</span>{' '}
+              {finishOptions.join(' · ')}
+              {doorFinish && resolveFinishBasePrice(product, doorFinish) != null && (
+                <span className="tb-detail-finish-active">
+                  {' '}
+                  (selected: {doorFinish} → £
+                  {resolveFinishBasePrice(product, doorFinish)!.toFixed(2)} ex VAT)
+                </span>
+              )}
+            </p>
+          )}
           <p className="tb-detail-availability" title={availability.detail ?? availability.label}>
             {availability.label}
           </p>

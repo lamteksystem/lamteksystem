@@ -6,6 +6,11 @@ export type BomLineResolver =
   | { type: 'lamtek_carcass_from_trade' }
   | { type: 'lamtek_part_type'; part_type: string; quantity: number }
   | { type: 'uform_door'; height_mm: number; width_mm: number; quantity: number }
+  // Door sized from the unit width at apply time: width = unitWidth / doorCount − 3mm,
+  // quantity = doorCount. Avoids hard-coding a single 497mm door for every size.
+  | { type: 'uform_door_auto' }
+  // Quantity scales with the unit's door count (e.g. 2 hinges per door).
+  | { type: 'lamtek_part_type_per_door'; part_type: string; per_door: number }
 
 export interface CompleteUnitBomTemplate {
   id: string
@@ -26,11 +31,12 @@ export const DEFAULT_COMPLETE_UNIT_BOM_TEMPLATES: CompleteUnitBomTemplate[] = [
     sectionPattern: /high[\s-]*line.*base/i,
     lines: [
       { type: 'lamtek_carcass_from_trade' },
-      { type: 'lamtek_part_type', part_type: 'hinge', quantity: 4 },
-      { type: 'lamtek_part_type', part_type: 'hinge_plate', quantity: 4 },
-      { type: 'uform_door', height_mm: 715, width_mm: 497, quantity: 2 },
+      // Door leaf is sized from the unit width (width − 3mm), 1 or 2 doors by width.
+      { type: 'uform_door_auto' },
+      // Hinges/plates scale with the door count (2 per door).
+      { type: 'lamtek_part_type_per_door', part_type: 'hinge', per_door: 2 },
+      { type: 'lamtek_part_type_per_door', part_type: 'hinge_plate', per_door: 2 },
       { type: 'lamtek_part_type', part_type: 'leg_kit', quantity: 1 },
-      { type: 'lamtek_part_type', part_type: 'other', quantity: 1 },
       { type: 'lamtek_part_type', part_type: 'fittings', quantity: 1 },
     ],
   },

@@ -1,4 +1,9 @@
 -- =============================================================================
+-- DEPRECATED for production: catalogue data belongs in catalogue_workbench_drafts
+-- until staff publish from Admin → Pricelist workbench. Do NOT run this against
+-- the live `products` table unless you explicitly want demo rows in catalogue.
+-- The real pricelist import (1,500+ draft rows) uses scripts/import-pricelists.mjs.
+-- =============================================================================
 -- Worked example: "1000 Base Unit (Dawson)" as Complete products + Components.
 -- =============================================================================
 -- Demonstrates the intended product architecture end to end:

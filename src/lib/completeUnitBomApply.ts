@@ -11,7 +11,19 @@ import {
   type CompleteUnitBomTemplate,
 } from '@/lib/completeUnitBomTemplates'
 import { CATALOG_PROGRAM } from '@/lib/catalogProgram'
+import { doorDimsForUnit } from '@/lib/variantGenerator'
 import type { ProductRow } from '@/types/database'
+
+/** Unit width (mm) from a complete product's options dims, for door sizing. */
+function unitWidthMmFromProduct(product: ProductRow): number | null {
+  const opts = product.options as Record<string, unknown> | null
+  const dims = opts && typeof opts === 'object' ? (opts.tealbury_dims_mm ?? opts.lamtek_dims_mm) : null
+  if (dims && typeof dims === 'object') {
+    const w = Number((dims as Record<string, unknown>).w)
+    if (Number.isFinite(w) && w > 0) return Math.round(w)
+  }
+  return null
+}
 
 export interface ApplyBomResult {
   completeProductId: string
@@ -61,19 +73,21 @@ function pickUformDoor(
   width_mm: number
 ): ProductRow | null {
   const tag = `${height_mm}x${width_mm}`.toLowerCase()
-  const rangeSlug = doorRange.toLowerCase()
-  return (
-    products.find((p) => {
-      const sku = (p.sku ?? '').toLowerCase()
-      const name = p.name.toLowerCase()
-      return (
-        p.active &&
-        (sku.includes(tag) || name.includes(tag)) &&
-        (sku.includes('uf-') || (p.options as { uform_spec?: boolean })?.uform_spec) &&
-        (name.includes(rangeSlug.toLowerCase()) || sku.includes(rangeSlug.replace(/\s+/g, '').slice(0, 8)))
-      )
-    }) ?? null
-  )
+  const rangeSlug = doorRange.toLowerCase().replace(/\s+/g, '')
+  const matches = products.filter((p) => {
+    const sku = (p.sku ?? '').toLowerCase()
+    const name = p.name.toLowerCase()
+    return (
+      p.active &&
+      (sku.includes(tag) || name.includes(tag.replace('x', '×'))) &&
+      (sku.includes('uf-') || (p.options as { uform_spec?: boolean })?.uform_spec) &&
+      (name.includes(doorRange.toLowerCase()) || sku.includes(rangeSlug.slice(0, 12)))
+    )
+  })
+  if (matches.length === 0) return null
+  // Prefer DR (door) over DF (drawer front) when both share the same dimensions.
+  const doorSku = matches.find((p) => (p.sku ?? '').toLowerCase().includes('-dr-'))
+  return doorSku ?? matches[0]
 }
 
 async function resolveLine(
@@ -82,6 +96,7 @@ async function resolveLine(
     products: ProductRow[]
     tradeCode: string
     doorRange: string
+    unitWidthMm: number | null
   }
 ): Promise<{ productId: string; role: string; qty: number } | null> {
   switch (resolver.type) {
@@ -97,10 +112,26 @@ async function resolveLine(
       if (!p) return null
       return { productId: p.id, role: resolver.part_type, qty: resolver.quantity }
     }
+    case 'lamtek_part_type_per_door': {
+      const p = pickByPartType(ctx.products, resolver.part_type)
+      if (!p) return null
+      const widthRaw = ctx.unitWidthMm ?? Number(carcassSizeFromTradeCode(ctx.tradeCode))
+      const doorCount = Number.isFinite(widthRaw) && widthRaw > 0 ? doorDimsForUnit(widthRaw).count : 1
+      return { productId: p.id, role: resolver.part_type, qty: doorCount * resolver.per_door }
+    }
     case 'uform_door': {
       const p = pickUformDoor(ctx.products, ctx.doorRange, resolver.height_mm, resolver.width_mm)
       if (!p) return null
       return { productId: p.id, role: 'door', qty: resolver.quantity }
+    }
+    case 'uform_door_auto': {
+      const widthRaw =
+        ctx.unitWidthMm ?? Number(carcassSizeFromTradeCode(ctx.tradeCode) ?? NaN)
+      if (!Number.isFinite(widthRaw) || widthRaw <= 0) return null
+      const dims = doorDimsForUnit(widthRaw)
+      const p = pickUformDoor(ctx.products, ctx.doorRange, dims.heightMm, dims.widthMm)
+      if (!p) return null
+      return { productId: p.id, role: 'door', qty: dims.count }
     }
     default:
       return null
@@ -146,9 +177,11 @@ export async function applyBomToCompleteProduct(params: {
     }
   }
 
+  const unitWidthMm = unitWidthMmFromProduct(completeProduct)
+
   let sort = 1
   for (const lineDef of template.lines) {
-    const resolved = await resolveLine(lineDef, { products: all, tradeCode, doorRange })
+    const resolved = await resolveLine(lineDef, { products: all, tradeCode, doorRange, unitWidthMm })
     if (!resolved) {
       base.warnings.push(`Could not resolve: ${JSON.stringify(lineDef)}`)
       continue

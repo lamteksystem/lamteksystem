@@ -13,6 +13,7 @@ export type WorkbenchColumnId =
   | 'category'
   | 'cost_price'
   | 'unit_price'
+  | 'bom'
   | 'active'
   | 'is_stock'
   | 'actions'
@@ -55,7 +56,7 @@ export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
   {
     id: 'section',
     label: 'Import section (legacy)',
-    tip: 'Original pricelist heading (e.g. HIGHLINE BASE UNITS), kept for reference only. Browsing/filtering now uses Categories — assign a Category instead of relying on Section. Hidden by default.',
+    tip: 'Original Tealbury/Lamtek spreadsheet heading (e.g. HIGHLINE BASE UNITS, 575 HIGH WALL UNITS). Not the same as Categories — do not pick Carcasses/Doors here. Hidden by default.',
     minWidth: 110,
     defaultWidth: 140,
   },
@@ -107,6 +108,13 @@ export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
     tip: 'Sell or list price (ex VAT) from the spreadsheet — what the customer pays before discounts.',
     minWidth: 80,
     defaultWidth: 88,
+  },
+  {
+    id: 'bom',
+    label: 'BOM',
+    tip: 'Draft bill of materials stored on this row (✓). Publish copies it to live assemblies when component SKUs exist.',
+    minWidth: 44,
+    defaultWidth: 52,
   },
   {
     id: 'active',

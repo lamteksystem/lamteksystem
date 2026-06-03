@@ -13,6 +13,7 @@ import {
   type WorkbenchColumnId,
 } from '@/lib/pricelistWorkbenchColumns'
 import {
+  importSectionOptionsFromRows,
   rowSections,
   rowItemKinds,
   rowPartTypes,
@@ -29,6 +30,7 @@ import { catalogueSourceLabel } from '@/lib/catalogueSourceLabel'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import { useColumnWidths } from '@/hooks/useColumnWidths'
 import PricelistWorkbenchRowModal from '@/components/admin/PricelistWorkbenchRowModal'
+import { hasWorkbenchBom } from '@/lib/workbenchBom'
 import type { AssemblyPartTypeRow, CategoryRow } from '@/types/database'
 
 type EditableField =
@@ -43,6 +45,8 @@ type EditableField =
 
 type Props = {
   pageItems: PricelistWorkbenchRow[]
+  /** Full workbench draft (BOM compute / modal preview). */
+  allRows: PricelistWorkbenchRow[]
   categories: CategoryRow[]
   partTypes: AssemblyPartTypeRow[]
   allSelectedOnPage: boolean
@@ -96,6 +100,7 @@ const BASELINE_WIDTHS: Record<string, number> = {
   category: 220,
   cost_price: 88,
   unit_price: 92,
+  bom: 52,
   active: 56,
   is_stock: 56,
   actions: 92,
@@ -103,6 +108,7 @@ const BASELINE_WIDTHS: Record<string, number> = {
 
 export default function PricelistWorkbenchTable({
   pageItems,
+  allRows,
   categories,
   partTypes,
   allSelectedOnPage,
@@ -150,14 +156,10 @@ export default function PricelistWorkbenchTable({
     () => ITEM_KIND_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
     [],
   )
-  const sectionOptions = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const c of categories) map.set(c.name.toLowerCase(), c.name)
-    for (const r of pageItems) {
-      for (const s of rowSections(r)) if (!map.has(s.toLowerCase())) map.set(s.toLowerCase(), s)
-    }
-    return [...map.values()].sort((a, b) => a.localeCompare(b)).map((s) => ({ value: s, label: s }))
-  }, [categories, pageItems])
+  const sectionOptions = useMemo(
+    () => importSectionOptionsFromRows(allRows, categories),
+    [allRows, categories],
+  )
   const categoryOptions = useMemo(
     () => categories.map((c) => ({ value: c.id, label: c.parent_id ? `— ${c.name}` : c.name })),
     [categories],
@@ -413,6 +415,17 @@ export default function PricelistWorkbenchTable({
           </button>
         )
       }
+      case 'bom':
+        return row.source === 'tealbury' && row.item_kind === 'complete' ? (
+          <span
+            className={hasWorkbenchBom(row) ? 'admin-pricelist-bom-ok' : 'admin-muted'}
+            title={hasWorkbenchBom(row) ? 'Draft BOM computed' : 'No draft BOM yet'}
+          >
+            {hasWorkbenchBom(row) ? '✓' : '—'}
+          </span>
+        ) : (
+          <span className="admin-muted">—</span>
+        )
       case 'unit_price': {
         const isEditing = editing?.id === row.id && editing.field === 'unit_price'
         if (isEditing) {
@@ -580,6 +593,7 @@ export default function PricelistWorkbenchTable({
     {modalRow ? (
       <PricelistWorkbenchRowModal
         row={modalRow}
+        allRows={allRows}
         categories={categories}
         partTypes={partTypes}
         onPatchRow={onPatchRow}

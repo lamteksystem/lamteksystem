@@ -17,6 +17,7 @@ import {
   downloadXlsx,
   type CatalogueExportRow,
 } from '@/lib/catalogue-import-export'
+import { getWorkbenchBom, materializeWorkbenchBomOnPublish } from '@/lib/workbenchBom'
 
 export type PricelistSource = 'tealbury' | 'lamtek' | 'uform'
 
@@ -131,6 +132,35 @@ export function rowSections(row: PricelistWorkbenchRow): string[] {
   return row.section.trim() ? [row.section.trim()] : []
 }
 
+/** Options for Import section (legacy) — Tealbury/Lamtek headings only, not catalogue categories. */
+export function importSectionOptionsFromRows(
+  rows: Iterable<PricelistWorkbenchRow>,
+  categories: CategoryRow[] = [],
+): { value: string; label: string }[] {
+  const categoryNames = new Set(
+    categories.map((c) => c.name.trim().toLowerCase()).filter(Boolean),
+  )
+  const map = new Map<string, string>()
+  for (const r of rows) {
+    for (const s of rowSections(r)) {
+      const t = s.trim()
+      if (!t || categoryNames.has(t.toLowerCase())) continue
+      if (!map.has(t.toLowerCase())) map.set(t.toLowerCase(), t)
+    }
+  }
+  return [...map.values()].sort(compareImportSectionLabels).map((s) => ({ value: s, label: s }))
+}
+
+function compareImportSectionLabels(a: string, b: string): number {
+  const na = /^\d+/.exec(a)
+  const nb = /^\d+/.exec(b)
+  if (na && nb) {
+    const diff = Number(na[0]) - Number(nb[0])
+    return diff !== 0 ? diff : a.localeCompare(b, undefined, { sensitivity: 'base' })
+  }
+  return a.localeCompare(b, undefined, { sensitivity: 'base' })
+}
+
 export function rowItemKinds(row: PricelistWorkbenchRow): WorkbenchItemKindValue[] {
   if (Array.isArray(row.item_kinds) && row.item_kinds.length) {
     return [...new Set(row.item_kinds)]
@@ -175,6 +205,8 @@ export interface PublishWorkbenchResult {
   inserted: number
   updated: number
   skipped: number
+  /** Complete units that had draft BOM materialized into assemblies. */
+  bomLinked: number
   errors: string[]
 }
 
@@ -425,7 +457,7 @@ export async function publishWorkbenchRows(
   rows: PricelistWorkbenchRow[],
   opts?: { onlySelected?: boolean; skipMissingSku?: boolean }
 ): Promise<PublishWorkbenchResult> {
-  const result: PublishWorkbenchResult = { inserted: 0, updated: 0, skipped: 0, errors: [] }
+  const result: PublishWorkbenchResult = { inserted: 0, updated: 0, skipped: 0, bomLinked: 0, errors: [] }
 
   const toPublish = opts?.onlySelected ? rows.filter((r) => r.selected) : rows
   if (!toPublish.length) {
@@ -509,6 +541,31 @@ export async function publishWorkbenchRows(
       const { error: catErr } = await saveProductCategories(productId, categoryIds, categoryIds[0])
       if (catErr) result.errors.push(`Categories ${sku}: ${catErr}`)
     }
+  }
+
+  for (const row of toPublish) {
+    if (row.source !== 'tealbury' || row.item_kind !== 'complete') continue
+    const bom = getWorkbenchBom(row)
+    if (!bom?.lines.length) continue
+    const sku = row.sku.trim()
+    const { data: completeProd } = await supabase.from('products').select('id').eq('sku', sku).maybeSingle()
+    if (!completeProd?.id) continue
+    const componentSkus = [...new Set(bom.lines.map((l) => l.component_sku.trim()).filter(Boolean))]
+    const { data: compRows } = await supabase
+      .from('products')
+      .select('id, sku')
+      .in('sku', componentSkus)
+    const skuToProductId = new Map(
+      (compRows ?? []).map((c) => [(c.sku as string).trim().toLowerCase(), c.id as string]),
+    )
+    const { linesAdded, warnings } = await materializeWorkbenchBomOnPublish({
+      completeProductId: completeProd.id,
+      bom,
+      skuToProductId,
+      replaceExisting: true,
+    })
+    if (linesAdded > 0) result.bomLinked++
+    for (const w of warnings) result.errors.push(`BOM ${sku}: ${w}`)
   }
 
   return result

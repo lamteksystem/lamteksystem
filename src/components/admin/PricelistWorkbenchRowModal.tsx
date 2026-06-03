@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
+  importSectionOptionsFromRows,
   rowSections,
   rowItemKinds,
   rowPartTypes,
@@ -14,6 +15,10 @@ import {
 import type { WorkbenchItemKind } from '@/lib/tealburyCatalogueBuild'
 import MultiSelectChips from '@/components/admin/MultiSelectChips'
 import { catalogueSourceLabel } from '@/lib/catalogueSourceLabel'
+import { getFinishPriceMap } from '@/lib/finishPricing'
+import type { HingeBrand } from '@/lib/tealburyOrderSetup'
+import { computeDraftBom, getWorkbenchBom, workbenchBomPatch } from '@/lib/workbenchBom'
+import WorkbenchBomBreakdown, { HingeBrandPreviewSelect } from '@/components/admin/WorkbenchBomBreakdown'
 import type { AssemblyPartTypeRow, CategoryRow } from '@/types/database'
 
 const ITEM_KIND_OPTIONS: { value: WorkbenchItemKind; label: string }[] = [
@@ -27,6 +32,7 @@ const ITEM_KIND_OPTIONS: { value: WorkbenchItemKind; label: string }[] = [
 
 interface Props {
   row: PricelistWorkbenchRow
+  allRows: PricelistWorkbenchRow[]
   categories: CategoryRow[]
   partTypes: AssemblyPartTypeRow[]
   onPatchRow: (id: string, patch: Partial<PricelistWorkbenchRow>) => void
@@ -36,12 +42,31 @@ interface Props {
 
 export default function PricelistWorkbenchRowModal({
   row,
+  allRows,
   categories,
   partTypes,
   onPatchRow,
   onDeleteRow,
   onClose,
 }: Props) {
+  const [hingePreview, setHingePreview] = useState<HingeBrand | null>('titus')
+  const [bomError, setBomError] = useState<string | null>(null)
+  const finishMap = useMemo(() => getFinishPriceMap({ options: row.options }), [row.options])
+  const finishEntries = useMemo(
+    () => (finishMap ? Object.entries(finishMap).sort((a, b) => a[0].localeCompare(b[0])) : []),
+    [finishMap],
+  )
+  const showBomSection = row.source === 'tealbury' && row.item_kind === 'complete'
+
+  function computeBomForRow() {
+    setBomError(null)
+    const { bom, error } = computeDraftBom(row, { allRows, hingeBrand: 'titus' })
+    if (!bom) {
+      setBomError(error ?? 'Could not compute BOM')
+      return
+    }
+    onPatchRow(row.id, workbenchBomPatch(bom))
+  }
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -53,12 +78,10 @@ export default function PricelistWorkbenchRowModal({
     return () => document.removeEventListener('keydown', handleKey, true)
   }, [onClose])
 
-  const sectionOptions = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const c of categories) map.set(c.name.toLowerCase(), c.name)
-    for (const s of rowSections(row)) if (!map.has(s.toLowerCase())) map.set(s.toLowerCase(), s)
-    return [...map.values()].sort((a, b) => a.localeCompare(b)).map((s) => ({ value: s, label: s }))
-  }, [categories, row])
+  const sectionOptions = useMemo(
+    () => importSectionOptionsFromRows(allRows, categories),
+    [allRows, categories],
+  )
   const partTypeOptions = useMemo(
     () => partTypes.map((t) => ({ value: t.code, label: t.label })),
     [partTypes],
@@ -231,6 +254,50 @@ export default function PricelistWorkbenchRowModal({
               <span>Stock item</span>
             </label>
           </div>
+
+          {finishEntries.length > 0 ? (
+            <div className="admin-pricelist-row-modal-field admin-pricelist-row-modal-field--wide admin-pricelist-finish-matrix">
+              <span>Finish price matrix</span>
+              <p className="admin-muted admin-pricelist-row-modal-hint">
+                List £ at order time follows the customer&apos;s door finish. Base list price is the cheapest
+                finish in this matrix.
+              </p>
+              <table className="admin-pricelist-finish-matrix-table">
+                <thead>
+                  <tr>
+                    <th>Finish</th>
+                    <th>List £</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {finishEntries.map(([label, price]) => (
+                    <tr key={label}>
+                      <td>{label}</td>
+                      <td>£{price.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          {showBomSection ? (
+            <div className="admin-pricelist-row-modal-field admin-pricelist-row-modal-field--wide admin-pricelist-row-modal-bom">
+              <span>Component breakdown (draft BOM)</span>
+              <div className="admin-pricelist-row-modal-bom-actions">
+                <button type="button" className="btn btn-outline btn-sm" onClick={computeBomForRow}>
+                  {getWorkbenchBom(row) ? 'Recompute BOM' : 'Compute BOM in draft'}
+                </button>
+                <HingeBrandPreviewSelect value={hingePreview} onChange={setHingePreview} />
+              </div>
+              {bomError ? <p className="admin-error">{bomError}</p> : null}
+              <WorkbenchBomBreakdown
+                row={row}
+                allRows={allRows}
+                hingeBrandPreview={hingePreview}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="admin-modal-actions admin-pricelist-row-modal-actions">

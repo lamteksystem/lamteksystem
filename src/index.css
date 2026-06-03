@@ -5750,6 +5750,34 @@ button.ordering-wizard-card {
   justify-content: space-between;
   gap: 0.75rem;
 }
+.admin-pricelist-row-modal-bom-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.admin-pricelist-finish-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.admin-pricelist-finish-matrix-table th,
+.admin-pricelist-finish-matrix-table td {
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--lamtek-border, #e0e0e0);
+}
+.admin-pricelist-bom-ok {
+  font-weight: 600;
+  color: var(--lamtek-success, #0a7a3e);
+}
+.admin-hinge-preview-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
 .admin-pricelist-row--clickable {
   cursor: pointer;
 }

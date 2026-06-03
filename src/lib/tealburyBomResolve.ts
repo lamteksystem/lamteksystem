@@ -8,7 +8,11 @@ export function productMatchesHingeBrand(
   brand: HingeBrand,
 ): boolean {
   const hay = `${product.name} ${product.sku ?? ''} ${product.description ?? ''}`.toLowerCase()
-  return hay.includes(brand)
+  if (hay.includes(brand)) return true
+  // Pricelist uses "Hettich" SKUs; order setup offers Hafele as the brand choice.
+  if (brand === 'hafele' && hay.includes('hettich')) return true
+  if (brand === 'titus' && (hay.includes('titus') || hay.startsWith('tit'))) return true
+  return false
 }
 
 /**

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import MultiSelectChips from '@/components/admin/MultiSelectChips'
 import { catalogueSourceLabel } from '@/lib/catalogueSourceLabel'
 import {
+  importSectionOptionsFromRows,
   rowSections,
   rowItemKinds,
   rowPartTypes,
@@ -103,12 +104,10 @@ export default function PricelistWorkbenchBulkEditModal({
     () => partTypes.map((t) => ({ value: t.code, label: t.label })),
     [partTypes],
   )
-  const sectionOptions = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const c of categories) map.set(c.name.toLowerCase(), c.name)
-    for (const r of rows) for (const s of rowSections(r)) if (!map.has(s.toLowerCase())) map.set(s.toLowerCase(), s)
-    return [...map.values()].sort((a, b) => a.localeCompare(b)).map((s) => ({ value: s, label: s }))
-  }, [categories, rows])
+  const sectionOptions = useMemo(
+    () => importSectionOptionsFromRows(rows, categories),
+    [rows, categories],
+  )
   const itemKindOptions = ITEM_KIND_OPTIONS.map((o) => ({ value: o.value, label: o.label }))
 
   const categoryNameById = useMemo(() => {

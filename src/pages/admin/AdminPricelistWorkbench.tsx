@@ -16,6 +16,7 @@ import {
   type PricelistWorkbenchRow,
 } from '@/lib/pricelistWorkbench'
 import { applyBomToCompleteProduct } from '@/lib/completeUnitBomApply'
+import { bulkComputeDraftBom, mergeWorkbenchRowPatch } from '@/lib/workbenchBom'
 import { parseTealburyPricelistWorkbookAsync } from '@/lib/tealburyPricelistParse'
 import {
   autoAssignDoorRangeCategories,
@@ -301,6 +302,83 @@ export default function AdminPricelistWorkbench() {
     }
   }
 
+  async function computeDraftBomsForSelected() {
+    const targets = rows.filter((r) => r.selected && r.source === 'tealbury' && r.item_kind === 'complete')
+    if (!targets.length) {
+      setError('Select one or more Tealbury complete-unit rows (checkbox), then try again.')
+      return
+    }
+    if (
+      !window.confirm(
+        `Compute draft BOM for ${targets.length} complete unit(s)?\n\nUses Lamtek + UFORM rows already in this workbench (no publish required). Hinges default to Titus SKUs; customers can still pick Blum/Hafele at order time.`,
+      )
+    ) {
+      return
+    }
+    setSetupAction('draft-bom')
+    setBusy(true)
+    setError(null)
+    try {
+      await new Promise((r) => window.setTimeout(r, 0))
+      const res = bulkComputeDraftBom(targets, rows, 'titus')
+      setRows((prev) =>
+        prev.map((r) => {
+          const patch = res.patches.get(r.id)
+          return patch ? mergeWorkbenchRowPatch(r, patch) : r
+        }),
+      )
+      setActionReport({
+        title: res.ok > 0 ? 'Draft BOM computed' : 'Draft BOM could not be computed',
+        summary: `Stored breakdown on ${res.ok} of ${targets.length} complete unit(s)${res.failed ? `; ${res.failed} failed` : ''}.`,
+        lines: res.notes.slice(0, 40),
+        variant: res.ok > 0 ? 'ok' : 'warn',
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+      setSetupAction(null)
+    }
+  }
+
+  async function computeDraftBomsForAllCompletes() {
+    const targets = rows.filter((r) => r.source === 'tealbury' && r.item_kind === 'complete')
+    if (!targets.length) {
+      setError('No Tealbury complete-unit rows in the workbench.')
+      return
+    }
+    if (
+      !window.confirm(
+        `Compute draft BOM for all ${targets.length} Tealbury complete unit(s) in the workbench? This may take a moment.`,
+      )
+    ) {
+      return
+    }
+    setSetupAction('draft-bom-all')
+    setBusy(true)
+    setError(null)
+    try {
+      const res = bulkComputeDraftBom(targets, rows, 'titus')
+      setRows((prev) =>
+        prev.map((r) => {
+          const patch = res.patches.get(r.id)
+          return patch ? mergeWorkbenchRowPatch(r, patch) : r
+        }),
+      )
+      setActionReport({
+        title: res.ok > 0 ? 'Draft BOM computed (all completes)' : 'Draft BOM could not be computed',
+        summary: `Stored breakdown on ${res.ok} of ${targets.length} complete unit(s).`,
+        lines: res.notes.slice(0, 50),
+        variant: res.ok > 0 ? 'ok' : 'warn',
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+      setSetupAction(null)
+    }
+  }
+
   async function applyBomsToSelectedCompletes() {
     const targets = rows.filter((r) => r.selected && r.source === 'tealbury' && r.item_kind === 'complete')
     if (!targets.length) {
@@ -417,7 +495,7 @@ export default function AdminPricelistWorkbench() {
   }
 
   function patchRow(id: string, patch: Partial<PricelistWorkbenchRow>) {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+    setRows((prev) => prev.map((r) => (r.id === id ? mergeWorkbenchRowPatch(r, patch) : r)))
   }
 
   function toggleSelectAllOnPage(checked: boolean) {
@@ -520,8 +598,10 @@ export default function AdminPricelistWorkbench() {
       const res = await publishWorkbenchRows(rows, { onlySelected: scope === 'selected' })
       showSuccess(
         'Publish complete',
-        `Publish complete: ${res.inserted} inserted, ${res.updated} updated, ${res.skipped} skipped.` +
-          (res.errors.length ? ` ${res.errors.length} message(s) — see details below.` : '')
+        `Publish complete: ${res.inserted} inserted, ${res.updated} updated, ${res.skipped} skipped` +
+          (res.bomLinked ? `, ${res.bomLinked} BOM(s) linked to assemblies` : '') +
+          '.' +
+          (res.errors.length ? ` ${res.errors.length} message(s) — see details below.` : ''),
       )
       if (res.errors.length) setError(res.errors.slice(0, 12).join('\n'))
       await loadCategories()
@@ -576,8 +656,8 @@ export default function AdminPricelistWorkbench() {
         <p className="page-intro">
           Build the <strong>Tealbury Complete</strong> catalogue visually: Lamtek <strong>components</strong> (carcasses,
           hinges, drawers), Tealbury <strong>complete units</strong> (one row per sellable kitchen), and UFORM{' '}
-          <strong>doors &amp; trim</strong> from spec PDFs. Assign categories and part types, publish (prices can stay at
-          0), then apply standard BOMs to link complete units to their parts.
+          <strong>doors &amp; trim</strong> from spec PDFs. Assign categories and part types, compute draft BOMs to preview
+          what&apos;s included, then publish — draft BOMs copy to live assemblies when component SKUs are published too.
         </p>
         <p className="admin-muted" style={{ marginTop: '-0.5rem' }}>
           <Link to={LIVE_CATALOGUE.categories}>Categories</Link> ·{' '}
@@ -644,12 +724,33 @@ export default function AdminPricelistWorkbench() {
             <button
               type="button"
               className="btn btn-outline"
+              disabled={busy || !rows.some((r) => r.selected && r.source === 'tealbury' && r.item_kind === 'complete')}
+              onClick={() => void computeDraftBomsForSelected()}
+            >
+              {setupAction === 'draft-bom' ? 'Computing BOM…' : 'Compute BOM in draft (selected)'}
+            </button>
+            <AdminHelpTip text="Builds a component breakdown on each selected Tealbury complete row while still in the workbench — preview “What’s included” before publish. Uses carcass + UFORM door sizing from unit width." />
+          </span>
+          <span className="admin-pricelist-setup-action">
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={busy || !rows.some((r) => r.source === 'tealbury' && r.item_kind === 'complete')}
+              onClick={() => void computeDraftBomsForAllCompletes()}
+            >
+              {setupAction === 'draft-bom-all' ? 'Computing…' : 'Compute BOM for all completes'}
+            </button>
+          </span>
+          <span className="admin-pricelist-setup-action">
+            <button
+              type="button"
+              className="btn btn-outline"
               disabled={busy || !rows.some((r) => r.selected && r.source === 'tealbury')}
               onClick={() => void applyBomsToSelectedCompletes()}
             >
-              {setupAction === 'bom' ? 'Applying BOM…' : 'Apply BOM to selected Tealbury completes'}
+              {setupAction === 'bom' ? 'Applying BOM…' : 'Apply BOM to live catalogue (published only)'}
             </button>
-            <AdminHelpTip text="BOM = Bill of Materials: the list of Lamtek parts (carcass, hinges, doors, etc.) that make up one Tealbury complete unit. This links published complete products to component SKUs using the default high-line base template." />
+            <AdminHelpTip text="After publish: links live complete products to component SKUs in assemblies. Use “Compute BOM in draft” first to preview and to auto-link on publish." />
           </span>
         </div>
       </PricelistWorkbenchSection>
@@ -813,6 +914,7 @@ export default function AdminPricelistWorkbench() {
             />
             <PricelistWorkbenchTable
               pageItems={pageItems}
+              allRows={rows}
               categories={categories}
               partTypes={partTypesHook.types}
               allSelectedOnPage={pageItems.length > 0 && pageItems.every((r) => r.selected)}

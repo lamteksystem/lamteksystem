@@ -11,6 +11,8 @@ export type BomLineResolver =
   | { type: 'uform_door_auto' }
   // Quantity scales with the unit's door count (e.g. 2 hinges per door).
   | { type: 'lamtek_part_type_per_door'; part_type: string; per_door: number }
+  /** Drawer-line: N drawer fronts sized from unit width − 3mm. */
+  | { type: 'uform_drawer_auto'; quantity: number; drawer_height_mm: number }
 
 export interface CompleteUnitBomTemplate {
   id: string
@@ -36,6 +38,30 @@ export const DEFAULT_COMPLETE_UNIT_BOM_TEMPLATES: CompleteUnitBomTemplate[] = [
       // Hinges/plates scale with the door count (2 per door).
       { type: 'lamtek_part_type_per_door', part_type: 'hinge', per_door: 2 },
       { type: 'lamtek_part_type_per_door', part_type: 'hinge_plate', per_door: 2 },
+      { type: 'lamtek_part_type', part_type: 'leg_kit', quantity: 1 },
+      { type: 'lamtek_part_type', part_type: 'fittings', quantity: 1 },
+    ],
+  },
+  {
+    id: 'dl-base-standard',
+    label: 'Drawer-line base unit',
+    tradeCodePattern: /^B\d+/i,
+    sectionPattern: /drawer[\s-]*line.*base/i,
+    lines: [
+      { type: 'lamtek_carcass_from_trade' },
+      { type: 'uform_drawer_auto', quantity: 3, drawer_height_mm: 180 },
+      { type: 'lamtek_part_type', part_type: 'leg_kit', quantity: 1 },
+      { type: 'lamtek_part_type', part_type: 'fittings', quantity: 1 },
+    ],
+  },
+  {
+    id: 'multidrawer-base',
+    label: 'Multi-drawer base unit',
+    tradeCodePattern: /^B\d+/i,
+    sectionPattern: /multidrawer.*base/i,
+    lines: [
+      { type: 'lamtek_carcass_from_trade' },
+      { type: 'uform_drawer_auto', quantity: 4, drawer_height_mm: 180 },
       { type: 'lamtek_part_type', part_type: 'leg_kit', quantity: 1 },
       { type: 'lamtek_part_type', part_type: 'fittings', quantity: 1 },
     ],

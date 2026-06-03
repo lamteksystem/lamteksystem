@@ -70,13 +70,18 @@ function pickUformDoor(
   products: ProductRow[],
   doorRange: string,
   height_mm: number,
-  width_mm: number
+  width_mm: number,
+  preferDrawer = false,
 ): ProductRow | null {
   const tag = `${height_mm}x${width_mm}`.toLowerCase()
   const rangeSlug = doorRange.toLowerCase().replace(/\s+/g, '')
   const matches = products.filter((p) => {
     const sku = (p.sku ?? '').toLowerCase()
     const name = p.name.toLowerCase()
+    const isDrawer = sku.includes('-df-') || name.includes('drawer')
+    const isDoor = sku.includes('-dr-') || (name.includes('door') && !isDrawer)
+    if (preferDrawer && !isDrawer) return false
+    if (!preferDrawer && isDrawer && !isDoor) return false
     return (
       p.active &&
       (sku.includes(tag) || name.includes(tag.replace('x', '×'))) &&
@@ -85,9 +90,8 @@ function pickUformDoor(
     )
   })
   if (matches.length === 0) return null
-  // Prefer DR (door) over DF (drawer front) when both share the same dimensions.
-  const doorSku = matches.find((p) => (p.sku ?? '').toLowerCase().includes('-dr-'))
-  return doorSku ?? matches[0]
+  if (preferDrawer) return matches[0]
+  return matches.find((p) => (p.sku ?? '').toLowerCase().includes('-dr-')) ?? matches[0]
 }
 
 async function resolveLine(
@@ -129,9 +133,18 @@ async function resolveLine(
         ctx.unitWidthMm ?? Number(carcassSizeFromTradeCode(ctx.tradeCode) ?? NaN)
       if (!Number.isFinite(widthRaw) || widthRaw <= 0) return null
       const dims = doorDimsForUnit(widthRaw)
-      const p = pickUformDoor(ctx.products, ctx.doorRange, dims.heightMm, dims.widthMm)
+      const p = pickUformDoor(ctx.products, ctx.doorRange, dims.heightMm, dims.widthMm, false)
       if (!p) return null
       return { productId: p.id, role: 'door', qty: dims.count }
+    }
+    case 'uform_drawer_auto': {
+      const widthRaw =
+        ctx.unitWidthMm ?? Number(carcassSizeFromTradeCode(ctx.tradeCode) ?? NaN)
+      if (!Number.isFinite(widthRaw) || widthRaw <= 0) return null
+      const leafW = doorDimsForUnit(widthRaw, { doubleDoorMinWidthMm: 9999 }).widthMm
+      const p = pickUformDoor(ctx.products, ctx.doorRange, resolver.drawer_height_mm, leafW, true)
+      if (!p) return null
+      return { productId: p.id, role: 'drawer', qty: resolver.quantity }
     }
     default:
       return null

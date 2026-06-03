@@ -1361,6 +1361,7 @@ export default function CatalogProductWorkbench({
                   categories={effectiveCategories}
                   customerUserId={customerUserId}
                   doorFinish={tealburySetup?.door_finish ?? null}
+                  isComplete={completeProductIds.has(selectedProduct.id)}
                   isFavourite={favouriteSet.has(selectedProduct.id)}
                   onToggleFavourite={() => toggleFavourite(selectedProduct.id)}
                   onClose={() => setSelectedProductId(null)}

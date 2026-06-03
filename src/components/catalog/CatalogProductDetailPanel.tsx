@@ -12,6 +12,7 @@ import {
   resolveProductPriceBreakdown,
   type ProductPriceBreakdown,
 } from '@/lib/productWorkbenchPricing'
+import ProductAssemblyBreakdown from '@/components/ProductAssemblyBreakdown'
 
 interface CatalogProductDetailPanelProps {
   product: ProductRow
@@ -19,6 +20,8 @@ interface CatalogProductDetailPanelProps {
   customerUserId?: string | null
   /** Chosen door/range finish so the shown price matches what will be charged. */
   doorFinish?: string | null
+  /** True when this product is a complete unit (has a linked BOM assembly). */
+  isComplete?: boolean
   isFavourite: boolean
   onToggleFavourite: () => void
   onClose: () => void
@@ -34,6 +37,7 @@ export default function CatalogProductDetailPanel({
   categories,
   customerUserId,
   doorFinish = null,
+  isComplete = false,
   isFavourite,
   onToggleFavourite,
   onClose,
@@ -143,6 +147,13 @@ export default function CatalogProductDetailPanel({
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {isComplete && (
+            <div className="tb-detail-block tb-detail-block--breakdown">
+              <h5>What&rsquo;s included</h5>
+              <ProductAssemblyBreakdown productId={product.id} compact />
             </div>
           )}
 

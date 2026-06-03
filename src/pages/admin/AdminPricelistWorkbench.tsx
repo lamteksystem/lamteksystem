@@ -42,6 +42,7 @@ import PricelistWorkbenchToolsModal, {
 } from '@/components/admin/PricelistWorkbenchToolsModal'
 import { KIT_LABEL } from '@/lib/kitTerminology'
 import type { KitActionId } from '@/lib/workbenchSmartPresets'
+import { cloneUformSizesToMissingRanges } from '@/lib/uformRangeClone'
 import type { BulkActionScope } from '@/components/admin/PricelistWorkbenchBulkActionsPanel'
 import PricelistWorkbenchSection from '@/components/admin/PricelistWorkbenchSection'
 import PricelistWorkbenchTable from '@/components/admin/PricelistWorkbenchTable'
@@ -350,6 +351,24 @@ export default function AdminPricelistWorkbench() {
       case 'bulk_assign_panels':
         bulkAssignPanels(true)
         return { message: 'Panels bulk assign finished.' }
+      case 'clone_uform_missing_ranges': {
+        const res = cloneUformSizesToMissingRanges(rows)
+        if (!res.added) {
+          return { message: '', error: res.notes[0] ?? 'Nothing to clone.' }
+        }
+        setRows(enrichWorkbenchRowsMetadata(res.rows))
+        setActionReport({
+          title: 'UFORM sizes cloned',
+          summary: res.notes[0],
+          lines: [
+            ...res.notes.slice(1),
+            `Targets: ${res.targetRanges.join(', ')}`,
+            'Re-run “Compute unit kits (all completes)” in Smart controls.',
+          ],
+          variant: 'ok',
+        })
+        return { message: res.notes[0] }
+      }
       default:
         return { message: '', error: 'Unknown kit action.' }
     }

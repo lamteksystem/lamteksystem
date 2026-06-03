@@ -2,6 +2,7 @@
  * Curated smart-control presets: taxonomy rules + unit-kit (BOM) workflows.
  */
 import { hasWorkbenchBom } from '@/lib/workbenchBom'
+import { previewUformRangeClone } from '@/lib/uformRangeClone'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
 import type { WorkbenchRule } from '@/lib/pricelistWorkbenchRules'
 import { filterRowsByRule, simulateRuleOnRows } from '@/lib/pricelistWorkbenchRules'
@@ -17,6 +18,7 @@ export type KitActionId =
   | 'infer_part_types'
   | 'title_case_names'
   | 'bulk_assign_panels'
+  | 'clone_uform_missing_ranges'
 
 export type SmartPreset =
   | {
@@ -190,6 +192,15 @@ export const WORKBENCH_SMART_PRESETS: SmartPreset[] = [
     description: 'Panels category + accessory on panel-like Tealbury/UFORM rows.',
     action: 'bulk_assign_panels',
   },
+  {
+    id: 'kit-clone-uform-ranges',
+    kind: 'kit_action',
+    category: 'kit',
+    title: 'Clone UFORM door sizes to missing ranges',
+    description:
+      'Copy door/drawer-front dimensions from Dawson (or your largest UFORM import) into Oakham, Norwood, Papplewick, etc. Same 715×497 leaves — different range name/SKU.',
+    action: 'clone_uform_missing_ranges',
+  },
 ]
 
 export type KitActionPreview = {
@@ -291,6 +302,32 @@ export function previewKitAction(
         })),
         warnings: !panelsCat ? ['No “Panels” category found.'] : [],
         canApply: !!panelsCat && needs.length > 0,
+      }
+    }
+    case 'clone_uform_missing_ranges': {
+      const preview = previewUformRangeClone(rows)
+      if (!preview) {
+        return {
+          action,
+          title: 'Clone UFORM door sizes',
+          summary: 'No UFORM doors in draft to clone from. Import UFORM spec JSON (e.g. Dawson) first.',
+          affected: 0,
+          samples: [],
+          warnings: ['Import at least one door-range UFORM JSON in section 1.'],
+          canApply: false,
+        }
+      }
+      return {
+        action,
+        title: 'Clone UFORM door sizes to missing ranges',
+        summary: `From “${preview.sourceRange}”: add ${preview.wouldAdd} door/drawer row(s) across ${preview.targetRanges.length} range(s) (${preview.targetRanges.slice(0, 4).join(', ')}${preview.targetRanges.length > 4 ? '…' : ''}). ${preview.templates} unique sizes.`,
+        affected: preview.wouldAdd,
+        samples: preview.samples.map((s) => {
+          const [label, ...rest] = s.split(' ')
+          return { label, detail: rest.join(' ') }
+        }),
+        warnings: preview.wouldAdd === 0 ? ['All target ranges already have these sizes.'] : [],
+        canApply: preview.wouldAdd > 0,
       }
     }
     default:

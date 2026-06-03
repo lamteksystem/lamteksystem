@@ -28,10 +28,11 @@ Use this with the pricelist workbench. Goal: **correct data in draft**, then one
 1. ~~**Pre-publish validation report**~~ — **Done:** Admin workbench → **Pre-publish validation** (readiness %, issues, BOM gap groups).
 2. ~~**Bulk “assign Panels category”** rule~~ — **Done:** **Bulk assign Panels** in section 0.
 3. **Door-range category auto-link** — When `door_range` = Dawson, auto-assign Dawson door-range category (already partially there; strengthen on import).
-4. **Merge duplicate trade codes** — Optional mode: one SKU per `trade_code` with merged `tealbury_finish_prices_gbp` across sheets (fewer rows, closer to “one product, many finishes”).
-5. **UFORM coverage report** — List Tealbury completes whose BOM failed for missing door size (e.g. 715×397 for 400 HL).
-6. ~~**Workbench “readiness %”**~~ — **Done:** shown in draft stats + validation modal.
-7. **Sample publish** — Publish only Dawson + 10 units + panels to a staging flag for quote testing without full catalogue.
+4. ~~**Clone UFORM sizes across door ranges**~~ — **Done:** Smart controls → *Clone UFORM door sizes to missing ranges* (same 715×497 leaves as Dawson; range name/SKU only). Also runs in `npm run catalogue:workbench-setup`.
+5. **Merge duplicate trade codes** — Optional mode: one SKU per `trade_code` with merged `tealbury_finish_prices_gbp` across sheets (fewer rows, closer to “one product, many finishes”).
+6. **UFORM coverage report** — List Tealbury completes whose BOM failed for missing door size (e.g. 715×397 for 400 HL).
+7. ~~**Workbench “readiness %”**~~ — **Done:** shown in draft stats + validation modal.
+8. **Sample publish** — Publish only Dawson + 10 units + panels to a staging flag for quote testing without full catalogue.
 
 ## Ordering / quoting (Phase 2 shipped)
 

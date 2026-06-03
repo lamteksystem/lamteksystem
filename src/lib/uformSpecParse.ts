@@ -61,7 +61,7 @@ function normalizeRangeFromFilename(fileStem: string): string {
   return match ?? titleCase
 }
 
-function buildDoorSku(range: string, h: number, w: number, section: string): string {
+export function buildDoorSku(range: string, h: number, w: number, section: string): string {
   const rangeSlug = slugifyCategorySegment(range).slice(0, 24)
   const kind = /drawer/i.test(section) ? 'DF' : 'DR'
   return `UF-${rangeSlug}-${kind}-${h}x${w}`.toUpperCase()

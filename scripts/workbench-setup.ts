@@ -61,6 +61,13 @@ async function main() {
     return { ...r, name: normalizeProductDisplayName(name) }
   })
 
+  console.log('\n→ Clone UFORM door sizes to missing door ranges…')
+  const { cloneUformSizesToMissingRanges } = await import('../src/lib/uformRangeClone.ts')
+  const cloneRes = cloneUformSizesToMissingRanges(rows)
+  rows = cloneRes.rows
+  console.log(`  ${cloneRes.notes.join(' ')}`)
+  if (cloneRes.added === 0) console.log('  (skipped — nothing to add)')
+
   console.log('\n→ Infer part types / sold-as on all rows…')
   rows = enrichWorkbenchRowsMetadata(rows)
   const kindCounts = new Map<string, number>()

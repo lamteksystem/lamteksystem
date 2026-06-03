@@ -186,7 +186,11 @@ function pickByPartType(
   partType: string,
   hingeBrand?: HingeBrand | null,
 ): PricelistWorkbenchRow | null {
-  const candidates = pool.lamtek.filter((r) => r.part_type === partType)
+  let candidates = pool.lamtek.filter((r) => r.part_type === partType)
+  // Lamtek trade list often has no separate hinge_plate rows — hinges are sold as pairs.
+  if (candidates.length === 0 && partType === 'hinge_plate') {
+    candidates = pool.lamtek.filter((r) => r.part_type === 'hinge' || /hinge/i.test(r.name))
+  }
   if (hingeBrand && (partType === 'hinge' || partType === 'hinge_plate')) {
     const branded = candidates.filter((r) => productMatchesHingeBrand(r, hingeBrand))
     if (branded.length > 0) {

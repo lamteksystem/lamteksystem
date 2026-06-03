@@ -18,6 +18,7 @@ import {
   type CatalogueExportRow,
 } from '@/lib/catalogue-import-export'
 import { getWorkbenchBom, materializeWorkbenchBomOnPublish } from '@/lib/workbenchBom'
+import { normalizeProductDisplayName } from '@/lib/titleCase'
 
 export type PricelistSource = 'tealbury' | 'lamtek' | 'uform'
 
@@ -294,7 +295,7 @@ export function deriveWorkbenchProductName(row: {
   trade_code: string
 }): string {
   const direct = row.name.trim()
-  if (direct) return direct.slice(0, 300)
+  if (direct) return normalizeProductDisplayName(direct).slice(0, 300)
 
   const itemLine =
     row.description
@@ -302,7 +303,7 @@ export function deriveWorkbenchProductName(row: {
       .find((l) => l.startsWith('Item: '))
       ?.slice(6)
       .trim() ?? ''
-  if (itemLine) return itemLine.slice(0, 300)
+  if (itemLine) return normalizeProductDisplayName(itemLine).slice(0, 300)
 
   const specLine =
     row.description
@@ -310,7 +311,7 @@ export function deriveWorkbenchProductName(row: {
       .find((l) => l.startsWith('Specification: '))
       ?.slice(15)
       .trim() ?? ''
-  if (specLine) return specLine.slice(0, 300)
+  if (specLine) return normalizeProductDisplayName(specLine).slice(0, 300)
 
   const sku = row.sku.trim()
   const code = row.trade_code.trim()
@@ -329,7 +330,9 @@ export function deriveWorkbenchProductName(row: {
 export function fillMissingWorkbenchProductNames(rows: PricelistWorkbenchRow[]): PricelistWorkbenchRow[] {
   return rows.map((r) => {
     const name = deriveWorkbenchProductName(r)
-    return name && !r.name.trim() ? { ...r, name } : r
+    if (name && !r.name.trim()) return { ...r, name }
+    if (r.name.trim()) return { ...r, name: normalizeProductDisplayName(r.name.trim()) }
+    return r
   })
 }
 
@@ -475,7 +478,9 @@ export async function publishWorkbenchRows(
       continue
     }
 
-    const displayName = (row.name.trim() || deriveWorkbenchProductName(row)).trim()
+    const displayName = normalizeProductDisplayName(
+      (row.name.trim() || deriveWorkbenchProductName(row)).trim(),
+    )
     if (!displayName) {
       result.skipped++
       result.errors.push(`Skipped ${sku}: missing product name (edit name before publish)`)

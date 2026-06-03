@@ -14,7 +14,7 @@ import {
 } from '@/lib/tealburyOrderSetup'
 import type { CategoryRow, CategoryTypeRow, OrderRow, ProductRow } from '@/types/database'
 
-export type CatalogProductKindFilter = 'all' | 'complete' | 'components'
+export type CatalogProductKindFilter = 'all' | 'complete' | 'components' | 'accessories'
 
 export interface WorkbenchFilterState {
   productCode: string
@@ -154,15 +154,85 @@ export function buildCatalogFacets(
  * range?") after the user has picked a kitchen range. Filter `products` to the
  * range first; this helper does not know which range a product belongs to.
  */
+/** Category names where finish is driven by kitchen range, not a multi-finish matrix. */
+export function isTealburyTrimOrAccessoryCategory(categoryName: string): boolean {
+  return /panel|plinth|cornice|pelmet|post|mould|accessor|wirework|cutlery|lighting|handle|hinge|filler|corbel|worktop/i.test(
+    categoryName,
+  )
+}
+
+function finishKeyMatchesLabel(key: string, finishLabel: string): boolean {
+  const k = key.trim().toLowerCase()
+  const t = finishLabel.trim().toLowerCase()
+  if (!k || !t) return false
+  if (k === t) return true
+  const kRange = k.split('—')[0]?.trim() ?? k
+  const tRange = t.split('—')[0]?.trim() ?? t
+  if (kRange && tRange && (kRange === tRange || k.startsWith(t) || t.startsWith(kRange))) return true
+  return false
+}
+
+function productAssignedCategoryNames(
+  product: ProductRow,
+  categories: CategoryRow[],
+  productCategoryMap?: ProductCategoryMap,
+): string[] {
+  const ids = productCategoryMap?.get(product.id) ?? (product.category_id ? [product.category_id] : [])
+  return ids
+    .map((id) => categories.find((c) => c.id === id)?.name ?? '')
+    .filter(Boolean)
+}
+
+/** Product belongs to a Tealbury door-range sheet (for setup wizard + contextual browse). */
+export function productBelongsToKitchenRange(
+  product: ProductRow,
+  rangeCategoryId: string,
+  categories: CategoryRow[],
+  productCategoryMap?: ProductCategoryMap,
+): boolean {
+  if (productMatchesBrowseFilter(product, categories, 'range', rangeCategoryId, productCategoryMap)) {
+    return true
+  }
+  const rangeCat = categories.find((c) => c.id === rangeCategoryId)
+  const rangeName = rangeCat?.name.trim().toLowerCase() ?? ''
+  const door = getDoorRange(product)?.trim().toLowerCase() ?? ''
+  if (rangeName && door && (door === rangeName || door.includes(rangeName) || rangeName.includes(door))) {
+    return true
+  }
+  return false
+}
+
 /** True when the product is sold in this door/range finish (finish price keys). */
-export function productHasDoorFinish(product: ProductRow, finishLabel: string): boolean {
+export function productHasDoorFinish(
+  product: ProductRow,
+  finishLabel: string,
+  options?: {
+    categories?: CategoryRow[]
+    productCategoryMap?: ProductCategoryMap
+    kitchenRangeName?: string | null
+  },
+): boolean {
   const target = finishLabel.trim().toLowerCase()
   if (!target || target === '— none recorded —') return true
+
+  const cats = options?.categories ?? []
+  const pcMap = options?.productCategoryMap
+  if (cats.length > 0) {
+    const names = productAssignedCategoryNames(product, cats, pcMap)
+    const rangeName = (options?.kitchenRangeName ?? '').trim().toLowerCase()
+    if (names.some((n) => isTealburyTrimOrAccessoryCategory(n))) {
+      const door = getDoorRange(product)?.trim().toLowerCase() ?? ''
+      if (!rangeName) return true
+      if (!door) return true
+      return door === rangeName || door.includes(rangeName) || rangeName.includes(door)
+    }
+  }
+
   const opts = getProductOpts(product)
   for (const src of [opts.tealbury_finish_prices_gbp, opts.lamtek_finish_prices_gbp]) {
     if (src && typeof src === 'object' && !Array.isArray(src)) {
       for (const key of Object.keys(src)) {
-        if (key.trim().toLowerCase() === target) return true
+        if (finishKeyMatchesLabel(key, target)) return true
       }
     }
   }
@@ -328,8 +398,19 @@ export function filterCatalogProducts(
       return false
     }
 
-    if (applyTealburyKitchenFilters && setup.door_finish && !productHasDoorFinish(p, setup.door_finish)) {
-      return false
+    if (applyTealburyKitchenFilters && setup.door_finish) {
+      const rangeName = setup.kitchen_range_id
+        ? categories.find((c) => c.id === setup.kitchen_range_id)?.name ?? null
+        : null
+      if (
+        !productHasDoorFinish(p, setup.door_finish, {
+          categories,
+          productCategoryMap: pcMap,
+          kitchenRangeName: rangeName,
+        })
+      ) {
+        return false
+      }
     }
 
     if (applyTealburyKitchenFilters && setup.line_style_preference && pcMap && types.length > 0) {
@@ -342,10 +423,19 @@ export function filterCatalogProducts(
       if (!pcMap) return false
       if (!productHasSystemCategory(p, filters.section, pcMap)) return false
     }
+    if (filters.productKind === 'accessories' && categories.length > 0 && pcMap) {
+      const names = productAssignedCategoryNames(p, categories, pcMap)
+      if (!names.some((n) => isTealburyTrimOrAccessoryCategory(n))) return false
+    }
     if (filters.productKind !== 'all' && completeIds) {
       const isComplete = completeIds.has(p.id)
       if (filters.productKind === 'complete' && !isComplete) return false
       if (filters.productKind === 'components' && isComplete) return false
+    }
+    if (filters.productKind === 'complete' && completeIds && !completeIds.has(p.id) && categories.length > 0 && pcMap) {
+      const names = productAssignedCategoryNames(p, categories, pcMap)
+      const looksLikeUnit = names.some((n) => /base|wall|tower|unit|highline|drawer line/i.test(n))
+      if (!looksLikeUnit && !names.some((n) => isTealburyTrimOrAccessoryCategory(n))) return false
     }
     if (filters.inStockOnly && (p.stock_quantity ?? 0) <= 0) return false
     if (filters.favouritesOnly && favouriteIds && !favouriteIds.has(p.id)) return false

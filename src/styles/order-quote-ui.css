@@ -84,6 +84,120 @@
   margin-bottom: 0.75rem;
 }
 
+.kq-build-context--sticky {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--lamtek-border);
+  background: linear-gradient(180deg, rgba(103, 39, 50, 0.06) 0%, var(--lamtek-surface) 100%);
+  position: sticky;
+  top: 0;
+  z-index: 12;
+}
+
+.kq-build-context-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--lamtek-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kq-build-chip--primary {
+  background: var(--lamtek-primary, #672332);
+  color: #fff;
+  border-color: transparent;
+}
+
+.kq-section-shortcuts {
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  border: 1px dashed var(--lamtek-border);
+  background: var(--lamtek-surface-alt, #fafafa);
+}
+
+.kq-section-shortcuts-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--lamtek-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.kq-section-shortcuts-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.kq-section-shortcut-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--lamtek-border);
+  background: var(--lamtek-surface);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kq-section-shortcut-chip:hover:not(:disabled) {
+  border-color: var(--lamtek-primary, #672332);
+}
+
+.kq-section-shortcut-chip.active {
+  background: var(--lamtek-primary, #672332);
+  color: #fff;
+  border-color: transparent;
+}
+
+.kq-section-shortcut-chip--empty {
+  opacity: 0.45;
+}
+
+.kq-section-shortcut-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.tb-empty-state {
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--lamtek-border);
+}
+
+.tb-empty-state h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.tb-empty-state p {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--lamtek-text-muted);
+}
+
+.tb-empty-state .btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--lamtek-primary);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
 .admin-btn-danger {
   color: #b91c1c;
   border-color: rgba(185, 28, 28, 0.35);

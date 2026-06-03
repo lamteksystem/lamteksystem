@@ -48,6 +48,7 @@
     "catalogue:import-pricelists": "node --env-file=.env scripts/import-pricelists.mjs",
     "catalogue:rebuild-workbench": "node --env-file=.env scripts/catalogue-rebuild-workbench.mjs",
     "catalogue:workbench-setup": "npx --yes tsx --env-file=.env scripts/workbench-setup.ts",
+    "catalogue:title-case-draft": "npx --yes tsx --env-file=.env scripts/workbench-setup.ts",
     "assign-images": "node --env-file=.env scripts/assign-product-images.js",
     "authorize:lamtek": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/authorize-lamtek-context.ps1"
   },

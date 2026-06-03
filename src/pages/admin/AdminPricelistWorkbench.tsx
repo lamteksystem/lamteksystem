@@ -17,6 +17,7 @@ import {
 } from '@/lib/pricelistWorkbench'
 import { applyBomToCompleteProduct } from '@/lib/completeUnitBomApply'
 import { bulkComputeDraftBom, mergeWorkbenchRowPatch } from '@/lib/workbenchBom'
+import { normalizeProductDisplayName } from '@/lib/titleCase'
 import { parseTealburyPricelistWorkbookAsync } from '@/lib/tealburyPricelistParse'
 import {
   autoAssignDoorRangeCategories,
@@ -56,6 +57,13 @@ import PricelistWorkbenchWarningsPanel from '@/components/admin/PricelistWorkben
 import WorkbenchActionReportModal, {
   type WorkbenchActionReport,
 } from '@/components/admin/WorkbenchActionReportModal'
+import WorkbenchPrePublishModal from '@/components/admin/WorkbenchPrePublishModal'
+import {
+  bulkAssignPanelsCategory,
+  buildPrePublishReport,
+  computeWorkbenchReadiness,
+  type PrePublishReport,
+} from '@/lib/workbenchReadiness'
 import type { CategoryRow } from '@/types/database'
 
 export default function AdminPricelistWorkbench() {
@@ -66,6 +74,9 @@ export default function AdminPricelistWorkbench() {
   const [warnings, setWarnings] = useState<WorkbenchWarning[]>([])
   const [setupAction, setSetupAction] = useState<string | null>(null)
   const [actionReport, setActionReport] = useState<WorkbenchActionReport | null>(null)
+  const [prePublishReport, setPrePublishReport] = useState<PrePublishReport | null>(null)
+  const [prePublishOpen, setPrePublishOpen] = useState(false)
+  const [computingBomGaps, setComputingBomGaps] = useState(false)
   const [busy, setBusy] = useState(false)
   const [importProgress, setImportProgress] = useState<
     Partial<Record<PricelistSource, PricelistSourceImportProgressState>>
@@ -184,6 +195,10 @@ export default function AdminPricelistWorkbench() {
 
   const selectedCount = useMemo(() => rows.filter((r) => r.selected).length, [rows])
   const filteredSelectedCount = useMemo(() => filtered.filter((r) => r.selected).length, [filtered])
+  const readinessPercent = useMemo(
+    () => (rows.length ? computeWorkbenchReadiness(rows).overallPercent : 0),
+    [rows],
+  )
 
   const clearImportProgress = useCallback((source: PricelistSource, delayMs = 0) => {
     const run = () => {
@@ -273,6 +288,69 @@ export default function AdminPricelistWorkbench() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       clearImportProgress('uform')
+    }
+  }
+
+  async function openPrePublishReport() {
+    if (!rows.length) return
+    setPrePublishOpen(true)
+    setComputingBomGaps(true)
+    setError(null)
+    const partial = buildPrePublishReport(rows, categories, { includeBomGaps: false })
+    setPrePublishReport(partial)
+    try {
+      await new Promise((r) => window.setTimeout(r, 0))
+      const full = buildPrePublishReport(rows, categories, { includeBomGaps: true })
+      setPrePublishReport(full)
+    } finally {
+      setComputingBomGaps(false)
+    }
+  }
+
+  function bulkAssignPanels() {
+    const panelsCat = categories.find((c) => c.name.toLowerCase() === 'panels' || c.slug === 'panels')
+    if (!panelsCat) {
+      setError('Create a “Panels” category under Accessories before using bulk assign.')
+      return
+    }
+    const { rows: next, changed } = bulkAssignPanelsCategory(rows, categories)
+    if (!changed) {
+      showSuccess('Panels', 'No panel-like rows needed updating.')
+      return
+    }
+    if (
+      !window.confirm(
+        `Assign category “${panelsCat.name}” and sold-as accessory to ${changed} panel-like row(s)?`,
+      )
+    ) {
+      return
+    }
+    setRows(next)
+    showSuccess('Panels assigned', `Updated ${changed} row(s) to Panels + accessory.`)
+  }
+
+  function applyTitleCaseToAllNames() {
+    if (!rows.length) return
+    if (
+      !window.confirm(
+        `Apply Title Case to all ${rows.length} product name(s) in the workbench draft? (Major words capitalized; minor words like "and" / "for" stay lowercase.)`,
+      )
+    ) {
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      setRows((prev) =>
+        prev.map((r) => {
+          const name = r.name?.trim()
+          if (!name) return r
+          return { ...r, name: normalizeProductDisplayName(name) }
+        }),
+      )
+      showSuccess('Title Case applied', `Updated names on ${rows.length} row(s).`)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -668,7 +746,8 @@ export default function AdminPricelistWorkbench() {
         {rows.length > 0 && (
           <p className="admin-pricelist-stats">
             {rows.length} draft row(s) · {lamtekCount} Lamtek · {uformCount} UFORM · {tealburyCount} Tealbury complete
-            · {unassignedCount} unassigned
+            · {unassignedCount} unassigned ·{' '}
+            <strong>{readinessPercent}%</strong> publish readiness
           </p>
         )}
       </div>
@@ -708,6 +787,39 @@ export default function AdminPricelistWorkbench() {
               {setupAction === 'categories' ? 'Working…' : 'Ensure Accessories categories'}
             </button>
             <AdminHelpTip text="Creates only the Accessories parent plus Cutlery Trays, Lighting, and Misc if missing. Does not add spreadsheet section categories or door-range categories." />
+          </span>
+          <span className="admin-pricelist-setup-action">
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={busy || !rows.length}
+              onClick={() => applyTitleCaseToAllNames()}
+            >
+              Title Case all names
+            </button>
+            <AdminHelpTip text="Capitalizes product names (Plain End Panel (Dawson)). New imports apply Title Case automatically on publish." />
+          </span>
+          <span className="admin-pricelist-setup-action">
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={busy || !rows.length}
+              onClick={() => void openPrePublishReport()}
+            >
+              {computingBomGaps ? 'Analysing…' : 'Pre-publish validation'}
+            </button>
+            <AdminHelpTip text="Readiness %, must-fix issues (SKU, names), and BOM/component gap groups before you publish." />
+          </span>
+          <span className="admin-pricelist-setup-action">
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={busy || !rows.length}
+              onClick={() => bulkAssignPanels()}
+            >
+              Bulk assign Panels
+            </button>
+            <AdminHelpTip text="Sets category Panels and sold-as accessory on rows whose name/section looks like an end panel." />
           </span>
           <span className="admin-pricelist-setup-action">
             <button
@@ -1009,6 +1121,20 @@ export default function AdminPricelistWorkbench() {
         message={message ?? ''}
         variant="success"
         onClose={() => setMessage(null)}
+      />
+      <WorkbenchPrePublishModal
+        open={prePublishOpen}
+        report={prePublishReport}
+        computingGaps={computingBomGaps}
+        onClose={() => {
+          setPrePublishOpen(false)
+          setPrePublishReport(null)
+        }}
+        onFilterSample={(sample) => {
+          const q = sample.split('·')[0]?.trim() ?? sample
+          patchTableFilters({ search: q })
+          setPrePublishOpen(false)
+        }}
       />
       <WorkbenchActionReportModal report={actionReport} onClose={() => setActionReport(null)} />
       {error && (

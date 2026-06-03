@@ -24,6 +24,7 @@ async function main() {
     '../src/lib/tealburyCatalogueBuild.ts'
   )
   const { bulkComputeDraftBom, mergeWorkbenchRowPatch } = await import('../src/lib/workbenchBom.ts')
+  const { normalizeProductDisplayName } = await import('../src/lib/titleCase.ts')
   type PricelistWorkbenchRow = import('../src/lib/pricelistWorkbench.ts').PricelistWorkbenchRow
 
   const supabase = createSupabaseAdmin()
@@ -52,6 +53,13 @@ async function main() {
   } catch (e) {
     console.warn('  skipped (use Admin button if needed):', e instanceof Error ? e.message : e)
   }
+
+  console.log('\n→ Title Case all product names…')
+  rows = rows.map((r) => {
+    const name = r.name?.trim()
+    if (!name) return r
+    return { ...r, name: normalizeProductDisplayName(name) }
+  })
 
   console.log('\n→ Infer part types / sold-as on all rows…')
   rows = enrichWorkbenchRowsMetadata(rows)

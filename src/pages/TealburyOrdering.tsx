@@ -175,6 +175,9 @@ export default function TealburyOrdering() {
         linePersistence="immediate"
         addButtonLabel="Add to order"
         tealburySetup={tealburySetup}
+        kitchenQuoteVariant="customer"
+        quoteDocLabel="order"
+        onEditKitchenSetup={() => setSetupOpen(true)}
         onCommit={commitPicker}
       />
     </div>

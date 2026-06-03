@@ -24,6 +24,10 @@ import {
   filterCatalogProducts,
   type WorkbenchFilterState,
 } from '@/lib/catalogProductDisplay'
+import { productsForKitchenContext } from '@/lib/kitchenQuoteBrowse'
+import KitchenQuoteContextBar from '@/components/catalog/KitchenQuoteContextBar'
+import KitchenQuoteSectionShortcuts from '@/components/catalog/KitchenQuoteSectionShortcuts'
+import CatalogKitchenEmptyState from '@/components/catalog/CatalogKitchenEmptyState'
 import { ColumnSettings } from '@/components/admin/ColumnSettings'
 import { useColumnVisibility } from '@/hooks/useColumnVisibility'
 import {
@@ -88,6 +92,9 @@ interface CatalogProductWorkbenchProps {
   onCommit: (payload: CatalogPickerCommitPayload) => Promise<void>
   /** Renders above the workbench grid (customer bar, quote ref, etc.). */
   buildBar?: ReactNode
+  onEditKitchenSetup?: () => void
+  quoteDocLabel?: string
+  kitchenQuoteVariant?: 'customer' | 'admin'
 }
 
 export default function CatalogProductWorkbench({
@@ -111,6 +118,9 @@ export default function CatalogProductWorkbench({
   tealburySetup = null,
   onCommit,
   buildBar,
+  onEditKitchenSetup,
+  quoteDocLabel = 'order',
+  kitchenQuoteVariant = 'customer',
 }: CatalogProductWorkbenchProps) {
   const tableScrollRef = useRef<HTMLDivElement>(null)
   const appliedSetupRangeIdRef = useRef<string | null>(null)
@@ -126,6 +136,7 @@ export default function CatalogProductWorkbench({
   const [mutatingOrderLineId, setMutatingOrderLineId] = useState<string | null>(null)
   const [assemblyQtyById, setAssemblyQtyById] = useState<Record<string, number>>({})
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [activeKitchenShortcutId, setActiveKitchenShortcutId] = useState<string | null>(null)
   const [favouriteIds, setFavouriteIds] = useState<string[]>([])
   const [filterPresets, setFilterPresets] = useState<SavedFilterPreset[]>([])
   const [sellPriceByProductId, setSellPriceByProductId] = useState<Record<string, number>>({})
@@ -263,6 +274,27 @@ export default function CatalogProductWorkbench({
       isTealburyCatalogueChoice(tealburySetup.catalogue_choice) &&
       !orderNeedsTealburyKitchenSetup(tealburySetup),
   )
+  const kitchenSetupReady = Boolean(
+    tealburySetup &&
+      isTealburyCatalogueChoice(tealburySetup.catalogue_choice) &&
+      !orderNeedsTealburyKitchenSetup(tealburySetup),
+  )
+  const kitchenContextProducts = useMemo(() => {
+    if (!kitchenSetupReady || !tealburySetup) return []
+    return productsForKitchenContext(scopeProducts, tealburySetup, effectiveCategories, {
+      productCategoryMap,
+      completeProductIds,
+      categoryTypes,
+    })
+  }, [
+    kitchenSetupReady,
+    tealburySetup,
+    scopeProducts,
+    effectiveCategories,
+    productCategoryMap,
+    completeProductIds,
+    categoryTypes,
+  ])
   const browseOptions = useMemo(
     () =>
       buildCategoryTreeOptions(effectiveCategories, filters.browseMode, {
@@ -424,7 +456,7 @@ export default function CatalogProductWorkbench({
         ...savedFilters,
         browseMode: setupReady || tealburySetup?.kitchen_range_id ? 'range' : (savedFilters.browseMode ?? 'category'),
         categoryId: initialCategoryId ?? tealburySetup?.kitchen_range_id ?? savedFilters.categoryId ?? null,
-        productKind: setupReady ? (savedFilters.productKind ?? 'complete') : (savedFilters.productKind ?? 'all'),
+        productKind: setupReady ? (savedFilters.productKind ?? 'all') : (savedFilters.productKind ?? 'all'),
       })
       setFavouriteIds(favs)
       setFilterPresets(presets)
@@ -451,7 +483,7 @@ export default function CatalogProductWorkbench({
       ...prev,
       browseMode: 'range',
       categoryId: rangeId,
-      productKind: prev.productKind === 'all' ? 'complete' : prev.productKind,
+      productKind: 'all',
     }))
   }, [tealburySetup])
 
@@ -716,6 +748,30 @@ export default function CatalogProductWorkbench({
   return (
     <div className={buildBar ? 'kq-build-workspace' : undefined}>
       {buildBar}
+      {kitchenSetupReady && tealburySetup && onEditKitchenSetup && (
+        <>
+          <KitchenQuoteContextBar
+            setup={tealburySetup}
+            categories={effectiveCategories}
+            onEditSetup={onEditKitchenSetup}
+            variant={kitchenQuoteVariant}
+            docLabel={quoteDocLabel}
+          />
+          <KitchenQuoteSectionShortcuts
+            products={scopeProducts}
+            categories={effectiveCategories}
+            setup={tealburySetup}
+            productCategoryMap={productCategoryMap}
+            completeProductIds={completeProductIds}
+            categoryTypes={categoryTypes}
+            activeShortcutId={activeKitchenShortcutId}
+            onApplyShortcut={(patch, shortcut) => {
+              setActiveKitchenShortcutId(shortcut.id)
+              updateFilter(patch)
+            }}
+          />
+        </>
+      )}
     <article className={workbenchClass}>
       {statusMessage && (
         <p className="ordering-toast tb-workbench-toast" role="status">
@@ -882,13 +938,15 @@ export default function CatalogProductWorkbench({
           </label>
         )}
 
-        {tealburySetup && (
+        {tealburySetup &&
+          isTealburyCatalogueChoice(tealburySetup.catalogue_choice) &&
+          !orderNeedsTealburyKitchenSetup(tealburySetup) && (
           <div className="tb-filter-group">
             <span className="tb-filter-group-label">
               <Layers size={12} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} aria-hidden />
-              Product type
+              For this kitchen
             </span>
-            <div className="tb-segmented" role="group" aria-label="Product type">
+            <div className="tb-segmented" role="group" aria-label="For this kitchen">
               <button
                 type="button"
                 className={filters.productKind === 'all' ? 'active' : ''}
@@ -902,6 +960,30 @@ export default function CatalogProductWorkbench({
                 onClick={() => updateFilter({ productKind: 'complete' })}
               >
                 Units
+              </button>
+              <button
+                type="button"
+                className={filters.productKind === 'accessories' ? 'active' : ''}
+                onClick={() => updateFilter({ productKind: 'accessories' })}
+              >
+                Accessories &amp; trim
+              </button>
+            </div>
+          </div>
+        )}
+        {tealburySetup && tealburySetup.catalogue_choice === 'lamtek' && (
+          <div className="tb-filter-group">
+            <span className="tb-filter-group-label">
+              <Layers size={12} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} aria-hidden />
+              Product type
+            </span>
+            <div className="tb-segmented" role="group" aria-label="Product type">
+              <button
+                type="button"
+                className={filters.productKind === 'all' ? 'active' : ''}
+                onClick={() => updateFilter({ productKind: 'all' })}
+              >
+                All
               </button>
               <button
                 type="button"
@@ -1109,6 +1191,24 @@ export default function CatalogProductWorkbench({
           )}
         </div>
 
+        {mainTab === 'products' && filtered.length === 0 && kitchenSetupReady && (
+          <CatalogKitchenEmptyState
+            totalInCatalogue={scopeProducts.length}
+            inKitchenContext={kitchenContextProducts.length}
+            setup={tealburySetup}
+            categories={effectiveCategories}
+            onClearFilters={() => {
+              setActiveKitchenShortcutId(null)
+              updateFilter({
+                ...EMPTY_WORKBENCH_FILTERS,
+                browseMode: 'range',
+                categoryId: tealburySetup?.kitchen_range_id ?? null,
+                productKind: 'all',
+              })
+            }}
+          />
+        )}
+
         {mainTab === 'products' ? (
         <div className="tb-table-wrap" ref={tableScrollRef}>
           <table
@@ -1137,7 +1237,9 @@ export default function CatalogProductWorkbench({
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={tableColumnIds.length} className="tb-table-empty">
-                    No products match your filters. Try clearing search or choosing another range.
+                    {kitchenSetupReady
+                      ? 'No products in this view — try another section shortcut or clear filters.'
+                      : 'No products match your filters. Try clearing search or choosing another range.'}
                   </td>
                 </tr>
               ) : (

@@ -10,8 +10,8 @@ import {
   Palette,
   Wrench,
 } from 'lucide-react'
-import { buildCategoryTreeOptions, productMatchesBrowseFilter } from '@/lib/categoryTaxonomy'
-import { getProductFinishLabels } from '@/lib/catalogProductDisplay'
+import { buildCategoryTreeOptions } from '@/lib/categoryTaxonomy'
+import { getProductFinishLabels, productBelongsToKitchenRange } from '@/lib/catalogProductDisplay'
 import { CARCASS_FINISH_OPTIONS, carcassFinishLabel } from '@/lib/orderRangeFinish'
 import {
   BUILD_STYLE_OPTIONS,
@@ -152,7 +152,7 @@ export default function TealburyOrderSetupWizard({
 
   const productsInRange = useMemo(() => {
     if (!rangeId) return []
-    return products.filter((p) => productMatchesBrowseFilter(p, categories, 'range', rangeId))
+    return products.filter((p) => productBelongsToKitchenRange(p, rangeId, categories))
   }, [products, categories, rangeId])
 
   const doorFinishOptions = useMemo(() => getProductFinishLabels(productsInRange), [productsInRange])
@@ -211,8 +211,8 @@ export default function TealburyOrderSetupWizard({
         <h2>{isCustomer ? 'Tell us about this kitchen' : `Set up this ${docLabel}`}</h2>
         <p>
           We will ask a few quick questions so the product search shows the right catalogue — Tealbury Complete
-          kitchens with full unit BOMs, or Lamtek components if you are ordering parts only. Plinth, cornice and
-          pelmet are added later from the workbench, not here.
+          kitchens with matching units, panels, plinth, cornice, and pelmet for your chosen range and finish, or
+          Lamtek components if you are ordering parts only.
         </p>
       </header>
 
@@ -326,7 +326,8 @@ export default function TealburyOrderSetupWizard({
             <>
               <h3 className="kq-wizard-step-title">Choose a door range</h3>
               <p className="kq-wizard-step-lead">
-                Pick the Tealbury door family for this kitchen. Panels, plinth and cornice are not chosen here.
+                Pick the Tealbury door family for this kitchen. Matching panels and trim for that range appear in
+                the catalogue after setup.
               </p>
               <div className="kq-wizard-options kq-wizard-options--grid">
                 {rangeOptions.map((opt) => (

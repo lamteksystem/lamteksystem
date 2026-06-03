@@ -227,6 +227,87 @@
   scrollbar-gutter: stable;
 }
 
+.workbench-readiness-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+.workbench-readiness-bar__track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lamtek-border) 70%, transparent);
+  overflow: hidden;
+}
+.workbench-readiness-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+.workbench-readiness-bar--ok .workbench-readiness-bar__fill {
+  background: color-mix(in srgb, #2d6a4f 85%, var(--lamtek-gold) 15%);
+}
+.workbench-readiness-bar--mid .workbench-readiness-bar__fill {
+  background: color-mix(in srgb, var(--lamtek-gold) 80%, #c9a227 20%);
+}
+.workbench-readiness-bar--low .workbench-readiness-bar__fill {
+  background: color-mix(in srgb, #9b2226 75%, var(--lamtek-gold) 25%);
+}
+.workbench-readiness-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+}
+.workbench-readiness-stats dt {
+  font-weight: 600;
+  margin: 0;
+}
+.workbench-readiness-stats dd {
+  margin: 0.1rem 0 0;
+  color: var(--lamtek-muted, #666);
+}
+.workbench-pre-publish-heading {
+  font-size: 0.95rem;
+  margin: 1rem 0 0.5rem;
+}
+.workbench-pre-publish-issues {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.workbench-pre-publish-issue {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--lamtek-border) 55%, transparent);
+}
+.workbench-pre-publish-issue__count {
+  flex-shrink: 0;
+  min-width: 2rem;
+  font-weight: 700;
+  text-align: right;
+}
+.workbench-pre-publish-issue--error .workbench-pre-publish-issue__count {
+  color: #9b2226;
+}
+.workbench-pre-publish-issue__samples {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.85rem;
+}
+.workbench-bom-gap-groups {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+}
+.workbench-bom-gap-groups li {
+  margin-bottom: 0.35rem;
+}
+
 .admin-app .admin-table thead th {
   background: linear-gradient(
     180deg,

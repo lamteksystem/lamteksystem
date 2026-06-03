@@ -14,12 +14,8 @@ import { ORDER_LINK_REASONS } from '@/types/database'
 import {
   loadTealburyOrderSetup,
   orderNeedsGuidedSetup,
-  orderNeedsTealburyKitchenSetup,
-  hingeBrandLabel,
-  isTealburyCatalogueChoice,
   type TealburyOrderSetup,
 } from '@/lib/tealburyOrderSetup'
-import { carcassFinishLabel } from '@/lib/orderRangeFinish'
 import { resolveAssemblyForHingeBrand } from '@/lib/tealburyBomResolve'
 import type { AssemblyWithLines } from '@/types/database'
 
@@ -254,11 +250,6 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
   const showGuidedWizard =
     buildActive && (tealburySetupOpen || orderNeedsGuidedSetup(tealburySetup)) && !catalogLoading
 
-  const rangeName = useMemo(() => {
-    if (!tealburySetup?.kitchen_range_id) return null
-    return categories.find((c) => c.id === tealburySetup.kitchen_range_id)?.name ?? null
-  }, [categories, tealburySetup?.kitchen_range_id])
-
   const customerLabel = useMemo(() => {
     const c = customers.find((x) => x.user_id === selectedUserId)
     if (!c) return 'Customer'
@@ -366,50 +357,6 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
 
   return (
     <div className={`admin-page admin-order-build-page admin-order-build-page--${mode} kq-build-shell kq-build-shell--full`}>
-      {buildActive && (
-        <>
-          {tealburySetup &&
-            isTealburyCatalogueChoice(tealburySetup.catalogue_choice) &&
-            !orderNeedsTealburyKitchenSetup(tealburySetup) &&
-            !showGuidedWizard && (
-              <div className="kq-build-context kq-build-context--inline">
-                <div className="kq-build-context-chips">
-                  <span className="kq-build-chip">Tealbury Complete</span>
-                  <span className="kq-build-chip">
-                    {tealburySetup.build_style === 'flat_pack' ? 'Flat pack' : 'Rigid'}
-                  </span>
-                  <span className="kq-build-chip">{rangeName ?? 'Range'}</span>
-                  <span className="kq-build-chip">{tealburySetup.door_finish}</span>
-                  <span className="kq-build-chip">{carcassFinishLabel(tealburySetup.carcass_finish)}</span>
-                  <span className="kq-build-chip">
-                    {tealburySetup.line_style_preference?.replace('_', ' ') ?? '—'}
-                  </span>
-                  <span className="kq-build-chip">{hingeBrandLabel(tealburySetup.hinge_brand) ?? '—'}</span>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-small"
-                  onClick={() => setTealburySetupOpen(true)}
-                >
-                  Change setup
-                </button>
-              </div>
-            )}
-          {tealburySetup?.catalogue_choice === 'lamtek' && !showGuidedWizard && (
-            <div className="kq-build-context kq-build-context--inline">
-              <span className="kq-build-chip">Lamtek components</span>
-              <button
-                type="button"
-                className="btn btn-outline btn-small"
-                onClick={() => setTealburySetupOpen(true)}
-              >
-                Change catalogue
-              </button>
-            </div>
-          )}
-        </>
-      )}
-
       {!buildActive && buildBar}
 
       {buildActive && catalogLoading && products.length === 0 ? (
@@ -456,6 +403,9 @@ export default function AdminOrderBuildPage({ mode }: AdminOrderBuildPageProps) 
             tealburySetup && !orderNeedsGuidedSetup(tealburySetup) ? tealburySetup : null
           }
           buildBar={buildBar}
+          kitchenQuoteVariant="admin"
+          quoteDocLabel={isQuote ? 'quote' : 'order'}
+          onEditKitchenSetup={() => setTealburySetupOpen(true)}
           onCommit={commitLines}
         />
       ) : null}

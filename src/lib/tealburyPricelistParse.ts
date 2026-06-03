@@ -12,6 +12,7 @@
 import * as XLSX from 'xlsx'
 import type { Json } from '@/types/database'
 import type { WorkbenchWarning } from '@/lib/pricelistWorkbenchWarnings'
+import { normalizeProductDisplayName } from '@/lib/titleCase'
 
 const COST_FACTOR = 0.75
 
@@ -137,7 +138,7 @@ function augmentCustomerRowWithDoorRange(row: TealburyParsedRow, sheetName: stri
   return {
     ...row,
     sku: buildTealburyStorageSku(tradeCode, sheetName),
-    name: `${row.name} (${sheetName})`.slice(0, 300),
+    name: normalizeProductDisplayName(`${row.name} (${sheetName})`).slice(0, 300),
     options: {
       ...row.options,
       tealbury_trade_code: tradeCode,
@@ -215,7 +216,8 @@ export function buildTealburyProductName(
     desc?.trim() ? desc.trim().slice(0, 160) : null,
   ].filter(Boolean) as string[]
   const joined = parts.join(' — ').slice(0, 300)
-  return joined || code.trim().slice(0, 300)
+  const raw = joined || code.trim().slice(0, 300)
+  return normalizeProductDisplayName(raw)
 }
 
 /**

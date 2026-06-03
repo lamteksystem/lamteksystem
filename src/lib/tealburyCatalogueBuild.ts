@@ -36,8 +36,19 @@ const UFORM_SECTION_PART_TYPE: [RegExp, string][] = [
   [/door|slab/i, 'door'],
 ]
 
-export function inferWorkbenchItemKind(row: Pick<PricelistWorkbenchRow, 'source' | 'section' | 'name' | 'options' | 'sku'>): WorkbenchItemKind {
-  if (row.source === 'tealbury') return 'complete'
+const TEALBURY_ACCESSORY_SECTION = /accessor|panel|plinth|cornice|pelmet|post|mould|corbel|filler|splash|worktop|wirework|cutlery|lighting|handle|hinge/i
+const TEALBURY_UNIT_SECTION = /high[\s-]*line|drawer[\s-]*line|wall\s*unit|base\s*unit|tower|multidrawer|larder|corner|appliance|wine/i
+
+export function inferWorkbenchItemKind(
+  row: Pick<PricelistWorkbenchRow, 'source' | 'section' | 'name' | 'description' | 'options' | 'sku'>,
+): WorkbenchItemKind {
+  if (row.source === 'tealbury') {
+    const hay = `${row.section} ${row.name} ${row.sku} ${row.description ?? ''}`.toLowerCase()
+    if (TEALBURY_ACCESSORY_SECTION.test(hay) && !TEALBURY_UNIT_SECTION.test(hay)) return 'accessory'
+    if (/\bdoor\b/.test(hay) && !/end panel|panel/.test(hay)) return 'door'
+    if (/drawer\s*front/.test(hay)) return 'drawer_front'
+    return 'complete'
+  }
   if (row.source === 'uform') {
     const sec = `${row.section} ${row.name} ${row.sku}`.toLowerCase()
     if (/drawer\s*front|drawerfront|-df-|kind":"drawer_front/i.test(sec)) return 'drawer_front'
@@ -61,8 +72,8 @@ export function inferWorkbenchPartType(
 }
 
 export function enrichWorkbenchRowMetadata(row: PricelistWorkbenchRow): PricelistWorkbenchRow {
-  const item_kind = row.item_kind || inferWorkbenchItemKind(row)
-  const part_type = row.part_type || (item_kind === 'complete' ? '' : inferWorkbenchPartType({ ...row, item_kind }))
+  const item_kind = inferWorkbenchItemKind(row)
+  const part_type = item_kind === 'complete' ? '' : inferWorkbenchPartType({ ...row, item_kind })
   return { ...row, item_kind, part_type }
 }
 

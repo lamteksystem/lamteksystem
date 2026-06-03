@@ -1,15 +1,21 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AdminHelpTip } from '@/components/admin/AdminHelpTip'
 import type { SmartApplyScope } from '@/components/admin/PricelistWorkbenchQuickCommand'
 import { KIT_LABEL, KIT_TOOLTIP } from '@/lib/kitTerminology'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
 import type { RuleSimulationResult, WorkbenchRule } from '@/lib/pricelistWorkbenchRules'
 import {
+  buildKitComputePlan,
+  buildKitComputeResultPreview,
+  type KitComputeRunResult,
+} from '@/lib/workbenchKitCompute'
+import {
   WORKBENCH_SMART_PRESETS,
   previewKitAction,
   previewRulePreset,
   type KitActionId,
   type KitActionPreview,
+  type KitTroubleshootId,
   type SmartPreset,
   type SmartPresetCategory,
 } from '@/lib/workbenchSmartPresets'
@@ -23,6 +29,11 @@ type Props = {
   onScopeChange: (scope: SmartApplyScope) => void
   onRunRule: (rule: WorkbenchRule, confirmDelete?: boolean) => void
   onApplyKitAction: (action: KitActionId) => Promise<{ message: string; error?: string }>
+  onComputeUnitKits: (
+    mode: 'all' | 'selected',
+    onProgress: (done: number, total: number, label?: string) => void,
+  ) => Promise<KitComputeRunResult>
+  onTroubleshoot?: (id: KitTroubleshootId) => void
   onOpenAiCommand?: (promptHint: string) => void
   onNotify: (message: string, error?: string | null) => void
 }
@@ -33,6 +44,8 @@ const CATEGORY_LABELS: Record<SmartPresetCategory, string> = {
   cleanup: 'Cleanup',
 }
 
+const COMPUTE_ACTIONS = new Set<KitActionId>(['compute_kits_all', 'compute_kits_selected'])
+
 export default function WorkbenchSmartPresetsPanel({
   rows,
   filtered,
@@ -41,6 +54,8 @@ export default function WorkbenchSmartPresetsPanel({
   onScopeChange,
   onRunRule,
   onApplyKitAction,
+  onComputeUnitKits,
+  onTroubleshoot,
   onOpenAiCommand,
   onNotify,
 }: Props) {
@@ -48,6 +63,7 @@ export default function WorkbenchSmartPresetsPanel({
   const [rulePreview, setRulePreview] = useState<RuleSimulationResult | null>(null)
   const [kitPreview, setKitPreview] = useState<KitActionPreview | null>(null)
   const [applying, setApplying] = useState(false)
+  const previewRef = useRef<HTMLDivElement>(null)
 
   const scopeRows = useMemo(() => {
     if (scope === 'all') return rows
@@ -62,6 +78,12 @@ export default function WorkbenchSmartPresetsPanel({
 
   const activePreset = WORKBENCH_SMART_PRESETS.find((p) => p.id === activeId) ?? null
 
+  const scrollToPreview = useCallback(() => {
+    requestAnimationFrame(() => {
+      previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [])
+
   const runPreview = useCallback(
     (preset: SmartPreset) => {
       setActiveId(preset.id)
@@ -72,8 +94,9 @@ export default function WorkbenchSmartPresetsPanel({
         setRulePreview(null)
         setKitPreview(previewKitAction(preset.action, rows, scopeRows, categories))
       }
+      scrollToPreview()
     },
-    [rows, scopeRows, categories, targetIds],
+    [rows, scopeRows, categories, targetIds, scrollToPreview],
   )
 
   const grouped = useMemo(() => {
@@ -86,11 +109,16 @@ export default function WorkbenchSmartPresetsPanel({
     return map
   }, [])
 
+  useEffect(() => {
+    if ((rulePreview || kitPreview) && activeId) scrollToPreview()
+  }, [rulePreview, kitPreview, activeId, scrollToPreview])
+
   async function pushToDraft() {
     if (!activePreset) return
-    setApplying(true)
-    try {
-      if (activePreset.kind === 'rule') {
+
+    if (activePreset.kind === 'rule') {
+      setApplying(true)
+      try {
         if (rulePreview && rulePreview.wouldChange === 0) {
           onNotify('', 'Nothing would change — adjust scope or pick another preset.')
           return
@@ -102,12 +130,82 @@ export default function WorkbenchSmartPresetsPanel({
         }
         setActiveId(null)
         setRulePreview(null)
-        return
+      } finally {
+        setApplying(false)
       }
-      if (!kitPreview?.canApply) {
-        onNotify('', kitPreview?.warnings[0] ?? 'Cannot apply this action.')
-        return
+      return
+    }
+
+    if (!kitPreview?.canApply && kitPreview?.phase !== 'result') {
+      onNotify('', kitPreview?.warnings[0] ?? 'Cannot apply this action.')
+      return
+    }
+
+    if (
+      activePreset.kind === 'kit_action' &&
+      COMPUTE_ACTIONS.has(activePreset.action) &&
+      kitPreview?.phase === 'plan'
+    ) {
+      const mode = activePreset.action === 'compute_kits_all' ? 'all' : 'selected'
+      const plan = buildKitComputePlan(rows, mode)
+      setApplying(true)
+      setKitPreview((prev) =>
+        prev
+          ? {
+              ...prev,
+              phase: 'running',
+              progress: { done: 0, total: plan.total, label: 'Starting…' },
+            }
+          : prev,
+      )
+      scrollToPreview()
+      try {
+        const run = await onComputeUnitKits(mode, (done, total, label) => {
+          setKitPreview((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  phase: 'running',
+                  progress: { done, total, label },
+                }
+              : prev,
+          )
+        })
+        const resultPreview = buildKitComputeResultPreview(run, plan)
+        setKitPreview({
+          action: activePreset.action,
+          title: activePreset.title,
+          summary: `${run.ok} kit(s) stored · ${run.failed} failed`,
+          affected: plan.total,
+          ok: run.ok,
+          failed: run.failed,
+          phase: 'result',
+          explanation: resultPreview.explanation,
+          stats: resultPreview.stats,
+          samples: resultPreview.samples,
+          warnings: run.failed > 0 ? [`${run.failed} unit(s) still have no kit — see samples below.`] : [],
+          troubleshoot: resultPreview.troubleshoot as KitActionPreview['troubleshoot'],
+          canApply: false,
+        })
+        scrollToPreview()
+        onNotify(`Unit kits: ${run.ok} stored, ${run.failed} could not be built.`)
+      } catch (e) {
+        onNotify('', e instanceof Error ? e.message : String(e))
+        setKitPreview(previewKitAction(activePreset.action, rows, scopeRows, categories))
+      } finally {
+        setApplying(false)
       }
+      return
+    }
+
+    if (kitPreview?.phase === 'result') {
+      setActiveId(null)
+      setKitPreview(null)
+      return
+    }
+
+    setApplying(true)
+    try {
       const res = await onApplyKitAction(activePreset.action)
       if (res.error) onNotify('', res.error)
       else onNotify(res.message)
@@ -118,12 +216,21 @@ export default function WorkbenchSmartPresetsPanel({
     }
   }
 
+  const pushLabel =
+    kitPreview?.phase === 'running'
+      ? 'Computing…'
+      : kitPreview?.phase === 'result'
+        ? 'Done — close'
+        : activePreset?.kind === 'kit_action' && activePreset.action && COMPUTE_ACTIONS.has(activePreset.action)
+          ? 'Compute & save to draft'
+          : 'Push to draft'
+
   return (
     <div className="workbench-smart-presets">
       <div className="admin-pricelist-smart-scope">
         <span className="admin-pricelist-smart-scope-label">
           Scope
-          <AdminHelpTip text="Presets and kit actions apply only within this scope. Use Preview before pushing to the draft." />
+          <AdminHelpTip text="Category rules respect this scope. Unit kit compute always runs on all kitchen units (or selected units only)." />
         </span>
         <label>
           <input
@@ -155,8 +262,8 @@ export default function WorkbenchSmartPresetsPanel({
       </div>
 
       <p className="admin-muted">
-        Pick a preset, <strong>Preview</strong> to see before/after, then <strong>Push to draft</strong> when it
-        looks right. {KIT_LABEL} = component list for a complete unit ({KIT_TOOLTIP})
+        Click a preset to <strong>preview</strong> (scrolls down). {KIT_LABEL} = parts list for a sellable kitchen
+        unit ({KIT_TOOLTIP})
       </p>
 
       {[...grouped.entries()].map(([cat, presets]) => (
@@ -180,8 +287,32 @@ export default function WorkbenchSmartPresetsPanel({
       ))}
 
       {activePreset && (rulePreview || kitPreview) && (
-        <div className="admin-pricelist-simulation workbench-smart-presets-preview" role="region">
-          <h4>Preview — {activePreset.title}</h4>
+        <div
+          ref={previewRef}
+          className="admin-pricelist-simulation workbench-smart-presets-preview"
+          role="region"
+          aria-label="Command preview"
+        >
+          <h4>
+            {kitPreview?.phase === 'result' ? 'Results' : 'Preview'} — {activePreset.title}
+          </h4>
+
+          {kitPreview?.phase === 'running' && kitPreview.progress && (
+            <div className="workbench-kit-progress">
+              <div className="workbench-readiness-bar__track" aria-hidden>
+                <span
+                  className="workbench-readiness-bar__fill"
+                  style={{
+                    width: `${kitPreview.progress.total ? Math.round((kitPreview.progress.done / kitPreview.progress.total) * 100) : 0}%`,
+                  }}
+                />
+              </div>
+              <p className="admin-muted">
+                Computing kits… <strong>{kitPreview.progress.done}</strong> / {kitPreview.progress.total}
+                {kitPreview.progress.label ? ` — ${kitPreview.progress.label}` : ''}
+              </p>
+            </div>
+          )}
 
           {rulePreview && (
             <>
@@ -220,37 +351,72 @@ export default function WorkbenchSmartPresetsPanel({
                   ))}
                 </ul>
               )}
-              {rulePreview.wouldChange === 0 && activePreset.kind === 'rule' && activePreset.promptHint && onOpenAiCommand && (
-                <div className="admin-pricelist-simulation-troubleshoot">
-                  <p>Nothing matched in this scope. Try AI command with a broader filter:</p>
-                  <button
-                    type="button"
-                    className="btn btn-small btn-outline"
-                    onClick={() => onOpenAiCommand(activePreset.promptHint!)}
-                  >
-                    Open in AI command →
-                  </button>
-                </div>
-              )}
             </>
           )}
 
-          {kitPreview && (
+          {kitPreview && kitPreview.phase !== 'running' && (
             <>
-              <p>{kitPreview.summary}</p>
+              <p className="workbench-preview-explanation">{kitPreview.explanation}</p>
+              <p className="admin-muted">{kitPreview.summary}</p>
+
+              {kitPreview.stats.length > 0 && (
+                <dl className="workbench-readiness-stats">
+                  {kitPreview.stats.map((s) => (
+                    <div key={s.label}>
+                      <dt>{s.label}</dt>
+                      <dd>{s.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
               {kitPreview.warnings.map((w) => (
                 <p key={w} className="admin-pricelist-simulation-warning">
                   {w}
                 </p>
               ))}
+
               {kitPreview.samples.length > 0 && (
-                <ul className="admin-pricelist-simulation-samples">
-                  {kitPreview.samples.map((s, i) => (
-                    <li key={i}>
-                      <strong>{s.label}</strong> <span className="admin-muted">{s.detail}</span>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <p className="admin-pricelist-simulation-samples-title">
+                    {kitPreview.phase === 'result' ? 'Outcome samples' : 'Example units (not panels)'}
+                  </p>
+                  <ul className="admin-pricelist-simulation-samples workbench-kit-sample-list">
+                    {kitPreview.samples.map((s, i) => (
+                      <li
+                        key={i}
+                        className={
+                          s.tone === 'fail'
+                            ? 'workbench-kit-sample--fail'
+                            : s.tone === 'ok'
+                              ? 'workbench-kit-sample--ok'
+                              : undefined
+                        }
+                      >
+                        <strong>{s.label}</strong> <span className="admin-muted">{s.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {kitPreview.troubleshoot.length > 0 && onTroubleshoot && (
+                <div className="admin-pricelist-simulation-troubleshoot">
+                  <p className="admin-pricelist-simulation-samples-title">Troubleshoot</p>
+                  <div className="workbench-smart-troubleshoot-actions">
+                    {kitPreview.troubleshoot.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className="btn btn-small btn-outline"
+                        disabled={applying}
+                        onClick={() => onTroubleshoot(t.id)}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </>
           )}
@@ -261,22 +427,32 @@ export default function WorkbenchSmartPresetsPanel({
               className="btn"
               disabled={
                 applying ||
-                (rulePreview ? rulePreview.wouldChange === 0 && activePreset.kind === 'rule' : !kitPreview?.canApply)
+                kitPreview?.phase === 'running' ||
+                (rulePreview
+                  ? rulePreview.wouldChange === 0
+                  : kitPreview?.phase === 'plan'
+                    ? !kitPreview?.canApply
+                    : false)
               }
               onClick={() => void pushToDraft()}
             >
-              {applying ? 'Applying…' : 'Push to draft'}
+              {applying ? 'Working…' : pushLabel}
             </button>
             <button
               type="button"
               className="btn btn-outline"
+              disabled={applying && kitPreview?.phase === 'running'}
               onClick={() => {
+                if (activePreset.kind === 'kit_action' && kitPreview) {
+                  setKitPreview(previewKitAction(activePreset.action, rows, scopeRows, categories))
+                  return
+                }
                 setActiveId(null)
                 setRulePreview(null)
                 setKitPreview(null)
               }}
             >
-              Cancel
+              {kitPreview?.phase === 'result' ? 'Close' : 'Back'}
             </button>
             {activePreset.kind === 'rule' && activePreset.promptHint && onOpenAiCommand && (
               <button

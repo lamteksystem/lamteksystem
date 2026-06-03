@@ -1,7 +1,7 @@
 /**
  * Curated smart-control presets: taxonomy rules + unit-kit (BOM) workflows.
  */
-import { hasWorkbenchBom } from '@/lib/workbenchBom'
+import { buildKitComputePlan, listKitComputeTargets } from '@/lib/workbenchKitCompute'
 import { previewUformRangeClone } from '@/lib/uformRangeClone'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
 import type { WorkbenchRule } from '@/lib/pricelistWorkbenchRules'
@@ -203,6 +203,14 @@ export const WORKBENCH_SMART_PRESETS: SmartPreset[] = [
   },
 ]
 
+export type KitTroubleshootId =
+  | 'open_validation'
+  | 'clone_uform'
+  | 'select_no_doors'
+  | 'infer_types'
+  | 'assign_panels'
+  | 'filter_failed'
+
 export type KitActionPreview = {
   action: KitActionId
   title: string
@@ -210,9 +218,28 @@ export type KitActionPreview = {
   affected: number
   ok?: number
   failed?: number
-  samples: { label: string; detail: string }[]
+  phase: 'plan' | 'running' | 'result'
+  explanation: string
+  stats: { label: string; value: string }[]
+  samples: { label: string; detail: string; tone?: 'ok' | 'warn' | 'fail' }[]
   warnings: string[]
+  troubleshoot: { id: KitTroubleshootId; label: string }[]
   canApply: boolean
+  progress?: { done: number; total: number; label?: string }
+  misTaggedPanels?: number
+}
+
+function kitPreviewBase(
+  partial: Omit<KitActionPreview, 'phase' | 'explanation' | 'stats' | 'troubleshoot'> &
+    Partial<Pick<KitActionPreview, 'phase' | 'explanation' | 'stats' | 'troubleshoot'>>,
+): KitActionPreview {
+  return {
+    phase: 'plan',
+    explanation: partial.summary,
+    stats: partial.affected ? [{ label: 'Rows affected', value: String(partial.affected) }] : [],
+    troubleshoot: [],
+    ...partial,
+  }
 }
 
 export function previewKitAction(
@@ -222,46 +249,72 @@ export function previewKitAction(
   categories: CategoryRow[],
 ): KitActionPreview {
   const panelsCat = categories.find((c) => c.name.toLowerCase() === 'panels' || c.slug === 'panels')
-  const completes = scopeRows.filter((r) => r.source === 'tealbury' && r.item_kind === 'complete')
-  const selectedCompletes = completes.filter((r) => r.selected)
 
   switch (action) {
     case 'compute_kits_all': {
-      const n = completes.length
-      const withKit = completes.filter((r) => hasWorkbenchBom(r)).length
+      const plan = buildKitComputePlan(rows, 'all')
       return {
         action,
         title: 'Compute unit kits (all completes)',
-        summary: `Will recompute kits on ${n} Tealbury complete(s). ${withKit} already have a kit (will refresh).`,
-        affected: n,
-        samples: completes.slice(0, 4).map((r) => ({
-          label: r.trade_code || r.sku,
-          detail: `${r.door_range || '—'} · kit ${hasWorkbenchBom(r) ? 'present' : 'missing'}`,
-        })),
-        warnings: n === 0 ? ['No Tealbury complete units in scope.'] : [],
-        canApply: n > 0,
+        summary: `Will compute kits on ${plan.total} kitchen unit(s) (${plan.missingKit} without a kit yet, ${plan.withKit} refresh).`,
+        affected: plan.total,
+        phase: 'plan',
+        explanation: plan.explanation,
+        stats: [
+          { label: 'Kitchen units', value: String(plan.total) },
+          { label: 'Already have kit', value: String(plan.withKit) },
+          { label: 'Kit missing', value: String(plan.missingKit) },
+        ],
+        samples: plan.sampleUnits.map((s) => ({ ...s, tone: 'warn' as const })),
+        warnings: [
+          ...(plan.total === 0 ? ['No Tealbury kitchen units found.'] : []),
+          ...(plan.misTaggedPanels > 0
+            ? [
+                `${plan.misTaggedPanels} row(s) look like panels but are still sold-as complete — Infer part types or Bulk assign Panels first.`,
+              ]
+            : []),
+        ],
+        troubleshoot:
+          plan.misTaggedPanels > 0
+            ? [
+                { id: 'infer_types', label: 'Infer part types' },
+                { id: 'assign_panels', label: 'Bulk assign Panels' },
+              ]
+            : [],
+        canApply: plan.total > 0,
+        misTaggedPanels: plan.misTaggedPanels,
       }
     }
     case 'compute_kits_selected': {
-      const n = selectedCompletes.length
+      const plan = buildKitComputePlan(rows, 'selected')
+      const targets = listKitComputeTargets(rows, 'selected')
       return {
         action,
         title: 'Compute unit kits (selected)',
-        summary: n ? `Will compute kits on ${n} selected complete(s).` : 'Select Tealbury complete rows first.',
-        affected: n,
-        samples: selectedCompletes.slice(0, 4).map((r) => ({
+        summary: plan.total
+          ? `Will compute kits on ${plan.total} selected kitchen unit(s).`
+          : 'Tick Tealbury base/wall unit rows (not panels), then preview again.',
+        affected: plan.total,
+        phase: 'plan',
+        explanation: plan.explanation,
+        stats: [{ label: 'Selected units', value: String(plan.total) }],
+        samples: targets.slice(0, 6).map((r) => ({
           label: r.trade_code || r.sku,
-          detail: r.name.slice(0, 48),
+          detail: `${r.door_range} · ${r.name.slice(0, 36)}`,
+          tone: 'warn' as const,
         })),
-        warnings: n === 0 ? ['Tick one or more Tealbury complete rows in the table.'] : [],
-        canApply: n > 0,
+        warnings: plan.total === 0 ? ['No selected kitchen units — select B40, B100 HL, etc. in the table.'] : [],
+        troubleshoot: plan.total === 0 ? [{ id: 'infer_types', label: 'Infer part types' }] : [],
+        canApply: plan.total > 0,
       }
     }
     case 'infer_part_types':
-      return {
+      return kitPreviewBase({
         action,
         title: 'Infer part types',
         summary: `Will re-infer sold-as and part types on ${scopeRows.length} row(s) in scope.`,
+        explanation:
+          'Re-reads section and name text so panels become accessory, units stay complete, and Lamtek/UFORM parts get part types. Run this before unit kit compute if panels appear in the kit preview.',
         affected: scopeRows.length,
         samples: scopeRows.slice(0, 4).map((r) => ({
           label: r.sku,
@@ -269,9 +322,9 @@ export function previewKitAction(
         })),
         warnings: [],
         canApply: scopeRows.length > 0,
-      }
+      })
     case 'title_case_names':
-      return {
+      return kitPreviewBase({
         action,
         title: 'Title Case names',
         summary: `Will Title Case names on ${rows.filter((r) => r.name?.trim()).length} row(s).`,
@@ -279,7 +332,7 @@ export function previewKitAction(
         samples: rows.slice(0, 3).map((r) => ({ label: r.sku, detail: r.name })),
         warnings: [],
         canApply: rows.length > 0,
-      }
+      })
     case 'bulk_assign_panels': {
       const panelLike = scopeRows.filter(
         (r) =>
@@ -289,7 +342,7 @@ export function previewKitAction(
       const needs = panelLike.filter(
         (r) => r.item_kind !== 'accessory' || r.category_id !== panelsCat?.id,
       )
-      return {
+      return kitPreviewBase({
         action,
         title: 'Bulk assign Panels',
         summary: panelsCat
@@ -302,12 +355,12 @@ export function previewKitAction(
         })),
         warnings: !panelsCat ? ['No “Panels” category found.'] : [],
         canApply: !!panelsCat && needs.length > 0,
-      }
+      })
     }
     case 'clone_uform_missing_ranges': {
       const preview = previewUformRangeClone(rows)
       if (!preview) {
-        return {
+        return kitPreviewBase({
           action,
           title: 'Clone UFORM door sizes',
           summary: 'No UFORM doors in draft to clone from. Import UFORM spec JSON (e.g. Dawson) first.',
@@ -315,12 +368,19 @@ export function previewKitAction(
           samples: [],
           warnings: ['Import at least one door-range UFORM JSON in section 1.'],
           canApply: false,
-        }
+        })
       }
-      return {
+      return kitPreviewBase({
         action,
         title: 'Clone UFORM door sizes to missing ranges',
-        summary: `From “${preview.sourceRange}”: add ${preview.wouldAdd} door/drawer row(s) across ${preview.targetRanges.length} range(s) (${preview.targetRanges.slice(0, 4).join(', ')}${preview.targetRanges.length > 4 ? '…' : ''}). ${preview.templates} unique sizes.`,
+        summary: `From “${preview.sourceRange}”: add ${preview.wouldAdd} door/drawer row(s) across ${preview.targetRanges.length} range(s).`,
+        explanation:
+          'Door leaf sizes (e.g. 715×497 for a 500 HL base) are the same for every range — only the range name and SKU change. This copies sizes from your largest UFORM import into ranges that lack spec PDFs.',
+        stats: [
+          { label: 'New UFORM rows', value: String(preview.wouldAdd) },
+          { label: 'Source sizes', value: String(preview.templates) },
+          { label: 'Target ranges', value: String(preview.targetRanges.length) },
+        ],
         affected: preview.wouldAdd,
         samples: preview.samples.map((s) => {
           const [label, ...rest] = s.split(' ')
@@ -328,10 +388,11 @@ export function previewKitAction(
         }),
         warnings: preview.wouldAdd === 0 ? ['All target ranges already have these sizes.'] : [],
         canApply: preview.wouldAdd > 0,
-      }
+        troubleshoot: preview.wouldAdd > 0 ? [{ id: 'open_validation', label: 'Then run pre-publish validation' }] : [],
+      })
     }
     default:
-      return {
+      return kitPreviewBase({
         action,
         title: action,
         summary: 'Unknown action',
@@ -339,7 +400,7 @@ export function previewKitAction(
         samples: [],
         warnings: [],
         canApply: false,
-      }
+      })
   }
 }
 

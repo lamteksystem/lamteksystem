@@ -7,7 +7,8 @@ import PricelistWorkbenchBulkActionsPanel, {
   type BulkActionScope,
 } from '@/components/admin/PricelistWorkbenchBulkActionsPanel'
 import type { PricelistWorkbenchRow } from '@/lib/pricelistWorkbench'
-import type { KitActionId } from '@/lib/workbenchSmartPresets'
+import type { KitActionId, KitTroubleshootId } from '@/lib/workbenchSmartPresets'
+import type { KitComputeRunResult } from '@/lib/workbenchKitCompute'
 import {
   applyRuleToRows,
   filterRowsByRule,
@@ -33,6 +34,11 @@ type Props = {
   onRowsChange: (rows: PricelistWorkbenchRow[]) => void
   onNotify: (message: string, error?: string | null) => void
   onApplyKitAction: (action: KitActionId) => Promise<{ message: string; error?: string }>
+  onComputeUnitKits: (
+    mode: 'all' | 'selected',
+    onProgress: (done: number, total: number, label?: string) => void,
+  ) => Promise<KitComputeRunResult>
+  onTroubleshoot: (id: KitTroubleshootId) => void
   filteredSelectedCount: number
   categoryOptions: CategoryOptions
   onSelectFiltered: () => void
@@ -63,6 +69,8 @@ export default function PricelistWorkbenchToolsModal({
   onRowsChange,
   onNotify,
   onApplyKitAction,
+  onComputeUnitKits,
+  onTroubleshoot,
   filteredSelectedCount,
   categoryOptions,
   onSelectFiltered,
@@ -163,6 +171,8 @@ export default function PricelistWorkbenchToolsModal({
               onScopeChange={setScope}
               onRunRule={runRule}
               onApplyKitAction={onApplyKitAction}
+              onComputeUnitKits={onComputeUnitKits}
+              onTroubleshoot={onTroubleshoot}
               onOpenAiCommand={(hint) => {
                 setCommandSeed(hint)
                 setTab('command')

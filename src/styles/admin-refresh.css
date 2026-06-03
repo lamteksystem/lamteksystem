@@ -346,6 +346,35 @@
   margin: -0.25rem 0 0.75rem;
   font-size: 0.9rem;
 }
+.workbench-preview-explanation {
+  margin: 0 0 0.65rem;
+  line-height: 1.45;
+}
+.workbench-kit-progress {
+  margin: 0.75rem 0 1rem;
+}
+.workbench-kit-progress .workbench-readiness-bar__track {
+  height: 0.65rem;
+}
+.workbench-smart-troubleshoot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.workbench-kit-sample-list .workbench-kit-sample--fail strong {
+  color: #9b2226;
+}
+.workbench-kit-sample-list .workbench-kit-sample--ok strong {
+  color: #2d6a4f;
+}
+.admin-modal--workbench-tools .admin-workbench-tools-body {
+  max-height: min(72vh, calc(100dvh - 10rem));
+  overflow-y: auto;
+}
+.workbench-smart-presets-preview {
+  scroll-margin-top: 1rem;
+}
 
 .admin-app .admin-table thead th {
   background: linear-gradient(

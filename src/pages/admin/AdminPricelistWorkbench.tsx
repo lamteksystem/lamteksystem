@@ -16,7 +16,7 @@ import {
   type PricelistWorkbenchRow,
 } from '@/lib/pricelistWorkbench'
 import { applyBomToCompleteProduct } from '@/lib/completeUnitBomApply'
-import { bulkComputeDraftBom, mergeWorkbenchRowPatch } from '@/lib/workbenchBom'
+import { mergeWorkbenchRowPatch } from '@/lib/workbenchBom'
 import { normalizeProductDisplayName } from '@/lib/titleCase'
 import { parseTealburyPricelistWorkbookAsync } from '@/lib/tealburyPricelistParse'
 import {
@@ -36,13 +36,15 @@ import PricelistSourceImportProgress, {
 } from '@/components/admin/PricelistSourceImportProgress'
 import AdminNoticeModal from '@/components/admin/AdminNoticeModal'
 import { useListPagination } from '@/lib/listPagination'
-import { deleteRowsByIds } from '@/lib/pricelistWorkbenchRules'
+import { applyRuleToRows, deleteRowsByIds } from '@/lib/pricelistWorkbenchRules'
 import PricelistWorkbenchToolsModal, {
   type WorkbenchToolsTab,
 } from '@/components/admin/PricelistWorkbenchToolsModal'
 import { KIT_LABEL } from '@/lib/kitTerminology'
-import type { KitActionId } from '@/lib/workbenchSmartPresets'
+import type { KitActionId, KitTroubleshootId } from '@/lib/workbenchSmartPresets'
+import { WORKBENCH_SMART_PRESETS } from '@/lib/workbenchSmartPresets'
 import { cloneUformSizesToMissingRanges } from '@/lib/uformRangeClone'
+import { listKitComputeTargets, runKitComputeWithProgress } from '@/lib/workbenchKitCompute'
 import type { BulkActionScope } from '@/components/admin/PricelistWorkbenchBulkActionsPanel'
 import PricelistWorkbenchSection from '@/components/admin/PricelistWorkbenchSection'
 import PricelistWorkbenchTable from '@/components/admin/PricelistWorkbenchTable'
@@ -334,14 +336,64 @@ export default function AdminPricelistWorkbench() {
     showSuccess('Panels assigned', `Updated ${changed} row(s) to Panels + accessory.`)
   }
 
+  async function runComputeUnitKits(
+    mode: 'all' | 'selected',
+    onProgress: (done: number, total: number, label?: string) => void,
+  ) {
+    const targets = listKitComputeTargets(rows, mode)
+    const run = await runKitComputeWithProgress(rows, targets, { onProgress })
+    setRows(run.rows)
+    setActionReport({
+      title: 'Unit kits computed',
+      summary: `Stored kits on ${run.ok} kitchen unit(s); ${run.failed} could not be built.`,
+      lines: run.notes.slice(0, 40),
+      variant: run.ok > 0 ? 'ok' : 'warn',
+    })
+    return run
+  }
+
+  function handleKitTroubleshoot(id: KitTroubleshootId) {
+    switch (id) {
+      case 'open_validation':
+        setToolsTab(null)
+        void openPrePublishReport()
+        break
+      case 'clone_uform':
+        void applyKitAction('clone_uform_missing_ranges')
+        break
+      case 'select_no_doors': {
+        const preset = WORKBENCH_SMART_PRESETS.find((p) => p.id === 'preset-no-doors-select')
+        if (preset?.kind === 'rule') {
+          const { rows: next, result } = applyRuleToRows(rows, preset.rule, undefined, categories)
+          setRows(next)
+          notifySmart(result.message)
+        }
+        break
+      }
+      case 'infer_types':
+        void applyKitAction('infer_part_types')
+        break
+      case 'assign_panels':
+        void applyKitAction('bulk_assign_panels')
+        break
+      case 'filter_failed':
+        setToolsTab(null)
+        patchTableFilters({ source: 'tealbury', itemKind: 'complete', search: '' })
+        showSuccess(
+          'Table filtered',
+          'Showing Tealbury completes. Rows without a kit have an empty Kit column — fix gaps then compute again.',
+        )
+        break
+      default:
+        break
+    }
+  }
+
   async function applyKitAction(action: KitActionId): Promise<{ message: string; error?: string }> {
     switch (action) {
       case 'compute_kits_all':
-        await computeDraftBomsForAllCompletes(true)
-        return { message: 'Unit kit compute finished — see action report if shown.' }
       case 'compute_kits_selected':
-        await computeDraftBomsForSelected(true)
-        return { message: 'Unit kit compute finished for selected completes.' }
+        return { message: '', error: 'Use Compute & save in the preview panel.' }
       case 'infer_part_types':
         await runInferPartTypes()
         return { message: 'Part types re-inferred on all rows.' }
@@ -420,85 +472,6 @@ export default function AdminPricelistWorkbench() {
         lines: [...kinds.entries()].map(([k, n]) => `${k}: ${n} row(s)`),
         variant: 'ok',
       })
-    } finally {
-      setBusy(false)
-      setSetupAction(null)
-    }
-  }
-
-  async function computeDraftBomsForSelected(skipConfirm = false) {
-    const targets = rows.filter((r) => r.selected && r.source === 'tealbury' && r.item_kind === 'complete')
-    if (!targets.length) {
-      setError('Select one or more Tealbury complete-unit rows (checkbox), then try again.')
-      return
-    }
-    if (
-      !skipConfirm &&
-      !window.confirm(
-        `Compute unit kit for ${targets.length} complete unit(s)?\n\nUses Lamtek + UFORM rows already in this workbench (no publish required). Hinges default to Titus SKUs; customers can still pick Blum/Hafele at order time.`,
-      )
-    ) {
-      return
-    }
-    setSetupAction('draft-bom')
-    setBusy(true)
-    setError(null)
-    try {
-      await new Promise((r) => window.setTimeout(r, 0))
-      const res = bulkComputeDraftBom(targets, rows, 'titus')
-      setRows((prev) =>
-        prev.map((r) => {
-          const patch = res.patches.get(r.id)
-          return patch ? mergeWorkbenchRowPatch(r, patch) : r
-        }),
-      )
-      setActionReport({
-        title: res.ok > 0 ? 'Unit kit computed' : 'Unit kit could not be computed',
-        summary: `Stored breakdown on ${res.ok} of ${targets.length} complete unit(s)${res.failed ? `; ${res.failed} failed` : ''}.`,
-        lines: res.notes.slice(0, 40),
-        variant: res.ok > 0 ? 'ok' : 'warn',
-      })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(false)
-      setSetupAction(null)
-    }
-  }
-
-  async function computeDraftBomsForAllCompletes(skipConfirm = false) {
-    const targets = rows.filter((r) => r.source === 'tealbury' && r.item_kind === 'complete')
-    if (!targets.length) {
-      setError('No Tealbury complete-unit rows in the workbench.')
-      return
-    }
-    if (
-      !skipConfirm &&
-      !window.confirm(
-        `Compute unit kits for all ${targets.length} Tealbury complete unit(s) in the workbench? This may take a moment.`,
-      )
-    ) {
-      return
-    }
-    setSetupAction('draft-bom-all')
-    setBusy(true)
-    setError(null)
-    try {
-      const res = bulkComputeDraftBom(targets, rows, 'titus')
-      setRows((prev) =>
-        prev.map((r) => {
-          const patch = res.patches.get(r.id)
-          return patch ? mergeWorkbenchRowPatch(r, patch) : r
-        }),
-      )
-      setActionReport({
-        title: res.ok > 0 ? 'Unit kits computed (all completes)' : 'Unit kits could not be computed',
-        summary: `Stored breakdown on ${res.ok} of ${targets.length} complete unit(s).`,
-        lines: res.notes.slice(0, 50),
-        variant: res.ok > 0 ? 'ok' : 'warn',
-      })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
       setSetupAction(null)
@@ -1114,6 +1087,8 @@ export default function AdminPricelistWorkbench() {
           onRowsChange={setRows}
           onNotify={notifySmart}
           onApplyKitAction={applyKitAction}
+          onComputeUnitKits={runComputeUnitKits}
+          onTroubleshoot={handleKitTroubleshoot}
           filteredSelectedCount={filteredSelectedCount}
           categoryOptions={categoryOptions}
           onSelectFiltered={() => toggleSelectAllFiltered(true)}

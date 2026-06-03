@@ -97,7 +97,7 @@ begin
   insert into public.products (name, description, sku, unit_price, cost_price, category_id, part_type, catalog_program, is_stock, stock_quantity, options)
   select '1000 HL Base Unit (Dawson)',
          'Complete high-line 1000mm base unit in the Dawson range: carcass, 2 doors, hinges, legs and fittings. Placeholder price.',
-         'B1000-HL-DAW', 165.00, 118.00, cat_dawson, null, 'tealbury', false, 0,
+         'B1000-HL-DAW', 210.00, 151.20, cat_dawson, null, 'tealbury', false, 0,
          '{"tealbury_trade_code":"B100","tealbury_door_range":"Dawson","tealbury_dims_mm":{"w":1000,"h":720,"d":560},"build_line_style":"high_line"}'::jsonb
   where not exists (select 1 from public.products where sku = 'B1000-HL-DAW');
   select id into p_hl from public.products where sku = 'B1000-HL-DAW' limit 1;
@@ -105,7 +105,7 @@ begin
   insert into public.products (name, description, sku, unit_price, cost_price, category_id, part_type, catalog_program, is_stock, stock_quantity, options)
   select '1000 DL Base Unit (Dawson)',
          'Complete drawer-line 1000mm base unit in the Dawson range: carcass, 3 drawer fronts, drawer boxes, legs and fittings. Placeholder price.',
-         'B1000-DL-DAW', 210.00, 150.00, cat_dawson, null, 'tealbury', false, 0,
+         'B1000-DL-DAW', 255.00, 183.60, cat_dawson, null, 'tealbury', false, 0,
          '{"tealbury_trade_code":"B100","tealbury_door_range":"Dawson","tealbury_dims_mm":{"w":1000,"h":720,"d":560},"build_line_style":"drawer_line"}'::jsonb
   where not exists (select 1 from public.products where sku = 'B1000-DL-DAW');
   select id into p_dl from public.products where sku = 'B1000-DL-DAW' limit 1;
@@ -144,4 +144,88 @@ begin
     set quantity = excluded.quantity,
         component_role = excluded.component_role,
         sort_order = excluded.sort_order;
+end $$;
+
+-- =============================================================================
+-- Range expansion: the rest of the Dawson base-unit range (HL + DL).
+-- =============================================================================
+-- Sizes 400/500/600/800 (1000 seeded above). Door count is driven by width
+-- (>= 800 => 2 doors, else 1). Shared components are reused; door dimensions
+-- are intentionally generic (a single template door/front) until the real
+-- pricelist provides per-size door sizes. Prices are PLACEHOLDERS.
+do $$
+declare
+  cat_carcass uuid;
+  cat_dawson uuid;
+  p_door uuid; p_dfront uuid; p_dboxkit uuid; p_hinge uuid; p_hplate uuid; p_legkit uuid; p_fittings uuid;
+  p_carcass uuid; p_hl uuid; p_dl uuid; a_hl uuid; a_dl uuid;
+  w int; doors int; carcass_price numeric; hl_price numeric; dl_price numeric;
+  sizes int[] := array[400, 500, 600, 800];
+begin
+  select id into cat_carcass from public.categories where slug = 'carcasses';
+  select id into cat_dawson  from public.categories where slug = 'dawson';
+  select id into p_door     from public.products where sku = 'DOOR-DAW-715-497' limit 1;
+  select id into p_dfront   from public.products where sku = 'DF-DAW-180-497' limit 1;
+  select id into p_dboxkit  from public.products where sku = 'DBOX-RUN-500' limit 1;
+  select id into p_hinge    from public.products where sku = 'HINGE-BLUM-110' limit 1;
+  select id into p_hplate   from public.products where sku = 'HPLATE-BLUM' limit 1;
+  select id into p_legkit   from public.products where sku = 'LEG-KIT-4' limit 1;
+  select id into p_fittings from public.products where sku = 'FIT-PACK' limit 1;
+
+  foreach w in array sizes loop
+    doors := case when w >= 800 then 2 else 1 end;
+    carcass_price := 50 + (w - 400) * 0.05;
+    hl_price := 120 + (w - 400) * 0.15;
+    dl_price := hl_price + 45;
+
+    -- per-size carcass
+    insert into public.products (name, description, sku, unit_price, cost_price, category_id, part_type, catalog_program, is_stock, stock_quantity, options)
+    select format('%s Base Carcass — White', w), format('%smm wide base carcass (white). Placeholder price.', w), format('CARC-B%s-WHI', w), carcass_price, round(carcass_price * 0.75, 2), cat_carcass, 'unit', 'lamtek', true, 20, jsonb_build_object('lamtek_dims_mm', jsonb_build_object('w', w, 'h', 720, 'd', 560))
+    where not exists (select 1 from public.products where sku = format('CARC-B%s-WHI', w));
+    select id into p_carcass from public.products where sku = format('CARC-B%s-WHI', w) limit 1;
+
+    -- HL complete unit
+    insert into public.products (name, description, sku, unit_price, cost_price, category_id, part_type, catalog_program, is_stock, stock_quantity, options)
+    select format('%s HL Base Unit (Dawson)', w), format('Complete high-line %smm base unit in the Dawson range. Placeholder price.', w), format('B%s-HL-DAW', w), hl_price, round(hl_price * 0.72, 2), cat_dawson, null, 'tealbury', false, 0, jsonb_build_object('tealbury_trade_code', format('B%s', w/10), 'tealbury_door_range', 'Dawson', 'tealbury_dims_mm', jsonb_build_object('w', w, 'h', 720, 'd', 560), 'build_line_style', 'high_line')
+    where not exists (select 1 from public.products where sku = format('B%s-HL-DAW', w));
+    select id into p_hl from public.products where sku = format('B%s-HL-DAW', w) limit 1;
+
+    -- DL complete unit
+    insert into public.products (name, description, sku, unit_price, cost_price, category_id, part_type, catalog_program, is_stock, stock_quantity, options)
+    select format('%s DL Base Unit (Dawson)', w), format('Complete drawer-line %smm base unit in the Dawson range. Placeholder price.', w), format('B%s-DL-DAW', w), dl_price, round(dl_price * 0.72, 2), cat_dawson, null, 'tealbury', false, 0, jsonb_build_object('tealbury_trade_code', format('B%s', w/10), 'tealbury_door_range', 'Dawson', 'tealbury_dims_mm', jsonb_build_object('w', w, 'h', 720, 'd', 560), 'build_line_style', 'drawer_line')
+    where not exists (select 1 from public.products where sku = format('B%s-DL-DAW', w));
+    select id into p_dl from public.products where sku = format('B%s-DL-DAW', w) limit 1;
+
+    -- assemblies
+    insert into public.assemblies (name, description, product_id, unit_type, width_mm, active)
+    select format('%s HL Base Unit (Dawson)', w), 'BOM (generated range example).', p_hl, 'base_unit', w, true
+    where not exists (select 1 from public.assemblies where product_id = p_hl);
+    select id into a_hl from public.assemblies where product_id = p_hl limit 1;
+
+    insert into public.assemblies (name, description, product_id, unit_type, width_mm, active)
+    select format('%s DL Base Unit (Dawson)', w), 'BOM (generated range example).', p_dl, 'base_unit', w, true
+    where not exists (select 1 from public.assemblies where product_id = p_dl);
+    select id into a_dl from public.assemblies where product_id = p_dl limit 1;
+
+    -- HL lines: carcass, doors (count by width), hinges/plates (2 per door), legs, fittings
+    insert into public.assembly_lines (assembly_id, product_id, quantity, component_role, sort_order) values
+      (a_hl, p_carcass,  1,         'unit',        0),
+      (a_hl, p_door,     doors,     'door',        1),
+      (a_hl, p_hinge,    doors * 2, 'hinge',       2),
+      (a_hl, p_hplate,   doors * 2, 'hinge_plate', 3),
+      (a_hl, p_legkit,   1,         'leg_kit',     4),
+      (a_hl, p_fittings, 1,         'fittings',    5)
+    on conflict (assembly_id, product_id) do update
+      set quantity = excluded.quantity, component_role = excluded.component_role, sort_order = excluded.sort_order;
+
+    -- DL lines: carcass, 3 fronts, 3 box kits, legs, fittings
+    insert into public.assembly_lines (assembly_id, product_id, quantity, component_role, sort_order) values
+      (a_dl, p_carcass,  1, 'unit',     0),
+      (a_dl, p_dfront,   3, 'drawer',   1),
+      (a_dl, p_dboxkit,  3, 'fittings', 2),
+      (a_dl, p_legkit,   1, 'leg_kit',  3),
+      (a_dl, p_fittings, 1, 'fittings', 4)
+    on conflict (assembly_id, product_id) do update
+      set quantity = excluded.quantity, component_role = excluded.component_role, sort_order = excluded.sort_order;
+  end loop;
 end $$;

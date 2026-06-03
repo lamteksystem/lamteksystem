@@ -40,6 +40,8 @@ import { deleteRowsByIds } from '@/lib/pricelistWorkbenchRules'
 import PricelistWorkbenchToolsModal, {
   type WorkbenchToolsTab,
 } from '@/components/admin/PricelistWorkbenchToolsModal'
+import { KIT_LABEL } from '@/lib/kitTerminology'
+import type { KitActionId } from '@/lib/workbenchSmartPresets'
 import type { BulkActionScope } from '@/components/admin/PricelistWorkbenchBulkActionsPanel'
 import PricelistWorkbenchSection from '@/components/admin/PricelistWorkbenchSection'
 import PricelistWorkbenchTable from '@/components/admin/PricelistWorkbenchTable'
@@ -97,6 +99,7 @@ export default function AdminPricelistWorkbench() {
 
   const [tableFilters, setTableFilters] = useState<WorkbenchTableFilters>(DEFAULT_WORKBENCH_FILTERS)
   const [toolsTab, setToolsTab] = useState<WorkbenchToolsTab | null>(null)
+  const [toolsCommandPrompt, setToolsCommandPrompt] = useState('')
   const tableScrollRef = useRef<HorizontalScrollHandle>(null)
   const [tableScrollState, setTableScrollState] = useState<HorizontalScrollState>({
     canScrollLeft: false,
@@ -307,7 +310,7 @@ export default function AdminPricelistWorkbench() {
     }
   }
 
-  function bulkAssignPanels() {
+  function bulkAssignPanels(skipConfirm = false) {
     const panelsCat = categories.find((c) => c.name.toLowerCase() === 'panels' || c.slug === 'panels')
     if (!panelsCat) {
       setError('Create a “Panels” category under Accessories before using bulk assign.')
@@ -319,6 +322,7 @@ export default function AdminPricelistWorkbench() {
       return
     }
     if (
+      !skipConfirm &&
       !window.confirm(
         `Assign category “${panelsCat.name}” and sold-as accessory to ${changed} panel-like row(s)?`,
       )
@@ -329,9 +333,32 @@ export default function AdminPricelistWorkbench() {
     showSuccess('Panels assigned', `Updated ${changed} row(s) to Panels + accessory.`)
   }
 
-  function applyTitleCaseToAllNames() {
+  async function applyKitAction(action: KitActionId): Promise<{ message: string; error?: string }> {
+    switch (action) {
+      case 'compute_kits_all':
+        await computeDraftBomsForAllCompletes(true)
+        return { message: 'Unit kit compute finished — see action report if shown.' }
+      case 'compute_kits_selected':
+        await computeDraftBomsForSelected(true)
+        return { message: 'Unit kit compute finished for selected completes.' }
+      case 'infer_part_types':
+        await runInferPartTypes()
+        return { message: 'Part types re-inferred on all rows.' }
+      case 'title_case_names':
+        applyTitleCaseToAllNames(true)
+        return { message: 'Title Case applied to all names.' }
+      case 'bulk_assign_panels':
+        bulkAssignPanels(true)
+        return { message: 'Panels bulk assign finished.' }
+      default:
+        return { message: '', error: 'Unknown kit action.' }
+    }
+  }
+
+  function applyTitleCaseToAllNames(skipConfirm = false) {
     if (!rows.length) return
     if (
+      !skipConfirm &&
       !window.confirm(
         `Apply Title Case to all ${rows.length} product name(s) in the workbench draft? (Major words capitalized; minor words like "and" / "for" stay lowercase.)`,
       )
@@ -380,15 +407,16 @@ export default function AdminPricelistWorkbench() {
     }
   }
 
-  async function computeDraftBomsForSelected() {
+  async function computeDraftBomsForSelected(skipConfirm = false) {
     const targets = rows.filter((r) => r.selected && r.source === 'tealbury' && r.item_kind === 'complete')
     if (!targets.length) {
       setError('Select one or more Tealbury complete-unit rows (checkbox), then try again.')
       return
     }
     if (
+      !skipConfirm &&
       !window.confirm(
-        `Compute draft BOM for ${targets.length} complete unit(s)?\n\nUses Lamtek + UFORM rows already in this workbench (no publish required). Hinges default to Titus SKUs; customers can still pick Blum/Hafele at order time.`,
+        `Compute unit kit for ${targets.length} complete unit(s)?\n\nUses Lamtek + UFORM rows already in this workbench (no publish required). Hinges default to Titus SKUs; customers can still pick Blum/Hafele at order time.`,
       )
     ) {
       return
@@ -406,7 +434,7 @@ export default function AdminPricelistWorkbench() {
         }),
       )
       setActionReport({
-        title: res.ok > 0 ? 'Draft BOM computed' : 'Draft BOM could not be computed',
+        title: res.ok > 0 ? 'Unit kit computed' : 'Unit kit could not be computed',
         summary: `Stored breakdown on ${res.ok} of ${targets.length} complete unit(s)${res.failed ? `; ${res.failed} failed` : ''}.`,
         lines: res.notes.slice(0, 40),
         variant: res.ok > 0 ? 'ok' : 'warn',
@@ -419,15 +447,16 @@ export default function AdminPricelistWorkbench() {
     }
   }
 
-  async function computeDraftBomsForAllCompletes() {
+  async function computeDraftBomsForAllCompletes(skipConfirm = false) {
     const targets = rows.filter((r) => r.source === 'tealbury' && r.item_kind === 'complete')
     if (!targets.length) {
       setError('No Tealbury complete-unit rows in the workbench.')
       return
     }
     if (
+      !skipConfirm &&
       !window.confirm(
-        `Compute draft BOM for all ${targets.length} Tealbury complete unit(s) in the workbench? This may take a moment.`,
+        `Compute unit kits for all ${targets.length} Tealbury complete unit(s) in the workbench? This may take a moment.`,
       )
     ) {
       return
@@ -444,7 +473,7 @@ export default function AdminPricelistWorkbench() {
         }),
       )
       setActionReport({
-        title: res.ok > 0 ? 'Draft BOM computed (all completes)' : 'Draft BOM could not be computed',
+        title: res.ok > 0 ? 'Unit kits computed (all completes)' : 'Unit kits could not be computed',
         summary: `Stored breakdown on ${res.ok} of ${targets.length} complete unit(s).`,
         lines: res.notes.slice(0, 50),
         variant: res.ok > 0 ? 'ok' : 'warn',
@@ -734,8 +763,9 @@ export default function AdminPricelistWorkbench() {
         <p className="page-intro">
           Build the <strong>Tealbury Complete</strong> catalogue visually: Lamtek <strong>components</strong> (carcasses,
           hinges, drawers), Tealbury <strong>complete units</strong> (one row per sellable kitchen), and UFORM{' '}
-          <strong>doors &amp; trim</strong> from spec PDFs. Assign categories and part types, compute draft BOMs to preview
-          what&apos;s included, then publish — draft BOMs copy to live assemblies when component SKUs are published too.
+          <strong>doors &amp; trim</strong> from spec PDFs. Assign categories and part types, compute{' '}
+          <strong>unit kits</strong> ({KIT_LABEL}) to preview what&apos;s included, then publish — kits copy to live
+          assemblies when component SKUs are published too.
         </p>
         <p className="admin-muted" style={{ marginTop: '-0.5rem' }}>
           <Link to={LIVE_CATALOGUE.categories}>Categories</Link> ·{' '}
@@ -777,28 +807,17 @@ export default function AdminPricelistWorkbench() {
           → import JSON below.
         </p>
         <div className="admin-pricelist-action-row" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
-          <span className="admin-pricelist-setup-action">
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={busy}
-              onClick={() => void runBootstrapCategories()}
-            >
-              {setupAction === 'categories' ? 'Working…' : 'Ensure Accessories categories'}
-            </button>
-            <AdminHelpTip text="Creates only the Accessories parent plus Cutlery Trays, Lighting, and Misc if missing. Does not add spreadsheet section categories or door-range categories." />
-          </span>
-          <span className="admin-pricelist-setup-action">
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={busy || !rows.length}
-              onClick={() => applyTitleCaseToAllNames()}
-            >
-              Title Case all names
-            </button>
-            <AdminHelpTip text="Capitalizes product names (Plain End Panel (Dawson)). New imports apply Title Case automatically on publish." />
-          </span>
+          <button
+            type="button"
+            className="btn"
+            disabled={busy || !rows.length}
+            onClick={() => {
+              setToolsCommandPrompt('')
+              setToolsTab('presets')
+            }}
+          >
+            Smart controls
+          </button>
           <span className="admin-pricelist-setup-action">
             <button
               type="button"
@@ -808,50 +827,18 @@ export default function AdminPricelistWorkbench() {
             >
               {computingBomGaps ? 'Analysing…' : 'Pre-publish validation'}
             </button>
-            <AdminHelpTip text="Readiness %, must-fix issues (SKU, names), and BOM/component gap groups before you publish." />
+            <AdminHelpTip text="Readiness %, must-fix issues, and unit-kit gap groups before you publish." />
           </span>
           <span className="admin-pricelist-setup-action">
             <button
               type="button"
               className="btn btn-outline"
-              disabled={busy || !rows.length}
-              onClick={() => bulkAssignPanels()}
+              disabled={busy}
+              onClick={() => void runBootstrapCategories()}
             >
-              Bulk assign Panels
+              {setupAction === 'categories' ? 'Working…' : 'Ensure Accessories categories'}
             </button>
-            <AdminHelpTip text="Sets category Panels and sold-as accessory on rows whose name/section looks like an end panel." />
-          </span>
-          <span className="admin-pricelist-setup-action">
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={busy || !rows.length}
-              onClick={() => void runInferPartTypes()}
-            >
-              {setupAction === 'infer' ? 'Inferring…' : 'Infer part types on all rows'}
-            </button>
-            <AdminHelpTip text="Guesses BOM part type (unit, hinge, door, …) and row kind (complete vs component) from section/name text. Use before publish and before applying BOMs." />
-          </span>
-          <span className="admin-pricelist-setup-action">
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={busy || !rows.some((r) => r.selected && r.source === 'tealbury' && r.item_kind === 'complete')}
-              onClick={() => void computeDraftBomsForSelected()}
-            >
-              {setupAction === 'draft-bom' ? 'Computing BOM…' : 'Compute BOM in draft (selected)'}
-            </button>
-            <AdminHelpTip text="Builds a component breakdown on each selected Tealbury complete row while still in the workbench — preview “What’s included” before publish. Uses carcass + UFORM door sizing from unit width." />
-          </span>
-          <span className="admin-pricelist-setup-action">
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={busy || !rows.some((r) => r.source === 'tealbury' && r.item_kind === 'complete')}
-              onClick={() => void computeDraftBomsForAllCompletes()}
-            >
-              {setupAction === 'draft-bom-all' ? 'Computing…' : 'Compute BOM for all completes'}
-            </button>
+            <AdminHelpTip text="Creates only the Accessories parent plus Cutlery Trays, Lighting, and Misc if missing." />
           </span>
           <span className="admin-pricelist-setup-action">
             <button
@@ -860,11 +847,15 @@ export default function AdminPricelistWorkbench() {
               disabled={busy || !rows.some((r) => r.selected && r.source === 'tealbury')}
               onClick={() => void applyBomsToSelectedCompletes()}
             >
-              {setupAction === 'bom' ? 'Applying BOM…' : 'Apply BOM to live catalogue (published only)'}
+              {setupAction === 'bom' ? 'Applying…' : 'Apply kits to live catalogue (published only)'}
             </button>
-            <AdminHelpTip text="After publish: links live complete products to component SKUs in assemblies. Use “Compute BOM in draft” first to preview and to auto-link on publish." />
+            <AdminHelpTip text="After publish: links live complete products to component SKUs. Compute unit kits in Smart controls first." />
           </span>
         </div>
+        <p className="admin-muted" style={{ marginTop: '0.5rem' }}>
+          Title Case, infer types, Panels assign, and {KIT_LABEL} compute live in <strong>Smart controls</strong> with
+          preview before push.
+        </p>
       </PricelistWorkbenchSection>
 
       <PricelistWorkbenchSection
@@ -993,22 +984,17 @@ export default function AdminPricelistWorkbench() {
             badge={filtered.length}
           >
             <div className="admin-pricelist-tools-bar">
-              <span className="admin-pricelist-tools-bar-label">Power tools</span>
               <button
                 type="button"
                 className="btn btn-small"
-                onClick={() => setToolsTab('smart')}
+                onClick={() => {
+                  setToolsCommandPrompt('')
+                  setToolsTab('presets')
+                }}
               >
-                ✨ AI command &amp; rules
+                Smart controls
               </button>
-              <button
-                type="button"
-                className="btn btn-small btn-outline"
-                onClick={() => setToolsTab('bulk')}
-              >
-                Bulk actions
-              </button>
-              <AdminHelpTip text="Open the AI natural-language command, bulk editor, presets and rule builder, or quick bulk actions (select / assign category / delete / auto-map) in a pop-up. They act on the current filter, selection, or all rows — without cluttering the table." />
+              <AdminHelpTip text="Quick fixes (kits, Panels, No Doors), AI command with before/after preview, and bulk select/assign — push to draft only when the preview looks right." />
             </div>
             <PricelistWorkbenchTableToolbar
               filters={tableFilters}
@@ -1097,13 +1083,18 @@ export default function AdminPricelistWorkbench() {
       {toolsTab && (
         <PricelistWorkbenchToolsModal
           initialTab={toolsTab}
-          onClose={() => setToolsTab(null)}
+          initialCommandPrompt={toolsCommandPrompt}
+          onClose={() => {
+            setToolsTab(null)
+            setToolsCommandPrompt('')
+          }}
           rows={rows}
           filtered={filtered}
           categories={categories}
           partTypes={partTypesHook.types}
           onRowsChange={setRows}
           onNotify={notifySmart}
+          onApplyKitAction={applyKitAction}
           filteredSelectedCount={filteredSelectedCount}
           categoryOptions={categoryOptions}
           onSelectFiltered={() => toggleSelectAllFiltered(true)}

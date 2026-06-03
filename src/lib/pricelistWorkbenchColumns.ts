@@ -111,8 +111,8 @@ export const PRICELIST_WORKBENCH_COLUMNS: WorkbenchColumnDef[] = [
   },
   {
     id: 'bom',
-    label: 'BOM',
-    tip: 'Draft bill of materials stored on this row (✓). Publish copies it to live assemblies when component SKUs exist.',
+    label: 'Kit',
+    tip: 'Unit kit (parts list for this complete) stored on this row (✓). Same as a bill of materials (BOM). Publish copies it to live assemblies when component SKUs exist.',
     minWidth: 44,
     defaultWidth: 52,
   },

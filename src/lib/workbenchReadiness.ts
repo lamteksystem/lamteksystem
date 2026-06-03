@@ -146,7 +146,7 @@ export function buildPrePublishValidation(
       kind: 'complete_without_bom',
       severity: 'warn',
       count: completesNoBom.length,
-      description: 'Tealbury complete units without a draft BOM — run “Compute BOM for all completes”.',
+      description: 'Tealbury complete units without a unit kit — use Smart controls → Compute unit kits (all completes).',
       samples: completesNoBom.slice(0, 8).map((r) => `${r.trade_code || r.sku} · ${r.door_range || '—'}`),
     })
   }

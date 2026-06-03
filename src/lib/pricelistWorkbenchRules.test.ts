@@ -50,7 +50,7 @@ describe('pricelistWorkbenchRules', () => {
       row({ id: 'a', door_range: 'No Doors' }),
       row({ id: 'b', door_range: 'Dawson' }),
     ]
-    const preset = WORKBENCH_RULE_PRESETS[0]
+    const preset = WORKBENCH_RULE_PRESETS.find((p) => p.id === 'preset-tealbury-no-doors-delete')!
     const { rows: next, result } = applyRuleToRows(rows, preset)
     expect(next).toHaveLength(1)
     expect(next[0].id).toBe('b')
@@ -190,7 +190,8 @@ describe('pricelistWorkbenchRules', () => {
       row({ id: 'a', door_range: 'No Doors' }),
       row({ id: 'b', door_range: 'Dawson' }),
     ]
-    const sim = simulateRuleOnRows(rows, WORKBENCH_RULE_PRESETS[0], undefined, [])
+    const preset = WORKBENCH_RULE_PRESETS.find((p) => p.id === 'preset-tealbury-no-doors-delete')!
+    const sim = simulateRuleOnRows(rows, preset, undefined, [])
     expect(rows).toHaveLength(2)
     expect(sim.matched).toBe(1)
     expect(sim.wouldChange).toBe(1)

@@ -308,6 +308,45 @@
   margin-bottom: 0.35rem;
 }
 
+.workbench-smart-presets-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.workbench-smart-preset-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--lamtek-border) 70%, transparent);
+  border-radius: 8px;
+  background: var(--lamtek-surface);
+  cursor: pointer;
+}
+.workbench-smart-preset-card:hover,
+.workbench-smart-preset-card.is-active {
+  border-color: color-mix(in srgb, var(--lamtek-gold) 55%, var(--lamtek-border));
+  background: color-mix(in srgb, var(--lamtek-bg) 92%, var(--lamtek-gold) 8%);
+}
+.workbench-smart-presets-group-title {
+  font-size: 0.9rem;
+  margin: 0.75rem 0 0.4rem;
+}
+.workbench-smart-presets-apply {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--lamtek-border) 55%, transparent);
+}
+.admin-modal-intro {
+  margin: -0.25rem 0 0.75rem;
+  font-size: 0.9rem;
+}
+
 .admin-app .admin-table thead th {
   background: linear-gradient(
     180deg,

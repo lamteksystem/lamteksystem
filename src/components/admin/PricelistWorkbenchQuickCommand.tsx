@@ -36,6 +36,8 @@ type Props = {
   onNotify: (message: string, error?: string | null) => void
   /** Hand the best-guess rule to the dropdown builder so the user can fix it in place. */
   onEditInBuilder?: (rule: WorkbenchRule) => void
+  initialPrompt?: string
+  onPromptConsumed?: () => void
 }
 
 type FlowPhase = 'idle' | 'simulated' | 'approved' | 'refining'
@@ -49,8 +51,10 @@ export default function PricelistWorkbenchQuickCommand({
   onRunRule,
   onNotify,
   onEditInBuilder,
+  initialPrompt = '',
+  onPromptConsumed,
 }: Props) {
-  const [prompt, setPrompt] = useState('')
+  const [prompt, setPrompt] = useState(initialPrompt)
   const [phase, setPhase] = useState<FlowPhase>('idle')
   const [simulation, setSimulation] = useState<RuleSimulationResult | null>(null)
   const [pendingRule, setPendingRule] = useState<WorkbenchRule | null>(null)
@@ -83,6 +87,13 @@ export default function PricelistWorkbenchQuickCommand({
     setFallbackRule(null)
     setInterpretedViaAi(false)
   }, [])
+
+  useEffect(() => {
+    if (!initialPrompt.trim()) return
+    setPrompt(initialPrompt)
+    resetFlow()
+    onPromptConsumed?.()
+  }, [initialPrompt, onPromptConsumed, resetFlow])
 
   function offerBuilderFallback() {
     if (!onEditInBuilder) return false
@@ -242,12 +253,12 @@ export default function PricelistWorkbenchQuickCommand({
   return (
     <div className="admin-pricelist-smart-card admin-pricelist-quick-command">
       <h3>
-        Quick command
-        <AdminHelpTip text="Test simulation dry-runs your command. If the parser misread it or nothing would change, the assistant suggests a repaired command — apply the fix and re-test until rows would update." />
+        AI command
+        <AdminHelpTip text="Test simulation shows before/after on sample rows. Troubleshoot in this panel until the preview matches what you want, then push to the draft." />
       </h3>
       <p className="admin-muted">
-        Describe filters and action in one sentence. <strong>Test simulation</strong> checks the result and
-        troubleshoots automatically when the command would not work as intended.
+        Describe filters and action in one sentence. <strong>Test simulation</strong> previews changes; then{' '}
+        <strong>Push to draft</strong> when the before/after looks right.
       </p>
 
       {promptPresets.length > 0 && (
@@ -455,7 +466,7 @@ export default function PricelistWorkbenchQuickCommand({
 
           {phase === 'simulated' && !assist?.needsAttention && simulation.wouldChange > 0 && (
             <div className="admin-pricelist-simulation-outcome">
-              <p>Simulation looks good — ready to apply.</p>
+              <p>Simulation looks good — ready to push to the draft.</p>
               <div className="admin-pricelist-smart-actions">
                 <button
                   type="button"
@@ -465,7 +476,7 @@ export default function PricelistWorkbenchQuickCommand({
                     setPresetName(defaultPromptPresetName(prompt))
                   }}
                 >
-                  Continue — run or save
+                  Continue — push or save
                 </button>
                 <button type="button" className="btn btn-small btn-outline" onClick={() => setPhase('refining')}>
                   Refine command
@@ -499,7 +510,7 @@ export default function PricelistWorkbenchQuickCommand({
               <p>Command confirmed. What would you like to do?</p>
               <div className="admin-pricelist-smart-actions">
                 <button type="button" className="btn btn-small" onClick={confirmAndRun}>
-                  Run on draft now
+                  Push to draft
                 </button>
                 <button
                   type="button"

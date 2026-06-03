@@ -46,6 +46,8 @@ const FIELD_OPTIONS: { value: WorkbenchMatchField; label: string }[] = [
   { value: 'cost_price', label: 'Lamtek cost price' },
   { value: 'unit_price', label: 'List / sell price' },
   { value: 'category', label: 'Category (unassigned)' },
+  { value: 'item_kind', label: 'Sold-as (complete, accessory, …)' },
+  { value: 'kit', label: 'Unit kit (present / missing)' },
 ]
 
 const OP_OPTIONS: { value: WorkbenchConditionOp; label: string }[] = [
@@ -81,6 +83,11 @@ type Props = {
   partTypes: AssemblyPartTypeRow[]
   onRowsChange: (rows: PricelistWorkbenchRow[]) => void
   onNotify: (message: string, error?: string | null) => void
+  /** When set, scope is controlled by the parent (Smart controls modal). */
+  scope?: SmartApplyScope
+  onScopeChange?: (scope: SmartApplyScope) => void
+  initialPrompt?: string
+  onPromptConsumed?: () => void
 }
 
 function newCondition(): WorkbenchCondition {
@@ -104,8 +111,14 @@ export default function PricelistWorkbenchSmartPanel({
   partTypes,
   onRowsChange,
   onNotify,
+  scope: scopeProp,
+  onScopeChange,
+  initialPrompt = '',
+  onPromptConsumed,
 }: Props) {
-  const [scope, setScope] = useState<SmartApplyScope>('filtered')
+  const [scopeInternal, setScopeInternal] = useState<SmartApplyScope>('filtered')
+  const scope = scopeProp ?? scopeInternal
+  const setScope = onScopeChange ?? setScopeInternal
   const [aiEnabled, setAiEnabled] = useState(true)
   const [bulkRows, setBulkRows] = useState<PricelistWorkbenchRow[] | null>(null)
   const [bulkLabel, setBulkLabel] = useState('')
@@ -370,6 +383,8 @@ export default function PricelistWorkbenchSmartPanel({
           onRunRule={runRule}
           onNotify={onNotify}
           onEditInBuilder={editRuleInBuilder}
+          initialPrompt={initialPrompt}
+          onPromptConsumed={onPromptConsumed}
         />
 
         <div className="admin-pricelist-smart-card admin-pricelist-bulk-card">

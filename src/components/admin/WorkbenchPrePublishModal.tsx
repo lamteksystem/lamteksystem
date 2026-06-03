@@ -1,4 +1,5 @@
 import AdminNoticeModal from '@/components/admin/AdminNoticeModal'
+import { KIT_LABEL } from '@/lib/kitTerminology'
 import type { PrePublishReport, ValidationIssue } from '@/lib/workbenchReadiness'
 
 type Props = {
@@ -91,7 +92,7 @@ export default function WorkbenchPrePublishModal({
               </dd>
             </div>
             <div>
-              <dt>Tealbury completes with BOM</dt>
+              <dt>Tealbury completes with {KIT_LABEL}</dt>
               <dd>
                 {readiness.tealburyCompletesWithBom.ok}/{readiness.tealburyCompletesWithBom.total} (
                 {readiness.tealburyCompletesWithBom.percent}%)
@@ -132,13 +133,13 @@ export default function WorkbenchPrePublishModal({
             <p className="admin-muted">No validation issues detected on this draft.</p>
           )}
 
-          <h3 className="workbench-pre-publish-heading">BOM &amp; component gaps</h3>
+          <h3 className="workbench-pre-publish-heading">{KIT_LABEL} &amp; component gaps</h3>
           {computingGaps ? (
             <p className="admin-muted">Computing gaps across Tealbury completes…</p>
           ) : bomGaps ? (
             <>
               <p className="admin-muted">
-                {bomGaps.okCount} of {bomGaps.completeCount} complete unit(s) resolve a full draft BOM ·{' '}
+                {bomGaps.okCount} of {bomGaps.completeCount} complete unit(s) resolve a full unit kit ·{' '}
                 {bomGaps.failedCount} failed
               </p>
               {bomGaps.groups.length > 0 ? (
@@ -155,7 +156,7 @@ export default function WorkbenchPrePublishModal({
                   ))}
                 </ul>
               ) : (
-                <p className="admin-muted">All completes resolved a BOM.</p>
+                <p className="admin-muted">All completes resolved a unit kit.</p>
               )}
               {bomGaps.groups.length > 12 && (
                 <p className="admin-muted">…and {bomGaps.groups.length - 12} more gap type(s).</p>

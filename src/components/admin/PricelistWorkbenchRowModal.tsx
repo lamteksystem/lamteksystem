@@ -62,7 +62,7 @@ export default function PricelistWorkbenchRowModal({
     setBomError(null)
     const { bom, error } = computeDraftBom(row, { allRows, hingeBrand: 'titus' })
     if (!bom) {
-      setBomError(error ?? 'Could not compute BOM')
+      setBomError(error ?? 'Could not compute unit kit')
       return
     }
     onPatchRow(row.id, workbenchBomPatch(bom))
@@ -283,10 +283,10 @@ export default function PricelistWorkbenchRowModal({
 
           {showBomSection ? (
             <div className="admin-pricelist-row-modal-field admin-pricelist-row-modal-field--wide admin-pricelist-row-modal-bom">
-              <span>Component breakdown (draft BOM)</span>
+              <span>Unit kit (component breakdown)</span>
               <div className="admin-pricelist-row-modal-bom-actions">
                 <button type="button" className="btn btn-outline btn-sm" onClick={computeBomForRow}>
-                  {getWorkbenchBom(row) ? 'Recompute BOM' : 'Compute BOM in draft'}
+                  {getWorkbenchBom(row) ? 'Recompute kit' : 'Compute unit kit'}
                 </button>
                 <HingeBrandPreviewSelect value={hingePreview} onChange={setHingePreview} />
               </div>

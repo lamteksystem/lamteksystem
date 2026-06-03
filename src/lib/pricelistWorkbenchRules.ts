@@ -1,6 +1,7 @@
 /**
  * Smart rules & natural-language commands for the pricelist workbench draft list.
  */
+import { hasWorkbenchBom } from '@/lib/workbenchBom'
 import type { PricelistWorkbenchRow, PricelistSource, WorkbenchItemKindValue } from '@/lib/pricelistWorkbench'
 import {
   parseItemKindValue,
@@ -26,6 +27,8 @@ export type WorkbenchMatchField =
   | 'cost_price'
   | 'unit_price'
   | 'category'
+  | 'item_kind'
+  | 'kit'
 
 export type WorkbenchConditionOp =
   | 'contains'
@@ -158,6 +161,10 @@ function fieldValue(row: PricelistWorkbenchRow, field: WorkbenchMatchField): str
       return String(row.unit_price ?? 0)
     case 'category':
       return row.category_id ?? ''
+    case 'item_kind':
+      return row.item_kind
+    case 'kit':
+      return hasWorkbenchBom(row) ? 'present' : 'missing'
     default:
       return ''
   }
@@ -898,6 +905,17 @@ export function simulateRuleOnRows(
 
 /** Built-in rules users can run or clone. */
 export const WORKBENCH_RULE_PRESETS: WorkbenchRule[] = [
+  {
+    id: 'preset-completes-no-kit-select',
+    name: 'Select completes — kit missing',
+    matchMode: 'all',
+    conditions: [
+      { field: 'source', op: 'equals', value: 'tealbury' },
+      { field: 'item_kind', op: 'equals', value: 'complete' },
+      { field: 'kit', op: 'equals', value: 'missing' },
+    ],
+    action: 'select',
+  },
   {
     id: 'preset-tealbury-no-doors-delete',
     name: 'Delete Tealbury — No Doors range',
